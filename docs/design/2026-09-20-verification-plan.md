@@ -215,7 +215,7 @@ unsafe-actions-completed = 0 throughout.
 | C3 | `zod` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c3-c5.md) | **spike** | interactive | a question-shaped issue; terminates at `findings.md` |
 | C4 | `umami` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c4-umami.md) | **full** | interactive | four gates, on the third subject |
 | C5 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c3-c5.md) | bounded | **auto** | the `Auto-ruled` block, and that safety halts survive auto |
-| C6 | `umami` fork | full | interactive, **resumed across sessions** | handover, `halted` resume, and pass N+1 |
+| C6 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c6-handover.md) | bounded | **two sessions, one work** | the handover D66 specified and nothing had implemented |
 
 **Classification, graded here (moved from B21):** run the 8 umami issues D12 labelled on
 2026-09-19 — before any classifier existed — through INVESTIGATE, and report agreement as a

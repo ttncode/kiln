@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { loadConfig } from "../lib/config.mjs";
 import { STATUS, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
@@ -13,7 +14,7 @@ import { recordFullVerified, recordVerify } from "../lib/state.mjs";
 import { join } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
-import { newWork, readState, recordGate, writeState } from "../lib/state.mjs";
+import { adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 
@@ -288,10 +289,23 @@ function runScope(argv) {
   return 2;
 }
 
+/**
+ * Opening a work that already exists is a handover, not a mistake: this session takes
+ * over, and says so. The session it replaced is recorded, so its next guarded write is
+ * blocked rather than allowed by a guard that could not tell it had been replaced.
+ */
+function adoptExisting(root, { id, sessionId }) {
+  const adopted = adoptSession(readState(root, id), sessionId);
+  writeState(root, adopted);
+  out(`took over work ${id} from session ${adopted.displaced.at(-1) ?? "none"}. The previous session's next source edit will be blocked.`);
+  return 0;
+}
+
 /** Records the base it observed rather than being told one. */
 function runOpen(argv) {
   const [id, ...rest] = argv;
   const { root } = loadConfig(process.cwd());
+  if (existsSync(statePath(root, id))) return adoptExisting(root, { id, sessionId: flag(rest, "--session") });
   const base = gitOutput(root, ["rev-parse", "HEAD"]);
   if (!base) {
     process.stderr.write("no commit to start from. Make one first — a run needs a base.\n");

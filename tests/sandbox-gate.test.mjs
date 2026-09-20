@@ -9,9 +9,9 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { dispatch } from "../hooks/dispatch.mjs";
-import { newWork, writeState } from "../lib/state.mjs";
+import { adoptSession, newWork, readState, writeState } from "../lib/state.mjs";
 import { cleanupFixtures } from "./helpers/fixture.mjs";
-import { kilnProject, payload } from "./helpers/project.mjs";
+import { SESSION, kilnProject, payload } from "./helpers/project.mjs";
 
 after(cleanupFixtures);
 
@@ -162,4 +162,49 @@ test("a heredoc still cannot smuggle a source edit past the gate", async () => {
   const command = `cat > ${join(project.root, "src", "app.ts")} <<'EOF'\nexport const a = 2;\nEOF`;
 
   assert.equal(await bash(command, project), BLOCK, "the redirect target is still read");
+});
+
+// ---------------------------------------------------------------- D66, handover
+
+test("D66: a second session takes the work over, out loud", () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const adopted = adoptSession(readState(project.root, "42"), "second-session");
+
+  assert.equal(adopted.session_id, "second-session");
+  assert.deepEqual(adopted.displaced, [SESSION], "the session it replaced is remembered");
+});
+
+test("D66: re-opening in the same session changes nothing", () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const state = readState(project.root, "42");
+
+  assert.deepEqual(adoptSession(state, SESSION), state, "a resume is not a handover");
+});
+
+test("D66: the displaced session is blocked, not quietly allowed", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  assert.equal(await edit(project.source, project), ALLOW, "this session owns the work");
+
+  writeState(project.root, adoptSession(readState(project.root, "42"), "second-session"));
+
+  assert.equal(await edit(project.source, project), BLOCK, "its guards would otherwise be silently off");
+  assert.equal(await edit(project.source, project, "second-session"), ALLOW, "the session that took over may work");
+});
+
+test("D33: a session kiln never drove is still allowed, which is the branch D66 must not break", async () => {
+  const project = kilnProject({ gates: {} });
+  assert.equal(await edit(project.source, project, "a-session-kiln-never-saw"), ALLOW);
+});
+
+// ---------------------------------------------------------------- sed grammar
+
+test("a quoted sed script is one argument, not two phantom paths", () => {
+  assert.deepEqual(writeTargets("sed -i '$a\\// a' lib/work.mjs"), ["lib/work.mjs"]);
+  assert.deepEqual(writeTargets("sed -i -e '$a// a' lib/work.mjs"), ["lib/work.mjs"], "-e carries the script");
+  assert.deepEqual(writeTargets("sed -i s#a#b# src/app.ts"), ["src/app.ts"], "any delimiter");
+});
+
+test("the sed file operand is still seen, so the gate still applies to it", async () => {
+  const project = kilnProject({ gates: {} });
+  assert.equal(await bash("sed -i '$a\\// note' src/app.ts", project), BLOCK);
 });
