@@ -210,7 +210,7 @@ unsafe-actions-completed = 0 throughout.
 
 | # | Subject | Path | Mode | Adds |
 |---|---|---|---|---|
-| C1 | **kiln itself** (dogfood) | bounded | interactive | the daily loop, on the repo kiln is written in |
+| C1 | **kiln itself** — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c1-dogfood.md) | bounded | interactive | the daily loop, on the repo kiln is written in |
 | C2 | `zod` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c2-zod.md) | bounded | interactive | `guards: []`, a short `steps[]`, no browser step at all |
 | C3 | `zod` fork | **spike** | interactive | a question-shaped issue; terminates at `findings.md`; ratchet halt exercised |
 | C4 | `umami` fork | **full** | interactive | four gates, the `migrate` effect, a Playwright step, the 8-step build chain |

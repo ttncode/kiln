@@ -210,3 +210,40 @@ test("but a pre-existing file the plan claims is still this run's doing", () => 
   assert.equal(result.actual, 1, "the plan claimed it, so the run owns it");
   assert.deepEqual(result.notTouched, []);
 });
+
+// ------------------------------------------------ written by kiln, in acceptance run C1
+
+function matchingFiles(count) {
+  return Object.fromEntries(Array.from({ length: count }, (_, i) => [`src/f${i}.ts`, "needle\n"]));
+}
+
+function rowsOf(stdout) {
+  return stdout.split("\n").filter((line) => line.includes("\t"));
+}
+
+test("a truncated blast radius says how much it dropped", () => {
+  const { root } = project(matchingFiles(25));
+
+  const { stdout } = kiln(root, ["blast", "needle"]);
+
+  assert.equal(rowsOf(stdout).length, 20);
+  assert.match(stdout, /5 more of 25 files/);
+});
+
+test("a blast radius exactly at the cap claims no truncation", () => {
+  const { root } = project(matchingFiles(20));
+
+  const { stdout } = kiln(root, ["blast", "needle"]);
+
+  assert.equal(rowsOf(stdout).length, 20);
+  assert.doesNotMatch(stdout, /more of/, "20 rows shown out of 20 is not a truncation");
+});
+
+test("the truncation notice is not mistakable for a row", () => {
+  const { root } = project(matchingFiles(25));
+
+  const notice = kiln(root, ["blast", "needle"]).stdout.split("\n").at(-2);
+
+  assert.match(notice, /more of 25 files/);
+  assert.ok(!notice.includes("\t"), "a tab would let a path parser read the notice as a file");
+});
