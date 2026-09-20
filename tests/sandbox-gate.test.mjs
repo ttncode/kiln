@@ -142,3 +142,24 @@ test("D33: an unreadable state blocks, proved at the process the harness actuall
   assert.equal(run.status, BLOCK, "unreadable is not absent");
   assert.match(run.stderr, /cannot be read/);
 });
+
+test("D43: a heredoc body is data, so a markdown blockquote is not a redirect", () => {
+  const heredoc = `cat > .kiln/work/42/plan.md <<'EOF'\n# Plan\n\n> Recommendation: approve.\n\n- modify bin/kiln.mjs\nEOF`;
+
+  assert.deepEqual(writeTargets(heredoc), [".kiln/work/42/plan.md"], "the blockquote is prose, not a shell verb");
+});
+
+test("D43: writing the plan does not block on the plan gate", async () => {
+  const project = kilnProject({ gates: {} });
+  const plan = join(project.root, ".kiln", "work", "42", "plan.md");
+  const command = `cat > ${plan} <<'EOF'\n> Recommendation: approve. See src/app.ts.\nEOF`;
+
+  assert.equal(await bash(command, project), ALLOW, "the plan stage cannot deadlock on its own output");
+});
+
+test("a heredoc still cannot smuggle a source edit past the gate", async () => {
+  const project = kilnProject({ gates: {} });
+  const command = `cat > ${join(project.root, "src", "app.ts")} <<'EOF'\nexport const a = 2;\nEOF`;
+
+  assert.equal(await bash(command, project), BLOCK, "the redirect target is still read");
+});
