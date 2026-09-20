@@ -1,0 +1,21 @@
+kiln
+Copyright (c) 2026 Truong Trung Nghia
+
+This product includes software developed by third parties, listed below with
+the exact point each copy was taken from. kiln forks rather than tracks these
+copies: there is no upstream merge, so the fork point is the whole provenance
+record and it does not move without an entry in the decision log.
+
+--------------------------------------------------------------------------------
+Superpowers — https://github.com/obra/superpowers
+Copyright (c) Jesse Vincent and Prime Radiant
+Licensed under the MIT License.
+
+Fork point: (recorded when the skills land — see docs/design, D69)
+
+Files: (recorded when the skills land)
+
+MIT grants copyright rights, not trademark rights. The Superpowers name and
+brand marks are not used, and the brand image fetch present upstream is removed
+(D11).
+--------------------------------------------------------------------------------
