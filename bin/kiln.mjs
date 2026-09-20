@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { loadConfig } from "../lib/config.mjs";
 import { applyInit, planInit, proposeConfig } from "../lib/init.mjs";
-
-/** A work id may never take one of these, or `work/dna/` would shadow the command (D79). */
-export const RESERVED = Object.freeze(["init", "doctor", "dna"]);
+import { resolveArgument } from "../lib/resolve.mjs";
+import { listWork } from "../lib/work.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
 
@@ -12,6 +12,16 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Detect the stack and write .kiln/. Overwrites nothing.
       --propose  print the proposed config and its questions; write nothing.
       --set      override one dotted key, e.g. --set stack.cmd.test="npm test".
+
+  kiln resolve [<arg>]
+      Decide what <arg> means - a URL, a work in progress, a ticket ref, or a
+      description - and print the decision as JSON. Writes nothing.
+
+  kiln list
+      Show work in progress.
+
+The three commands a user types are /kiln init, /kiln <arg> and /kiln doctor.
+The verbs here are what the orchestrator skill calls to serve them.
 `;
 
 function out(text) {
@@ -62,9 +72,26 @@ function runInit(argv) {
   return 0;
 }
 
+function runResolve(argv) {
+  const { root, config } = loadConfig(process.cwd());
+  out(JSON.stringify(resolveArgument({ arg: argv[0], root, config }), null, 2));
+  return 0;
+}
+
+function runList() {
+  const { root } = loadConfig(process.cwd());
+  const rows = listWork(root);
+  if (rows.length === 0) return out("No work in progress.") ?? 0;
+  for (const row of rows) out(`  ${row.id}\t${row.status}\t${row.stage}\tpass ${row.pass}`);
+  return 0;
+}
+
+const COMMANDS = { init: runInit, resolve: runResolve, list: runList };
+
 export function main(argv) {
   const [command, ...rest] = argv;
-  if (command === "init") return runInit(rest);
+  const run = COMMANDS[command];
+  if (run) return run(rest);
   out(USAGE);
   return command === undefined || command === "--help" ? 0 : 1;
 }
