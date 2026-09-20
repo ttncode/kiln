@@ -1,7 +1,9 @@
 import js from "@eslint/js";
 
 export default [
-  { ignores: ["vendor/**", "node_modules/**", "tests/fixtures/**/tmp/**"] },
+  // The visual companion is vendored code (D26, D69). Restyling it would mean
+  // rewriting 1,400 lines kiln did not author and does not maintain.
+  { ignores: ["vendor/**", "node_modules/**", "tests/fixtures/**/tmp/**", "skills/kiln-brainstorming/scripts/**"] },
   js.configs.recommended,
   {
     languageOptions: {
@@ -17,7 +19,9 @@ export default [
       "prefer-const": "error",
       "no-var": "error",
       eqeqeq: ["error", "always"],
-      "no-unused-vars": "error",
+      // ignoreRestSiblings is what makes `const { omit, ...rest } = obj` an omission
+      // rather than an unused variable.
+      "no-unused-vars": ["error", { ignoreRestSiblings: true }],
       "no-param-reassign": "error",
       "no-console": ["error", { allow: ["error", "warn"] }],
     },
