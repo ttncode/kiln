@@ -1,0 +1,19 @@
+{
+  "id": "php-ci3",
+  "detect": ["composer.json"],
+  "steps": [
+    { "id": "migrate", "run": "${cmd.migrate}", "provides": "migrate", "phase": "fast" },
+    { "id": "unit", "run": "${cmd.test}", "requires": ["migrate"] }
+  ],
+  "effects": [
+    {
+      "id": "migrate",
+      "glyph": "⚙",
+      "hint": "one bullet per DDL effect: `<table>`: +|~|- `<column>` <type>"
+    }
+  ],
+  "guards": [
+    { "id": "migrations", "phase": "pre-edit", "script": "php-ci3/migrations.mjs" },
+    { "id": "php-lint", "phase": "post-edit", "script": "php-ci3/php-lint.mjs" }
+  ]
+}

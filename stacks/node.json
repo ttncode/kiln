@@ -1,0 +1,10 @@
+{
+  "id": "node",
+  "detect": ["package.json"],
+  "steps": [
+    { "id": "typecheck", "run": "${cmd.typecheck}" },
+    { "id": "unit", "run": "${cmd.test}" }
+  ],
+  "effects": [],
+  "guards": []
+}
