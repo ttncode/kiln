@@ -244,11 +244,19 @@ function recordRun({ root, state, phase, head, result }) {
   return 1;
 }
 
+const BLAST_ROW_LIMIT = 20;
+
 function runBlast(argv) {
   const { root } = loadConfig(process.cwd());
   const rows = grepBlastRadius(root, argv);
   if (rows.length === 0) return out("No file mentions those terms.") ?? 0;
-  for (const row of rows.slice(0, 20)) out(`  ${row.hits}\t${row.path}`);
+
+  for (const row of rows.slice(0, BLAST_ROW_LIMIT)) out(`  ${row.hits}\t${row.path}`);
+  // No tab in the notice: a caller splitting this output into paths must not pick it up
+  // as one. It counts files rather than hits, because `hits` counts matched terms.
+  if (rows.length > BLAST_ROW_LIMIT) {
+    out(`  … ${rows.length - BLAST_ROW_LIMIT} more of ${rows.length} files not shown — narrow the terms.`);
+  }
   return 0;
 }
 
