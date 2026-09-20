@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DEFAULTS, loadConfig } from "../lib/config.mjs";
 import { STATUS, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { newWork, statePath, writeState } from "../lib/state.mjs";
-import { cleanupFixtures, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
+import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
 
@@ -92,4 +92,19 @@ test("doctor exits non-zero on a failure, so a wrapper can gate on it", () => {
 
   assert.equal(run.status, 1);
   assert.match(run.stdout, /would stop a run/);
+});
+
+test("D7 item 1: doctor fails when the branch the repo ships from is unprotected", () => {
+  const root = tempRoot("kiln-doctor-branch-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  git(root, ["remote", "add", "origin", "https://github.com/acme/app.git"]);
+  git(root, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, protected: ["feat/trying-kiln-out"] } });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "protected branches");
+  assert.equal(row.status, STATUS.fail);
+  assert.match(row.detail, /ships from "main"/);
 });
