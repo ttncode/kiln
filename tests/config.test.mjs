@@ -91,3 +91,11 @@ test("D81: a scalar still answers for every module", () => {
   const scalar = { vcs: { integration_branch: "develop" } };
   assert.equal(integrationBranch(scalar, "anything"), "develop");
 });
+
+test("findRoot terminates on a relative path, where parse().root is empty", () => {
+  assert.equal(findRoot("some/relative/path"), null);
+});
+
+test("findRoot terminates on a malformed path rather than spinning", () => {
+  assert.equal(findRoot(String.fromCharCode(0) + "invalid"), null);
+});
