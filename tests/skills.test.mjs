@@ -62,6 +62,22 @@ test("D27: a skill carries its rationalization table, red flags and verification
   }
 });
 
+/**
+ * A forked skill carries the sibling files it used to sit beside. A pointer to one that
+ * did not come with it fails the way agent-skills #361 describes: silently, at the
+ * moment a user needs it.
+ */
+test("D69: every file a skill points at came with it", () => {
+  for (const name of skillNames()) {
+    const dir = join(SKILLS, name);
+    const referenced = frontmatter(name).body.match(/\]\(([a-z0-9-]+\.(?:md|sh|mjs))\)/g) ?? [];
+    for (const link of referenced) {
+      const file = /\(([^)]+)\)/.exec(link)[1];
+      assert.ok(existsSync(join(dir, file)), `${name} points at ${file}, which did not come with it`);
+    }
+  }
+});
+
 test("D69: a skill never names a superpowers skill kiln does not ship", () => {
   const shipped = new Set(skillNames());
   for (const name of skillNames()) {

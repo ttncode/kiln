@@ -11,9 +11,33 @@ Superpowers — https://github.com/obra/superpowers
 Copyright (c) Jesse Vincent and Prime Radiant
 Licensed under the MIT License.
 
-Fork point: (recorded when the skills land — see docs/design, D69)
+Fork point: v6.4.1, commit b92c4fa87ea1252077a7f7d3bf420e52325dd25e
 
-Files: (recorded when the skills land)
+This is a fork, not a tracked pin: there is no upstream merge, so the commit
+above is the whole provenance record and it does not move without a decision
+entry (D69). Upstream's later fixes do not arrive on their own; reading their
+releases from this commit forward is a step in kiln's own release checklist.
+
+Forked files, and what changed in each:
+
+  skills/kiln-tdd/SKILL.md
+  skills/kiln-tdd/writing-good-tests.md
+      from skills/test-driven-development/. Frontmatter renamed. One reference
+      to a superpowers skill kiln does not ship was dropped from the prose.
+
+  skills/kiln-debugging/SKILL.md
+      from skills/systematic-debugging/SKILL.md. Frontmatter renamed. Two
+      REQUIRED SUB-SKILL pointers repointed: test-driven-development becomes
+      kiln-tdd, and verification-before-completion becomes kiln's own record,
+      because kiln mechanizes that check in state.verify[] rather than asking
+      for it in prose (D20, D69).
+
+      Not carried: root-cause-tracing.md, defense-in-depth.md,
+      condition-based-waiting.md and find-polluter.sh. The first was pointed at
+      from the middle of Phase 1, and the method it holds is restated inline
+      where that pointer was; the other three were reachable only from a
+      trailing list. Recorded here rather than dropped quietly, which is the
+      distinction that matters.
 
 MIT grants copyright rights, not trademark rights. The Superpowers name and
 brand marks are not used, and the brand image fetch present upstream is removed
