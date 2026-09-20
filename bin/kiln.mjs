@@ -124,11 +124,22 @@ function runResolve(argv) {
   return 0;
 }
 
+const LIST_HEADER = ["ID", "STATUS", "STAGE", "PASS"];
+
+/** An unreadable state reports `pass` as "-", so every cell is taken as text. */
+function alignRows(rows) {
+  const widths = LIST_HEADER.map((_, column) => Math.max(...rows.map((row) => row[column].length)));
+  const pad = (cell, column) => (column === LIST_HEADER.length - 1 ? cell : cell.padEnd(widths[column]));
+  return rows.map((row) => `  ${row.map(pad).join("  ")}`);
+}
+
 function runList() {
   const { root } = loadConfig(process.cwd());
   const rows = listWork(root);
   if (rows.length === 0) return out("No work in progress.") ?? 0;
-  for (const row of rows) out(`  ${row.id}\t${row.status}\t${row.stage}\tpass ${row.pass}`);
+
+  const cells = rows.map((row) => [row.id, row.status, row.stage, String(row.pass)]);
+  for (const line of alignRows([LIST_HEADER, ...cells])) out(line);
   return 0;
 }
 
