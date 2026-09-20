@@ -11,3 +11,8 @@ test("kiln ships zero runtime dependencies", () => {
 test("the engine floor admits the measured node version", () => {
   assert.match(pkg.engines.node, /^>=20\./);
 });
+
+test("D17: the plugin manifest and package.json agree on the version", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../.claude-plugin/plugin.json", import.meta.url), "utf8"));
+  assert.equal(manifest.version, pkg.version, "version-sync: two manifests disagreeing is agent-skills #440");
+});

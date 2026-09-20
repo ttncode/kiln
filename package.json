@@ -1,6 +1,6 @@
 {
   "name": "kiln",
-  "version": "0.0.0",
+  "version": "1.0.0-rc.1",
   "description": "A harness plugin that drives one unit of work to a reviewed, verified, ship-ready change, and blocks unsafe actions at runtime.",
   "license": "MIT",
   "type": "module",

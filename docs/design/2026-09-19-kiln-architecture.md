@@ -1,7 +1,7 @@
 # kiln — Architecture Design
 
 > **STATUS: BUILD-READY.** kiln's own third path is named `full`, not upstream's `architectural` (D68).
-> Section 1 (v1 scope) and Sections A–H all locked. Decision log runs to **D85** after five
+> Section 1 (v1 scope) and Sections A–H all locked. Decision log runs to **D89** after five
 > review passes on 2026-09-20: a pre-build audit (7 blockers, 10 high, 14 medium → D48–D62), the
 > **pre-P0 hook test, which PASSED** — a `PreToolUse` hook does block a real write in Claude Code
 > 2.1.270, and ten further measured answers are in **§1.6** → D63–D64 — a source review of what
@@ -11,7 +11,9 @@
 > back from the user's seat** and asked three questions of it (2 blockers, 1 high, 5 medium →
 > D77–D84), plus **D85** from a closing attack on that pass's own fixes. Findings and evidence
 > live in **`2026-09-19-design-audit.md`**, the companion to this file.
-> **Design is confirmed build-ready. Next action is P0 (§3i) — the walking skeleton.**
+> **Built.** P0–P5 are complete, six acceptance runs are recorded, and the decision log gained
+> **D86–D89** from building it and running it. What remains for a v1.0 tag is the four
+> human-graded scorecard lines; see `2026-09-21-acceptance-c6-handover.md`.
 > Nothing is parked. Q2 and Q3 remain open by design and block nothing (§5).
 > Last updated: 2026-09-20.
 >
@@ -320,6 +322,20 @@ times.
 
 | **D85** | **Opening pass N+1 clears `gates` and `predicted[]`; `base` and `last_verified` advance to the shipped HEAD; `carry_over[]` survives** | D24 promised that a `shipped` work *"opens pass N+1 after confirmation"* and `state.json` carries `pass`, but nothing in eighty-four entries said what becomes of the gate records — so pass 2 would begin with every one of pass 1's gates still reading `approved`, and two of D7's promises would turn off at once: `guard-gate` sees `gates.plan == approved` and permits source edits before pass 2 has a plan (item 4), and D77's `SHIP_AUTHORIZING[bounded] = "review"` sees `gates.review == approved` and permits a PR nothing reviewed. **`artifact_sha` does not cover this**, and the reason is worth stating because it inverts: the hash catches an artifact that *changed*, while here the artifact is **unchanged and that is the problem** — `plan.md` was approved for pass 1's work, so a matching hash is the wrong signal rather than a reassuring one. D65's hash rule was also written only about the gate that authorizes source edits; it now reads on **every** gate key. The reset is the whole fix, because a gate record belongs to the pass that earned it: `predicted[]` goes with it, being pass 1's claim set and therefore wrong input to D72's overlap check; `base` and `last_verified` advance to the HEAD that shipped, per D67a's rule that REVIEW never anchors behind what was already verified; `carry_over[]` is the one field designed to cross the boundary (D58) and is untouched. Resuming an **unfinished** pass does not increment `pass` and is unaffected. Same family as superpowers #2138 and D51 — a previous unit of work's approval read as current. Found by attacking **D77, itself the fifth pass's own fix**, which is §6.1 rule 9 holding rather than failing. | 09-20 |
 
+#### Post-construction entries (2026-09-21, from building it and running it)
+
+Construction and six acceptance runs produced nine defects. Most were implementations
+falling short of a decision already written; the four below changed a decision, and are
+recorded here rather than left in a pull request. Evidence:
+`2026-09-21-live-harness-evidence.md` and the five acceptance records beside it.
+
+| # | Decision | Rationale | Date |
+|---|---|---|---|
+| **D86** | **A stack's `steps[]` is a default the project's config replaces, and `init` writes the set it can satisfy** | D40's own title says *"`stack-node` ships no `lint` step; `kiln init` **adds one when it detects** a `lint` script"* — so steps were always meant to be detected. The implementation left them in the stack file and shipped `typecheck` unconditionally, which a plain JavaScript project can never satisfy: `init` warned, `doctor` failed and `verify` refused, on the most common Node project there is. `stacks/node.json` now ships the one step every Node project has; `init` adds `typecheck` with a tsconfig and `lint` with a lint script. D60.1 is unchanged and is why this had to be fixed here rather than by skipping: an unsatisfiable step must refuse, so it must not be written in the first place. | 09-21 |
+| **D87** | **A blocking unknown halts. It is not a downward ratchet, and there is no downward ratchet** | Acceptance run C4 hit an unanswerable question on the `full` path — *which* third database backend, since a second OLAP store slots beside ClickHouse while a second relational store replaces Prisma — and recommended *"drop to spike"*. The code refused it correctly (D12), but the skill stated the ban without naming the alternative, so the agent reached for the only move it knew and had nowhere to go. The gap was never the ban: D12 exists so a task that proved large does not become cheap again because investigating it was tiring, and what C4 found was a different thing — not *smaller than we thought* but *not buildable yet*. The move is: name the unknown and what each answer would change, halt with `carry_over[] = {kind: "blocking_unknown", text}`, and offer two futures — answer it and continue, or **close this work and open a spike**. The second stays the user's to take, because closing a work is a decision about their time. | 09-21 |
+| **D88** | **The integration branch is the remote's default branch, never the branch the user happens to be standing on** | Measured on a clone of zod while standing on a feature branch, which is how anyone tries a new tool: `init` recorded `protected: ["feat/kiln-acceptance"]`, and `git push origin main` returned **exit 0**. D7 item 1 — the project's first promise — defeated by the ordinary act of running `init` on a branch, with `guard-protected-branch` working perfectly and guarding the wrong thing. Read from `refs/remotes/origin/HEAD`, falling back to the current branch only when there is no remote to ask; `kiln doctor` fails when the branch a repository ships from is not protected. Confirmed on a third repository that does not use `main`: umami detected `master`. | 09-21 |
+| **D89** | **Work already uncommitted when a run opened is subtracted from the reconciliation** | `git status` has no notion of *since*, so every file the user had left lying around — and, on a first run, kiln's own `.gitignore` line — was reported as **beyond prediction**. P4's bankruptcy condition is that tier-0 reconciliation becomes noise people ignore, and a line that cries wolf gets there quickly. The set is recorded at `open` as `dirty_at_open[]` and subtracted at `scope`. A file the plan **claims** is still the run's doing even if it was already dirty: the subtraction is for work the run did not touch, never for work it did. | 09-21 |
+
 ### Superseded
 
 - ~~Section 2 "Port contracts" (5 code ports)~~ → retracted 2026-09-19 by D13. Tracker, VCS and Verify are **not code ports**; they are a config line plus skill instructions telling the agent which of its own tools to use. Only **Stack** (its `steps[]` must execute deterministically and its `guards[]` must run inside hooks) and **Knowledge** (grep / DNA are real code) remain code ports. 5 → 2.
@@ -328,6 +344,8 @@ times.
 - ~~`round-N/` folders + `guard-rounds`~~ → superseded by **D18/D19**.
 - ~~Stage `SCOPE`~~ → superseded by **D23**. 8 stages → 7.
 - ~~`tmp/<id>/` is deleted when review is clean (D18)~~ → corrected by **D28/D29**. Full verification runs *after* the review gate, so its step logs would be written into a directory already deleted. **Deletion moves to the end of SHIP**, which is also the real end-of-life: before SHIP the work is not finished, and a failed VERIFY sends the run back to IMPLEMENT. D18's other claims stand.
+- ~~D66's displaced-session block, read as implemented because it was specified~~ → it was not. Acceptance run C6 found the hole D66 itself names still open: `workForSession` finds no match for a displaced session, "no match" means kiln is not driving, and "not driving" means allow — so the first session kept working with its guards silently off. Ownership could not cover it, because a path discovered during implementation is in no `predicted[]` **by design** (D31). `kiln open` on an existing work is now a handover that says so, records the session it replaced, and blocks that session's next source edit.
+- ~~D40 read as "the stack file holds the steps"~~ → corrected by **D86**. Its own title says `init` adds a step when it detects one.
 - ~~D24's *"opens pass N+1 after confirmation"*, silent on what happens to `gates`~~ → answered by **D85**. Pass 2 inheriting pass 1's approvals turns off D7 item 4 and D77's ship gate together.
 - ~~D65's artifact-hash rule, written only about the gate that authorizes source edits~~ → extended by **D85** to every gate key. It also does not reach the pass boundary at all, where an **unchanged** artifact is the failure rather than the proof.
 - ~~D59's narrowing of D7 item 6 to *"kiln's own code performs no network egress"*, full stop~~ → qualified by **D83**, found in the final pass. D59 dropped the original *"outside the declared tracker/VCS"* and D82 then made kiln's own code run `git fetch` — so the narrowed claim was false from the moment the drift check was specified. Item 6 now names the two git verbs it permits against the configured remote.
