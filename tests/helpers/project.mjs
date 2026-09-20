@@ -9,9 +9,9 @@ export const SESSION = "sess-under-test";
  * A whole .kiln project in one call: config, a work directory, its artifacts, and a
  * gate record whose hash matches the artifact on disk — the shape guards actually read.
  */
-export function kilnProject({ path = "bounded", gates = {}, predicted = [], id = "42", sessionId = SESSION } = {}) {
+export function kilnProject({ path = "bounded", gates = {}, predicted = [], id = "42", sessionId = SESSION, stack = "node" } = {}) {
   const root = tempRoot("kiln-project-");
-  writeConfig(root, DEFAULTS);
+  writeConfig(root, { ...DEFAULTS, stack: { ...DEFAULTS.stack, id: stack } });
   writeFile(join(root, "src", "app.ts"), "export const a = 1;\n");
 
   const artifacts = { plan: writeFile(join(root, ".kiln", "work", id, "plan.md"), "# plan\n") };
@@ -33,7 +33,7 @@ function gateRecord(decision, artifactPath) {
   };
 }
 
-export function payload({ command, file, root, session = SESSION }) {
-  const tool_input = command === undefined ? { file_path: file } : { command };
+export function payload({ command, file, root, session = SESSION, content }) {
+  const tool_input = command === undefined ? { file_path: file, content } : { command };
   return { tool_input, cwd: root, session_id: session };
 }

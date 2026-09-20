@@ -20,12 +20,12 @@ after(cleanupFixtures);
 
 const BLOCK = 2;
 const ALLOW = 0;
-const edit = (file, project, session) => dispatch("pre-edit", payload({ file, root: project.root, session }));
-const bash = (command, project) => dispatch("pre-bash", payload({ command, root: project.root }));
+const edit = async (file, project, session) => dispatch("pre-edit", payload({ file, root: project.root, session }));
+const bash = async (command, project) => dispatch("pre-bash", payload({ command, root: project.root }));
 
 // ---------------------------------------------------------- 1. protected branch
 
-test("D7 item 1 — kiln never pushes to a protected branch", () => {
+test("D7 item 1 — kiln never pushes to a protected branch", async () => {
   const onFeature = { protectedBranches: ["main", "v3-master"], currentBranch: "feat/x" };
   const onMain = { protectedBranches: ["main"], currentBranch: "main" };
 
@@ -37,16 +37,16 @@ test("D7 item 1 — kiln never pushes to a protected branch", () => {
 
 // ---------------------------------------------------------- 2. destroys data
 
-test("D7 item 2 — kiln never destroys data unasked", () => {
+test("D7 item 2 — kiln never destroys data unasked", async () => {
   const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(bash("rm -rf /tmp/not-my-repo", project), BLOCK);
-  assert.equal(bash("git clean -xfd", project), ALLOW, "inside the repo is the user's own tree");
-  assert.equal(bash("rm -rf build", project), ALLOW);
+  assert.equal(await bash("rm -rf /tmp/not-my-repo", project), BLOCK);
+  assert.equal(await bash("git clean -xfd", project), ALLOW, "inside the repo is the user's own tree");
+  assert.equal(await bash("rm -rf build", project), ALLOW);
 });
 
 // ---------------------------------------------------------- 3. failing test as passing
 
-test("D7 item 3 — a failing step can never be reported as passing", () => {
+test("D7 item 3 — a failing step can never be reported as passing", async () => {
   const root = tempRoot();
   const ctx = { cwd: root, cmd: {}, tmpDir: join(root, "steps"), range: "aaa..bbb" };
   const liar = { id: "unit", run: "echo 'All tests passed' && exit 1" };
@@ -59,7 +59,7 @@ test("D7 item 3 — a failing step can never be reported as passing", () => {
   assert.equal(recordVerify(newWork({ id: "42", base: "a" }), result.entries[0]).verify[0].exit, 1);
 });
 
-test("D7 item 3 — a fast pass is never the project's green", () => {
+test("D7 item 3 — a fast pass is never the project's green", async () => {
   const root = tempRoot();
   const ctx = { cwd: root, cmd: {}, tmpDir: join(root, "steps"), range: "aaa..bbb" };
   const result = runPhase(planSteps([{ id: "unit", run: "exit 0", phase: "fast" }], { phase: "fast" }), ctx);
@@ -70,40 +70,40 @@ test("D7 item 3 — a fast pass is never the project's green", () => {
 
 // ---------------------------------------------------------- 4. skips a gate
 
-test("D7 item 4 — no source edit without a gate record matching the current artifact", () => {
+test("D7 item 4 — no source edit without a gate record matching the current artifact", async () => {
   const before = kilnProject({ gates: {} });
-  assert.equal(edit(before.source, before), BLOCK, "no approval");
+  assert.equal(await edit(before.source, before), BLOCK, "no approval");
 
   const after = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(after.source, after), ALLOW, "approved");
+  assert.equal(await edit(after.source, after), ALLOW, "approved");
 
   writeFileSync(after.artifacts.plan, "# quietly rewritten\n", "utf8");
-  assert.equal(edit(after.source, after), BLOCK, "the approval was for the document they read");
+  assert.equal(await edit(after.source, after), BLOCK, "the approval was for the document they read");
 });
 
-test("D7 item 4 — a halted work, and a new pass, both block", () => {
+test("D7 item 4 — a halted work, and a new pass, both block", async () => {
   const halted = kilnProject({ gates: { plan: "approved" } });
   writeState(halted.root, { ...readState(halted.root, "42"), status: "halted" });
-  assert.equal(edit(halted.source, halted), BLOCK);
+  assert.equal(await edit(halted.source, halted), BLOCK);
 
   const next = kilnProject({ gates: { plan: "approved" } });
   writeState(next.root, openNextPass(readState(next.root, "42"), "bbbb222"));
-  assert.equal(edit(next.source, next), BLOCK, "an unchanged artifact is the failure here, not the proof");
+  assert.equal(await edit(next.source, next), BLOCK, "an unchanged artifact is the failure here, not the proof");
 });
 
-test("D7 item 4 — the shell is not a way around the gate", () => {
+test("D7 item 4 — the shell is not a way around the gate", async () => {
   const project = kilnProject({ gates: {} });
-  assert.equal(bash('echo "x" > src/app.ts', project), BLOCK, "the measured first retry of a blocked agent");
-  assert.equal(bash("sed -i s/a/b/ src/app.ts", project), BLOCK);
+  assert.equal(await bash('echo "x" > src/app.ts', project), BLOCK, "the measured first retry of a blocked agent");
+  assert.equal(await bash("sed -i s/a/b/ src/app.ts", project), BLOCK);
 });
 
 // ---------------------------------------------------------- 5. writes outside the sandbox
 
-test("D7 item 5 — kiln never writes outside its sandbox", () => {
+test("D7 item 5 — kiln never writes outside its sandbox", async () => {
   const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit("/tmp/somewhere-else.txt", project), BLOCK, "outside the root");
-  assert.equal(edit(join(project.root, ".kiln", "work", "99", "plan.md"), project), BLOCK, "another work's directory");
-  assert.equal(edit(project.source, project), ALLOW);
+  assert.equal(await edit("/tmp/somewhere-else.txt", project), BLOCK, "outside the root");
+  assert.equal(await edit(join(project.root, ".kiln", "work", "99", "plan.md"), project), BLOCK, "another work's directory");
+  assert.equal(await edit(project.source, project), ALLOW);
 });
 
 // ---------------------------------------------------------- 6. network egress (STATIC)
@@ -119,7 +119,7 @@ function sourceFiles(dir, root) {
   });
 }
 
-test("D7 item 6 — STATIC: kiln's own code performs no network egress", () => {
+test("D7 item 6 — STATIC: kiln's own code performs no network egress", async () => {
   const root = new URL("..", import.meta.url).pathname;
   for (const dir of SOURCE_DIRS) {
     for (const path of sourceFiles(dir, root)) {
@@ -131,7 +131,7 @@ test("D7 item 6 — STATIC: kiln's own code performs no network egress", () => {
   }
 });
 
-test("D7 item 6 — STATIC: the two git verbs that do reach the network are allowlisted by name", () => {
+test("D7 item 6 — STATIC: the two git verbs that do reach the network are allowlisted by name", async () => {
   const root = new URL("..", import.meta.url).pathname;
   const calls = SOURCE_DIRS.flatMap((dir) => sourceFiles(dir, root))
     .flatMap((path) => [...readFileSync(path, "utf8").matchAll(/gitOutput\([^,]+,\s*\[\s*"([a-z-]+)"/g)].map((m) => m[1]));
@@ -156,7 +156,7 @@ const BRAND_HOST = ["primeradiant", "com"].join(".");
  */
 const SHIPPED = (relative) => !relative.startsWith("docs/");
 
-test("D7 item 6 — STATIC: the upstream brand hotlink is absent from everything that ships (D11)", () => {
+test("D7 item 6 — STATIC: the upstream brand hotlink is absent from everything that ships (D11)", async () => {
   const root = new URL("..", import.meta.url).pathname;
   const tracked = spawnSync("git", ["ls-files"], { cwd: root, encoding: "utf8" }).stdout.split("\n").filter(Boolean);
   for (const relative of tracked.filter(SHIPPED)) {
@@ -168,14 +168,14 @@ test("D7 item 6 — STATIC: the upstream brand hotlink is absent from everything
 
 // ---------------------------------------------------------- 7. approves its own gate
 
-test("D7 item 7 — the agent cannot approve its own gate or disarm its own guards", () => {
+test("D7 item 7 — the agent cannot approve its own gate or disarm its own guards", async () => {
   const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(join(project.root, ".kiln", "work", "42", "state.json"), project), BLOCK);
-  assert.equal(edit(join(project.root, ".kiln", "config.json"), project), BLOCK);
-  assert.equal(edit(project.artifacts.plan, project), ALLOW, "artifacts precede every gate");
+  assert.equal(await edit(join(project.root, ".kiln", "work", "42", "state.json"), project), BLOCK);
+  assert.equal(await edit(join(project.root, ".kiln", "config.json"), project), BLOCK);
+  assert.equal(await edit(project.artifacts.plan, project), ALLOW, "artifacts precede every gate");
 });
 
-test("D7 item 7 — the control files stay closed in a session kiln does not drive", () => {
+test("D7 item 7 — the control files stay closed in a session kiln does not drive", async () => {
   const project = kilnProject();
-  assert.equal(edit(join(project.root, ".kiln", "config.json"), project, "unrelated"), BLOCK);
+  assert.equal(await edit(join(project.root, ".kiln", "config.json"), project, "unrelated"), BLOCK);
 });

@@ -9,6 +9,7 @@ import { claimOwner, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
+import { guardsFor, loadStack } from "../lib/stack.mjs";
 
 const BLOCK = 2;
 const ALLOW = 0;
@@ -34,16 +35,39 @@ function block(message) {
 function rootAndBranches(cwd) {
   try {
     const { root, config } = loadConfig(cwd);
-    return { root, protectedBranches: config.vcs.protected };
+    return { root, protectedBranches: config.vcs.protected, stackId: config.stack.id };
   } catch {
-    return { root: cwd, protectedBranches: ["main", "master"] };
+    return { root: cwd, protectedBranches: ["main", "master"], stackId: null };
   }
 }
 
 function context(payload) {
   const cwd = payload.cwd ?? process.cwd();
-  const { root, protectedBranches } = rootAndBranches(cwd);
-  return { cwd, root, protectedBranches, state: workForSession(root, payload.session_id) };
+  const { root, protectedBranches, stackId } = rootAndBranches(cwd);
+  return { cwd, root, protectedBranches, stackId, state: workForSession(root, payload.session_id) };
+}
+
+/**
+ * D33 has no exemption for project-contributed code: a stack guard that crashes blocks,
+ * and the message names the file so the user can fix theirs rather than kiln's.
+ */
+async function runStackGuard(guard, payload) {
+  try {
+    const module = await import(guard.path);
+    return module.check?.(payload) ?? null;
+  } catch (error) {
+    const detail = error instanceof Error ? error.stack ?? error.message : String(error);
+    return { blocked: true, reason: `stack guard "${guard.id}" failed.\n${guard.path}\n${detail}\nRun \`kiln doctor\`.` };
+  }
+}
+
+async function runStackGuards(payload, { phase, stackId }) {
+  if (!stackId) return ALLOW;
+  for (const guard of guardsFor(loadStack(stackId), phase)) {
+    const verdict = await runStackGuard(guard, payload);
+    if (verdict?.blocked) return block(verdict.reason);
+  }
+  return ALLOW;
 }
 
 function guardProtectedBranch(payload, ctx) {
@@ -102,16 +126,16 @@ const CHAINS = {
   "post-edit": [],
 };
 
-export function dispatch(phase, payload) {
-  const chain = CHAINS[phase] ?? [];
-  if (chain.length === 0) return ALLOW;
-  if (phase !== "pre-edit" && !payload.tool_input?.command) return ALLOW;
+/** Core guards first, fixed order, hardcoded. Stack guards only after all of them. */
+export async function dispatch(phase, payload) {
+  if (!CHAINS[phase]) return ALLOW;
+  if (phase !== "pre-edit" && phase !== "post-edit" && !payload.tool_input?.command) return ALLOW;
 
   const ctx = context(payload);
-  for (const guard of chain) {
+  for (const guard of CHAINS[phase]) {
     if (guard(payload, ctx) === BLOCK) return BLOCK;
   }
-  return ALLOW;
+  return runStackGuards(payload, { phase, stackId: ctx.stackId });
 }
 
 /**
@@ -120,13 +144,13 @@ export function dispatch(phase, payload) {
  * reach is named rather than hidden: node absent from PATH, a syntax error in this file,
  * OOM, or a hook timeout all fail open, because the process never arrives at a branch.
  */
-function main() {
+async function main() {
   try {
-    return dispatch(process.argv[2], readStdin());
+    return await dispatch(process.argv[2], readStdin());
   } catch (error) {
     return block(`kiln guard failed: ${error instanceof Error ? error.message : String(error)}
 This is a bug in kiln, not in your change. Run \`kiln doctor\`.`);
   }
 }
 
-if (process.argv[1]?.endsWith("dispatch.mjs")) process.exit(main());
+if (process.argv[1]?.endsWith("dispatch.mjs")) process.exit(await main());
