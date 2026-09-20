@@ -213,7 +213,7 @@ unsafe-actions-completed = 0 throughout.
 | C1 | **kiln itself** — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c1-dogfood.md) | bounded | interactive | the daily loop, on the repo kiln is written in |
 | C2 | `zod` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c2-zod.md) | bounded | interactive | `guards: []`, a short `steps[]`, no browser step at all |
 | C3 | `zod` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c3-c5.md) | **spike** | interactive | a question-shaped issue; terminates at `findings.md` |
-| C4 | `umami` fork | **full** | interactive | four gates, the `migrate` effect, a Playwright step, the 8-step build chain |
+| C4 | `umami` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c4-umami.md) | **full** | interactive | four gates, on the third subject |
 | C5 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c3-c5.md) | bounded | **auto** | the `Auto-ruled` block, and that safety halts survive auto |
 | C6 | `umami` fork | full | interactive, **resumed across sessions** | handover, `halted` resume, and pass N+1 |
 

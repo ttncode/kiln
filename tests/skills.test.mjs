@@ -140,3 +140,15 @@ test("the orchestrator describes every path the code actually supports", () => {
   assert.doesNotMatch(body, /walking skeleton/i, "a phase note that outlived its phase");
   assert.match(body, /ratchet/, "the way up a rung has to be in the skill that renders the paths");
 });
+
+/**
+ * Acceptance run C4 hit a blocking unknown on the full path and recommended "drop to
+ * spike" — a downward ratchet, which does not exist. The code refused it correctly; the
+ * skill had told the agent the ratchet only goes up without saying what to do instead.
+ */
+test("the orchestrator names the move for a blocking unknown, not just the ban", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /never down/, "the ban still has to be stated");
+  assert.match(body, /blocking[_ ]unknown/i, "and the thing to do instead has to be named");
+  assert.match(body, /close this work and open a spike/i, "including the option that is the user's to take");
+});
