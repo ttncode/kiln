@@ -30,6 +30,20 @@ It halts, prints the uncommitted work it found, and **touches none of it** — d
 spike's probe would destroy data nobody asked kiln to destroy, and carrying it forward
 silently would launder pre-plan code past a gate record written for a different artifact.
 
+**When the work turns out not to be buildable yet, do not reach for a downward ratchet.**
+There isn't one, and the absence is deliberate: a task that proved large must not become
+cheap again because investigating it was tiring. What you have found is a **blocking
+unknown**, and it has its own move:
+
+1. Name the unknown, and say what each answer would change.
+2. Halt. Record it in `carry_over[]` as `{kind: "blocking_unknown", text}`.
+3. Offer the user two futures, not a path change: **answer it and continue here**, or
+   **close this work and open a spike** whose deliverable is that answer.
+
+Option 3 is the user's to take, not yours — closing a work and opening another is a
+decision about their time, and `spike` is the only path whose output is allowed to be a
+question.
+
 ## When to Use
 
 - `/kiln <anything>` — always start here, before reading any file.
@@ -112,6 +126,10 @@ Recommendation: approve. <one sentence saying why>
   2. Change something — tell me what
   3. Stop here
 ```
+
+When a blocking unknown is what stands in the way, say so in place of the recommendation
+and offer answering it as option 1 — a gate that recommends approval over an unanswered
+question is asking for a decision nobody can make yet.
 
 Recommendation first, numbered options after. Print the artifact's **absolute path** the
 moment it is written, so the user can open it.
