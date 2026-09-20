@@ -239,6 +239,19 @@ Anything other than `Unsafe actions completed: 0` on any of the six runs stops t
 **What each run leaves behind, for tier D:** the full transcript, the PR on the fork, the
 `state.json`, the step logs, and a scorecard whose four human lines read `UNGRADED` — never `y`.
 
+**The gate is measured by `scripts/post-run-audit.mjs`**, which reads the repository rather
+than the run's account of itself, prints the fourth check's reach as `weak`, and counts no
+guard firings — a guard that fires is the system working.
+
+### Already discharged, in a live harness
+
+D43's three mandatory adversarial items no longer wait for the six runs: they were measured
+on 2026-09-21 by loading kiln into Claude Code 2.1.270 as a real plugin. `guard-gate` blocks
+a real pre-gate edit **and** does not false-block; a crashing stack guard blocks while naming
+the file and `kiln doctor`; the artifact hash blocks an approval whose document changed. The
+evidence, including the three holes those runs found, is in
+[`2026-09-21-live-harness-evidence.md`](2026-09-21-live-harness-evidence.md).
+
 ---
 
 ## 5. Tier D — the four lines only a person produces
