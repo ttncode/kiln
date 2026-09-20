@@ -1,0 +1,4 @@
+node_modules/
+.kiln/tmp/
+*.log
+.DS_Store
