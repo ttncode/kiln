@@ -166,3 +166,25 @@ test("B02: a plain JS project is Ready out of the box, with nothing to fix first
   const { config } = proposeConfig(nodeProject());
   assert.deepEqual(unsatisfiedSteps({ steps: config.stack.steps }, config.stack.cmd), []);
 });
+
+test("D7 item 1: the integration branch is what the repo ships from, not where you stand", () => {
+  const root = initRepo(nodeProject());
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  gitOutput(root, ["remote", "add", "origin", "https://github.com/acme/app.git"]);
+  gitOutput(root, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  gitOutput(root, ["checkout", "-q", "-b", "feat/trying-kiln-out"]);
+
+  const vcs = detectVcs(root);
+  assert.equal(vcs.integration_branch, "main", "running init from a branch must not protect that branch");
+  assert.deepEqual(vcs.protected, ["main"], "otherwise a push to main is allowed on every real repository");
+});
+
+test("with no remote, the branch you are on is the best answer there is", () => {
+  const root = initRepo(nodeProject());
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  gitOutput(root, ["checkout", "-q", "-b", "v3-master"]);
+
+  assert.equal(detectVcs(root).integration_branch, "v3-master");
+});
