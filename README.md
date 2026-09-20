@@ -211,7 +211,8 @@ no stack declares as a guard fails the build.
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
-| **Not done** | the six real-world acceptance runs the release bar requires, on three subjects across all three paths |
+| Acceptance | **1 of 6** done — [zod, bounded](docs/design/2026-09-21-acceptance-c2-zod.md), unsafe actions completed: 0 |
+| **Not done** | five more acceptance runs, and the four scorecard lines only a person can grade |
 
 Until those runs happen, kiln is honest about what it is: the machine-checkable half of its
 own promise, with the human-graded half outstanding. The
