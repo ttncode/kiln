@@ -2,7 +2,13 @@
 import { readFileSync } from "node:fs";
 import { loadConfig } from "../lib/config.mjs";
 import { gitOutput } from "../lib/init.mjs";
+import { relative } from "node:path";
+import { resolveTarget } from "../lib/paths.mjs";
+import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
+import { claimOwner, workForSession } from "../lib/guards/context.mjs";
+import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
+import { sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 
 const BLOCK = 2;
 const ALLOW = 0;
@@ -25,36 +31,85 @@ function block(message) {
  * falls back to allow: a guard that opens when it cannot read its own settings makes
  * the promise it exists to keep a paper one (D33).
  */
-function vcsSettings(cwd) {
+function rootAndBranches(cwd) {
   try {
-    const { config } = loadConfig(cwd);
-    return { protectedBranches: config.vcs.protected, root: cwd };
+    const { root, config } = loadConfig(cwd);
+    return { root, protectedBranches: config.vcs.protected };
   } catch {
-    return { protectedBranches: ["main", "master"], root: cwd };
+    return { root: cwd, protectedBranches: ["main", "master"] };
   }
 }
 
-function guardProtectedBranch(payload) {
-  const command = payload.tool_input?.command;
-  if (!command || !command.includes("git")) return ALLOW;
-
+function context(payload) {
   const cwd = payload.cwd ?? process.cwd();
-  const { protectedBranches } = vcsSettings(cwd);
-  const currentBranch = gitOutput(cwd, ["symbolic-ref", "--short", "HEAD"]);
-  const violation = protectedBranchViolation({ command, protectedBranches, currentBranch });
+  const { root, protectedBranches } = rootAndBranches(cwd);
+  return { cwd, root, protectedBranches, state: workForSession(root, payload.session_id) };
+}
+
+function guardProtectedBranch(payload, ctx) {
+  const command = payload.tool_input?.command;
+  if (!command.includes("git")) return ALLOW;
+  const currentBranch = gitOutput(ctx.cwd, ["symbolic-ref", "--short", "HEAD"]);
+  const violation = protectedBranchViolation({ command, protectedBranches: ctx.protectedBranches, currentBranch });
   return violation ? block(protectedBranchMessage(violation)) : ALLOW;
 }
 
+/** D66: ownership, asked of every write, not only of the ones inside a work directory. */
+function claimVerdict(target, ctx) {
+  const owner = claimOwner(ctx.root, { path: relative(ctx.root, target), excludeId: ctx.state?.id });
+  return owner ? `claimed by work ${owner}, which is still active` : null;
+}
+
+function checkPath(path, ctx) {
+  const target = resolveTarget(path, ctx.cwd);
+  const verdict = sandboxVerdict(ctx.root, { target, activeId: ctx.state?.id });
+  const reason = verdict.blocked ? verdict.reason : claimVerdict(target, ctx);
+  return reason ? block(sandboxMessage(ctx.root, { target, reason })) : ALLOW;
+}
+
+function guardSandboxFile(payload, ctx) {
+  const path = payload.tool_input?.file_path ?? payload.tool_input?.notebook_path;
+  return path ? checkPath(path, ctx) : ALLOW;
+}
+
+function guardSandboxBash(payload, ctx) {
+  const command = payload.tool_input?.command;
+  const paths = [...destructiveTargets(command), ...writeTargets(command)];
+  return paths.map((path) => checkPath(path, ctx)).find((verdict) => verdict === BLOCK) ?? ALLOW;
+}
+
+function guardGateFile(payload, ctx) {
+  const path = payload.tool_input?.file_path ?? payload.tool_input?.notebook_path;
+  if (!path) return ALLOW;
+  const verdict = sourceEditVerdict(ctx.root, { state: ctx.state, target: resolveTarget(path, ctx.cwd) });
+  return verdict.blocked ? block(gateMessage("a source edit", verdict.reason)) : ALLOW;
+}
+
+function guardGateBash(payload, ctx) {
+  const command = payload.tool_input?.command;
+  if (opensPullRequest(command)) {
+    const verdict = shipVerdict(ctx.root, ctx.state);
+    if (verdict.blocked) return block(gateMessage("opening a pull request", verdict.reason));
+  }
+  return writeTargets(command)
+    .map((path) => guardGateFile({ tool_input: { file_path: path } }, ctx))
+    .find((verdict) => verdict === BLOCK) ?? ALLOW;
+}
+
 const CHAINS = {
-  "pre-bash": [guardProtectedBranch],
-  "pre-edit": [],
+  "pre-bash": [guardProtectedBranch, guardSandboxBash, guardGateBash],
+  "pre-edit": [guardSandboxFile, guardGateFile],
   "post-edit": [],
 };
 
 export function dispatch(phase, payload) {
-  for (const guard of CHAINS[phase] ?? []) {
-    const verdict = guard(payload);
-    if (verdict === BLOCK) return BLOCK;
+  const chain = CHAINS[phase] ?? [];
+  if (chain.length === 0) return ALLOW;
+  if (phase !== "pre-edit" && !payload.tool_input?.command) return ALLOW;
+
+  const ctx = context(payload);
+  for (const guard of chain) {
+    if (guard(payload, ctx) === BLOCK) return BLOCK;
   }
   return ALLOW;
 }
