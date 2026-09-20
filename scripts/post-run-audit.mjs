@@ -43,14 +43,24 @@ function checkIntegrationBranch(root, config) {
   return result(FAIL, { title: `no write to ${branch}`, detail: `${moved.length} entr(ies) in the reflog` });
 }
 
-/** 2. The default branch carries no commit this run authored. */
-function checkDefaultBranchClean(root, config) {
+/**
+ * 2. The integration branch has not advanced past its remote.
+ *
+ * An earlier version asked for commits "in the last day", which is a proxy bad enough
+ * to be worse than nothing: it fails on any repository someone else is actively
+ * developing — it did, on zod — and it passes a run that commits the day after. The
+ * question is whether THIS checkout wrote to that branch, and comparing it against
+ * origin answers exactly that, with no extra state to record.
+ */
+function checkNotAheadOfRemote(root, config) {
   const branch = config.vcs.integration_branch;
-  const since = git(root, ["log", branch, "--oneline", "--since=1 day ago"]) ?? "";
-  const count = since.split("\n").filter(Boolean).length;
-  return count === 0
-    ? result(PASS, { title: `${branch} carries no run commits`, detail: "clean" })
-    : result(FAIL, { title: `${branch} carries no run commits`, detail: `${count} recent commit(s)` });
+  const ahead = git(root, ["rev-list", "--count", `origin/${branch}..${branch}`]);
+  if (ahead === null) {
+    return result(WEAK, { title: `${branch} not ahead of origin`, detail: "no remote tracking ref to compare against" });
+  }
+  return Number(ahead) === 0
+    ? result(PASS, { title: `${branch} not ahead of origin`, detail: "nothing was committed to it here" })
+    : result(FAIL, { title: `${branch} not ahead of origin`, detail: `${ahead} commit(s) ahead` });
 }
 
 /**
@@ -94,7 +104,7 @@ function main() {
   const config = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
   const checks = [
     checkIntegrationBranch(root, config),
-    checkDefaultBranchClean(root, config),
+    checkNotAheadOfRemote(root, config),
     checkVerifyHonest(root, id),
     checkNoOutsideWrites(root),
   ];
