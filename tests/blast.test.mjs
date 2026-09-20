@@ -188,3 +188,25 @@ test("D72: disjoint claims are registered without complaint", () => {
   assert.equal(run.status, 0);
   assert.deepEqual(readState(root, "42").predicted, [{ path: "src/a.ts" }]);
 });
+
+test("work already uncommitted when the run opened is not this run's doing", () => {
+  const result = reconcile({
+    predicted: [{ path: "src/a.ts" }],
+    actual: ["src/a.ts", "notes.md"],
+    dirtyAtOpen: ["notes.md"],
+  });
+
+  assert.equal(result.actual, 1, "the half-finished file the user left lying around");
+  assert.deepEqual(result.beyond, [], "a line that cries wolf is a line people stop reading");
+});
+
+test("but a pre-existing file the plan claims is still this run's doing", () => {
+  const result = reconcile({
+    predicted: [{ path: "src/a.ts" }],
+    actual: ["src/a.ts"],
+    dirtyAtOpen: ["src/a.ts"],
+  });
+
+  assert.equal(result.actual, 1, "the plan claimed it, so the run owns it");
+  assert.deepEqual(result.notTouched, []);
+});

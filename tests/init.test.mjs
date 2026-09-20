@@ -2,7 +2,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyInit, detectStack, detectVcs, gitOutput, planInit, proposeConfig } from "../lib/init.mjs";
+import { applyInit, detectStack, detectVcs, gitOutput, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
@@ -151,4 +151,18 @@ test("the tmp ignore is not appended twice", () => {
 
   const hits = readFileSync(join(root, ".gitignore"), "utf8").split("\n").filter((l) => l === ".kiln/tmp/");
   assert.equal(hits.length, 1);
+});
+
+test("D40: init writes the steps it can satisfy, and no others", () => {
+  const plain = proposeConfig(nodeProject());
+  assert.deepEqual(plain.config.stack.steps.map((s) => s.id), ["unit"], "a plain JS project has no typecheck");
+
+  const typed = nodeProject({ test: "vitest run", lint: "biome check" });
+  writeFile(join(typed, "tsconfig.json"), "{}");
+  assert.deepEqual(proposeConfig(typed).config.stack.steps.map((s) => s.id), ["typecheck", "lint", "unit"]);
+});
+
+test("B02: a plain JS project is Ready out of the box, with nothing to fix first", () => {
+  const { config } = proposeConfig(nodeProject());
+  assert.deepEqual(unsatisfiedSteps({ steps: config.stack.steps }, config.stack.cmd), []);
 });

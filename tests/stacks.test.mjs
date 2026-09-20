@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatch } from "../hooks/dispatch.mjs";
-import { effectIds, guardsFor, loadStack, stacksDir, StackError } from "../lib/stack.mjs";
+import { effectIds, effectiveSteps, guardsFor, loadStack, stacksDir, StackError } from "../lib/stack.mjs";
 import { planSteps } from "../lib/steps.mjs";
 import { cleanupFixtures } from "./helpers/fixture.mjs";
 import { kilnProject, payload } from "./helpers/project.mjs";
@@ -17,7 +17,15 @@ test("D10 / §3d: a stack adapter is a JSON file and nothing else", () => {
   const node = loadStack("node");
   assert.deepEqual(node.guards, [], "zero guards");
   assert.deepEqual(node.effects, [], "zero effects");
-  assert.equal(node.steps.length, 2);
+  assert.deepEqual(node.steps.map((s) => s.id), ["unit"], "the one step every Node project has");
+});
+
+test("D40: a stack's steps are a default the project's own config replaces", () => {
+  const stack = loadStack("node");
+  assert.deepEqual(effectiveSteps(stack, {}).map((s) => s.id), ["unit"], "no config, the default stands");
+
+  const detected = { stack: { steps: [{ id: "typecheck", run: "x" }, { id: "unit", run: "y" }] } };
+  assert.deepEqual(effectiveSteps(stack, detected).map((s) => s.id), ["typecheck", "unit"]);
 });
 
 test("P2 bankruptcy observable: non-guard code in a stack is zero lines", () => {
