@@ -26,6 +26,33 @@ test("a rejection is read as a rejection, not as the verb buried inside it", () 
   assert.equal(classifyAnswer("not yet"), DECISION.rejected);
 });
 
+/**
+ * Every test above this line feeds one clean clause, which is how a whole-text scan
+ * survived: it read "yes, approved — no new flag" as a REJECTION, because `no` sat in a
+ * condition attached to the approval. Real answers carry conditions.
+ */
+test("an approval with conditions attached is still an approval", () => {
+  for (const answer of [
+    "yes, approved — cap stays 20, no new flag",
+    "approved, no changes needed",
+    "yes, go ahead — but no extra dependencies",
+    "lgtm, nothing to stop for",
+    "I have read it and I approve",
+  ]) {
+    assert.equal(classifyAnswer(answer), DECISION.approved, answer);
+  }
+});
+
+test("a rejection with a reason attached is still a rejection", () => {
+  assert.equal(classifyAnswer("no, do not proceed"), DECISION.rejected);
+  assert.equal(classifyAnswer("not yet, the plan misses the empty case"), DECISION.rejected);
+});
+
+test("a verdict that is not in the opening clause is not a verdict", () => {
+  assert.equal(classifyAnswer("sounds good, no changes"), DECISION.notAYes, "soft agreement stays soft");
+  assert.equal(classifyAnswer("after thinking about it for a while, yes"), DECISION.notAYes, "a gate wants a clear answer");
+});
+
 test("an answer nothing recognises defaults to deny", () => {
   assert.equal(classifyAnswer("the weather is nice"), DECISION.notAYes);
 });
