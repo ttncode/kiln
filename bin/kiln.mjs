@@ -2,6 +2,7 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../lib/config.mjs";
+import { STATUS, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
@@ -33,6 +34,9 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
       Classify what the user said, hash the artifact, and record what was observed.
       You supply only --answer; every other field is measured here.
+
+  kiln doctor
+      Check this project's setup and say what would stop a run.
 
   kiln verify <id> [--phase fast|full]
       Run the stack's steps for that phase, record every exit code, and stop at
@@ -175,6 +179,22 @@ function describeConflicts(conflicts) {
   return `this plan claims paths another active work already claimed:\n${rows}\nFinish or park that work first. kiln will not split a file between two runs.`;
 }
 
+const MARK = { ok: " ok ", warn: "warn", fail: "FAIL" };
+
+/**
+ * Exits non-zero on a failure so a wrapper can gate on it. A warning is a thing to know,
+ * not a thing to stop for.
+ */
+function runDoctor() {
+  const loaded = loadConfig(process.cwd());
+  const results = runChecks(loaded.root, loaded);
+  for (const row of results) out(`  [${MARK[row.status]}] ${row.title}: ${row.detail}`);
+
+  const worst = worstStatus(results);
+  out(worst === STATUS.fail ? "\nSomething here would stop a run. Fix the FAIL lines." : "\nReady.");
+  return worst === STATUS.fail ? 1 : 0;
+}
+
 function reportStep(entry) {
   if (entry.skipped) return out(`  skip  ${entry.id} — ${entry.skipped}`);
   return out(`  ${entry.exit === 0 ? "pass" : "FAIL"}  ${entry.id}  exit ${entry.exit}  ${entry.ms}ms`);
@@ -305,6 +325,7 @@ const COMMANDS = {
   blast: runBlast,
   scope: runScope,
   verify: runVerify,
+  doctor: runDoctor,
 };
 
 /**
