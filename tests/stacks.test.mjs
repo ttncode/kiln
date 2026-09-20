@@ -153,3 +153,25 @@ test("D33: a stack guard that crashes blocks, and the message names the file", a
     rmSync(join(stacksDir(), "broken"), { recursive: true, force: true });
   }
 });
+
+test("D7 item 2: a stack guard sees a shell write, not only a Write tool call", async () => {
+  const project = kilnProject({ stack: "php-ci3", gates: { plan: "approved" } });
+  const migration = join(project.root, "application", "migrations", "001_drop.php");
+  const ddl = "$this->dbforge->drop_column('users','email');";
+
+  const viaWrite = await dispatch("pre-edit", {
+    tool_input: { file_path: migration, content: ddl },
+    cwd: project.root,
+    session_id: "sess-under-test",
+  });
+  assert.equal(viaWrite, BLOCK);
+
+  const viaRedirect = await dispatch("pre-bash", payload({ command: `echo "${ddl}" > ${migration}`, root: project.root }));
+  assert.equal(viaRedirect, BLOCK, "the same DDL through the door D64 closed for core guards");
+});
+
+test("a shell write to a file the stack guard does not care about still passes", async () => {
+  const project = kilnProject({ stack: "php-ci3", gates: { plan: "approved" } });
+  const verdict = await dispatch("pre-bash", payload({ command: "echo hello > src/app.ts", root: project.root }));
+  assert.equal(verdict, ALLOW);
+});
