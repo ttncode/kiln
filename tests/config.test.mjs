@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import {
   ConfigError,
   DEFAULTS,
@@ -92,10 +92,31 @@ test("D81: a scalar still answers for every module", () => {
   assert.equal(integrationBranch(scalar, "anything"), "develop");
 });
 
+/**
+ * These two assert TERMINATION, which is the bug they were written for: the walk used to
+ * converge on "." and never reach its stop condition.
+ *
+ * They used to assert `null`, which is only true when the working directory happens to
+ * have no `.kiln/` above it — so they failed the moment anyone ran `kiln init` on the
+ * kiln repository, which is the first thing a contributor does. Found by dogfooding.
+ * A test that cannot pass in the repository it ships from is a test about the
+ * environment, not about the code.
+ */
+function terminates(path) {
+  const found = findRoot(path);
+  assert.notEqual(found, ".", "`.` is where the old walk converged and spun forever");
+  assert.ok(found === null || isAbsolute(found), `findRoot returned ${found}`);
+}
+
 test("findRoot terminates on a relative path, where parse().root is empty", () => {
-  assert.equal(findRoot("some/relative/path"), null);
+  terminates("some/relative/path");
 });
 
 test("findRoot terminates on a malformed path rather than spinning", () => {
-  assert.equal(findRoot(String.fromCharCode(0) + "invalid"), null);
+  terminates(String.fromCharCode(0) + "invalid");
+});
+
+test("findRoot returns null when no ancestor holds a config", () => {
+  const root = join(tempRoot(), "nested", "deeper");
+  assert.equal(findRoot(root), null, "an absolute path is not affected by where the tests run");
 });
