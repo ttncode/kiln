@@ -1,3 +1,7 @@
+/**
+ * Unit-level coverage for the two guards. The promise they serve, and its proof, live
+ * together in tests/d7.test.mjs; this file is the detail underneath it.
+ */
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -5,7 +9,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { dispatch } from "../hooks/dispatch.mjs";
-import { newWork, openNextPass, readState, writeState } from "../lib/state.mjs";
+import { newWork, writeState } from "../lib/state.mjs";
 import { cleanupFixtures } from "./helpers/fixture.mjs";
 import { kilnProject, payload } from "./helpers/project.mjs";
 
@@ -47,76 +51,6 @@ test("D77: PR creation is matched by command name, not by parsing a shell", () =
   assert.equal(opensPullRequest("glab mr create"), true);
   assert.equal(opensPullRequest("gh pr view 4"), false);
   assert.equal(opensPullRequest("npm test"), false);
-});
-
-// ---------------------------------------------------------------- D7 item 7
-
-test("A7 / D48: the agent cannot edit the files its guards read", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(join(project.root, ".kiln", "work", "42", "state.json"), project), BLOCK);
-  assert.equal(edit(join(project.root, ".kiln", "config.json"), project), BLOCK);
-  assert.equal(edit(project.artifacts.plan, project), ALLOW, "artifacts stay writable");
-});
-
-test("A7: the control-file block does not depend on kiln driving the session", () => {
-  const project = kilnProject();
-  const verdict = edit(join(project.root, ".kiln", "config.json"), project, "some-other-session");
-  assert.equal(verdict, BLOCK, "an emptied vcs.protected outlives the run that emptied it");
-});
-
-// ---------------------------------------------------------------- D7 item 5
-
-test("A5: another work's directory is not this work's to write", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(join(project.root, ".kiln", "work", "99", "plan.md"), project), BLOCK);
-});
-
-test("A5: outside the project root is blocked, inside is not", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit("/tmp/somewhere-else.txt", project), BLOCK);
-  assert.equal(edit(project.source, project), ALLOW);
-});
-
-// ---------------------------------------------------------------- D7 item 2
-
-test("A2: rm -rf outside the repo is blocked, inside it is not", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(bash("rm -rf /tmp/not-my-repo", project), BLOCK);
-  assert.equal(bash("rm -rf build", project), ALLOW);
-});
-
-// ---------------------------------------------------------------- D7 item 4
-
-test("A4: a source edit before the plan gate is blocked", () => {
-  const project = kilnProject({ gates: {} });
-  assert.equal(edit(project.source, project), BLOCK);
-});
-
-test("A4: a source edit after the plan gate is allowed", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(project.source, project), ALLOW);
-});
-
-test("A4: a halted work blocks source edits immediately", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  writeState(project.root, { ...readState(project.root, "42"), status: "halted" });
-  assert.equal(edit(project.source, project), BLOCK);
-});
-
-test("A4 / D65: approving a plan and then editing it blocks the next source write", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(project.source, project), ALLOW);
-
-  writeFileSync(project.artifacts.plan, "# plan, quietly rewritten\n", "utf8");
-  assert.equal(edit(project.source, project), BLOCK, "the approval was for the document they read");
-});
-
-test("A4 / D85: a new pass does not inherit the previous pass's approval", () => {
-  const project = kilnProject({ gates: { plan: "approved" } });
-  assert.equal(edit(project.source, project), ALLOW);
-
-  writeState(project.root, openNextPass(readState(project.root, "42"), "bbbb222"));
-  assert.equal(edit(project.source, project), BLOCK, "the artifact is unchanged, and that is the failure");
 });
 
 test("D33: kiln does not police a session it is not driving", () => {
