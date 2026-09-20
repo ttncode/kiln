@@ -70,6 +70,24 @@ async function runStackGuards(payload, { phase, stackId }) {
   return ALLOW;
 }
 
+/**
+ * A stack's pre-edit guards have to see a shell write too, or `DROP COLUMN` lands by
+ * redirect while the same line is blocked through Write — D64's door, left open for
+ * project-contributed guards. The command text stands in for the content, because that
+ * is where a redirect's payload actually is. What it cannot see is content that never
+ * appears in the command (`cat template > file`), which is the same residue as the
+ * interpreter ceiling and is named rather than claimed closed.
+ */
+async function stackGuardsOnBashWrites(payload, ctx) {
+  const command = payload.tool_input?.command;
+  for (const path of writeTargets(command)) {
+    const synthetic = { ...payload, tool_input: { file_path: resolveTarget(path, ctx.cwd), content: command } };
+    const verdict = await runStackGuards(synthetic, { phase: "pre-edit", stackId: ctx.stackId });
+    if (verdict === BLOCK) return BLOCK;
+  }
+  return ALLOW;
+}
+
 function guardProtectedBranch(payload, ctx) {
   const command = payload.tool_input?.command;
   if (!command.includes("git")) return ALLOW;
@@ -135,6 +153,7 @@ export async function dispatch(phase, payload) {
   for (const guard of CHAINS[phase]) {
     if (guard(payload, ctx) === BLOCK) return BLOCK;
   }
+  if (phase === "pre-bash") return stackGuardsOnBashWrites(payload, ctx);
   return runStackGuards(payload, { phase, stackId: ctx.stackId });
 }
 

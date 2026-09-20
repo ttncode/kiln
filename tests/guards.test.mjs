@@ -86,8 +86,20 @@ test("D52: a string prefix is not a boundary", async () => {
 test("D52: a leaf that does not exist yet still resolves, because a guard runs first", async () => {
   const root = tempRoot();
   const target = resolveTarget(join(root, "src", "new-file.ts"), root);
-  assert.match(target, /new-file\.ts$/);
+  assert.equal(target, join(root, "src", "new-file.ts"), "the tail is kept, not collapsed to the leaf");
   assert.equal(isInside(root, target), true);
+});
+
+test("D52: a deep path whose directories do not exist keeps every segment", async () => {
+  const root = tempRoot();
+  const deep = join(root, "application", "migrations", "001_drop.php");
+
+  assert.equal(resolveTarget(deep, root), deep, "collapsing it makes every path-shape guard read the wrong shape");
+});
+
+test("D52: `..` is normalised before anything looks at the path", async () => {
+  const root = tempRoot();
+  assert.equal(resolveTarget(join(root, "src", "..", "a.ts"), root), join(root, "a.ts"));
 });
 
 test("D52: `..` cannot climb out of the sandbox", async () => {
