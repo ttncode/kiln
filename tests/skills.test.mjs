@@ -56,7 +56,7 @@ test("A11: a description carries trigger conditions, not a changelog", () => {
 test("D27: a skill carries its rationalization table, red flags and verification", () => {
   for (const name of skillNames()) {
     const { body } = frontmatter(name);
-    assert.match(body, /\| Excuse \| Reality \||\| Rationalization \| Reality \|/, `${name}: no rationalization table`);
+    assert.match(body, /\|\s*(?:Excuse|Rationalization|Thought)\s*\|\s*Reality\s*\|/, `${name}: no rationalization table`);
     assert.match(body, /## Red Flags/, `${name}: no red flags`);
     assert.match(body, /## Verification/, `${name}: no verification`);
   }
@@ -78,11 +78,35 @@ test("D69: every file a skill points at came with it", () => {
   }
 });
 
-test("D69: a skill never names a superpowers skill kiln does not ship", () => {
+/**
+ * Named namespaces rather than a `<word>:<word>` pattern, which cannot tell a skill
+ * reference from `display:flex` or `font-family:system-ui`. Every fork records the
+ * plugin it came from in NOTICE; this list is that record, enforced. A future fork adds
+ * its namespace here, by the same discipline.
+ */
+const FOREIGN_NAMESPACES = ["superpowers", "elements-of-style", "agent-skills", "bmad"];
+
+function skillFiles(name) {
+  return readdirSync(join(SKILLS, name), { recursive: true })
+    .filter((entry) => typeof entry === "string" && entry.endsWith(".md"))
+    .map((entry) => join(SKILLS, name, entry));
+}
+
+test("D69: no page under a skill names a plugin kiln does not ship", () => {
+  for (const name of skillNames()) {
+    for (const path of skillFiles(name)) {
+      const text = readFileSync(path, "utf8");
+      for (const namespace of FOREIGN_NAMESPACES) {
+        const found = text.match(new RegExp(`\\b${namespace}:[a-z][a-z-]+`, "g")) ?? [];
+        assert.deepEqual(found, [], `${path} references ${found.join(", ")}`);
+      }
+    }
+  }
+});
+
+test("D69: a skill only names sibling skills kiln actually ships", () => {
   const shipped = new Set(skillNames());
   for (const name of skillNames()) {
-    const referenced = frontmatter(name).body.match(/\bsuperpowers:[a-z-]+/g) ?? [];
-    assert.deepEqual(referenced, [], `${name} references ${referenced.join(", ")}, which kiln does not ship`);
     for (const sibling of frontmatter(name).body.match(/\bkiln-[a-z-]+(?=\s+skill)/g) ?? []) {
       assert.ok(shipped.has(sibling), `${name} names ${sibling}, which is not a skill kiln ships`);
     }

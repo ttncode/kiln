@@ -32,6 +32,47 @@ Forked files, and what changed in each:
       because kiln mechanizes that check in state.verify[] rather than asking
       for it in prose (D20, D69).
 
+  skills/kiln-brainstorming/
+      from skills/brainstorming/. Frontmatter renamed. The third path is renamed
+      architectural -> full (D68): kiln's paths name how much ceremony the work
+      gets, not what kind of work it is. Spec and plan locations repointed at
+      .kiln/work/<id>/, which is where kiln's guards allow a write and what the
+      gate hashes. One optional pointer to a third-party writing skill dropped.
+      A Verification section added, per kiln's skill anatomy (D27).
+
+      scripts/ is the visual companion, 1,432 lines carried as-is per D11. The
+      only change is the one D11 requires: the brand image fetch, its telemetry
+      opt-out branch, and the helper that read those env vars are deleted, and
+      readSuperpowersVersion becomes readKilnVersion pointed at kiln's own
+      manifest. MIT grants copyright rights, not trademark, so the upstream name
+      and mark are not kiln's to display - and a page that fetches an image is
+      egress the safety gate forbids. The <!-- BRANDING --> marker and every
+      line of the design stay. This directory is excluded from lint (D26).
+
+  skills/kiln-writing-plans/SKILL.md
+      from skills/writing-plans/SKILL.md. Frontmatter renamed. The worktree note
+      is dropped (D66 forbids requiring one). Plans save to .kiln/work/<id>/
+      plan.md. The Execution Handoff menu is replaced by a one-line handover:
+      the path was classified before this skill ran, and offering a choice here
+      would be a second gate nobody asked for (D21). Rationalizations, Red Flags
+      and Verification sections added.
+
+  skills/kiln-implement/SKILL.md
+      from skills/executing-plans/SKILL.md. The task loop, the completion
+      contract, the rulings discipline and the rationalization table are kept
+      verbatim - they are what D69 forks this page for. Replaced: the sdd
+      workspace and its progress.md ledger become .kiln/work/<id>/state.json,
+      which kiln owns and the agent may not edit; task-start becomes reading the
+      task from plan.md; task-done becomes `kiln verify --phase fast`. Cut: the
+      worktree requirement (D66), the Final Review section and the Finish
+      section, because kiln runs REVIEW and SHIP as its own stages and a second
+      copy of either is the duplication D69 forked to remove.
+
+  skills/kiln-review/code-reviewer.md
+      from skills/requesting-code-review/code-reviewer.md, unchanged. It is a
+      reference file under kiln's own review skill rather than a skill of its
+      own, so it costs no always-on description.
+
       Not carried: root-cause-tracing.md, defense-in-depth.md,
       condition-based-waiting.md and find-polluter.sh. The first was pointed at
       from the middle of Phase 1, and the method it holds is restated inline

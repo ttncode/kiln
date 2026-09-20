@@ -2,10 +2,14 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../lib/config.mjs";
-import { applyInit, planInit, proposeConfig } from "../lib/init.mjs";
+import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
+import { loadStack } from "../lib/stack.mjs";
+import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
+import { recordFullVerified, recordVerify } from "../lib/state.mjs";
+import { join } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
 import { newWork, readState, recordGate, writeState } from "../lib/state.mjs";
@@ -29,6 +33,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
       Classify what the user said, hash the artifact, and record what was observed.
       You supply only --answer; every other field is measured here.
+
+  kiln verify <id> [--phase fast|full]
+      Run the stack's steps for that phase, record every exit code, and stop at
+      the first failure with the tool's own output.
 
   kiln blast <term> [<term> ...]
       Tier-0 blast radius: which files mention these terms.
@@ -84,6 +92,14 @@ function reportInit(result) {
   out(result.written.length > 0 ? "\nRun `kiln doctor` to check it." : "\nAlready set up. Run `kiln doctor --write` to repair paths.");
 }
 
+function warnUnsatisfied(config) {
+  const gaps = unsatisfiedSteps(loadStack(config.stack.id), config.stack.cmd);
+  for (const gap of gaps) {
+    process.stderr.write(`note: step "${gap.step}" needs stack.cmd.${gap.key}, which is not set. It will refuse to run until you set it, or remove the step.\n`);
+  }
+  return 0;
+}
+
 function runInit(argv) {
   const root = process.cwd();
   const { config, questions, detected } = proposeConfig(root);
@@ -95,7 +111,7 @@ function runInit(argv) {
   out(`integration branch: ${detected.vcs.integration_branch}`);
   out(`${planInit(root).missing.length} file(s) to write`);
   reportInit(applyInit(root, applyOverrides(config, argv)));
-  return 0;
+  return warnUnsatisfied(config);
 }
 
 function runResolve(argv) {
@@ -157,6 +173,53 @@ function writeGate(root, { id, key, decision, answer, claimed, rest }) {
 function describeConflicts(conflicts) {
   const rows = conflicts.map((row) => `  ${row.path} — claimed by work ${row.owner}`).join("\n");
   return `this plan claims paths another active work already claimed:\n${rows}\nFinish or park that work first. kiln will not split a file between two runs.`;
+}
+
+function reportStep(entry) {
+  if (entry.skipped) return out(`  skip  ${entry.id} — ${entry.skipped}`);
+  return out(`  ${entry.exit === 0 ? "pass" : "FAIL"}  ${entry.id}  exit ${entry.exit}  ${entry.ms}ms`);
+}
+
+/**
+ * The task-done shape: run the thing, read the real exit code, record what was
+ * observed. A failing run records the failure and stops; it never records a pass.
+ */
+function runVerify(argv) {
+  const [id, ...rest] = argv;
+  const { root, config } = loadConfig(process.cwd());
+  const phase = flag(rest, "--phase") ?? "full";
+  const state = readState(root, id);
+  const head = gitOutput(root, ["rev-parse", "HEAD"]) ?? state.base;
+  const planned = planSteps(loadStack(config.stack.id).steps, { phase, effects: effectsInPlay(rest) });
+
+  const result = runPhase(planned, {
+    cwd: root,
+    cmd: config.stack.cmd,
+    tmpDir: join(root, ".kiln", "tmp", id, "steps"),
+    range: `${state.base}..${head}`,
+  });
+  return recordRun({ root, state, phase, head, result });
+}
+
+function effectsInPlay(rest) {
+  return (flag(rest, "--effects") ?? "").split(",").map((effect) => effect.trim()).filter(Boolean);
+}
+
+function recordRun({ root, state, phase, head, result }) {
+  // The raw output goes to a log file, never into state: a record you can grep for the
+  // word "passed" is a record someone will eventually read for a verdict (D29).
+  const stored = result.entries.map(({ output, ...entry }) => entry);
+  let next = stored.reduce((acc, entry) => recordVerify(acc, entry), state);
+  if (isGreen(result, phase)) next = recordFullVerified(next, head);
+  writeState(root, next);
+
+  result.entries.forEach(reportStep);
+  if (!result.failed) {
+    out(phase === "full" ? "green" : "fast pass — not green; the project's suite defines that");
+    return 0;
+  }
+  process.stderr.write(`${result.failed.output}\n`);
+  return 1;
 }
 
 function runBlast(argv) {
@@ -241,14 +304,33 @@ const COMMANDS = {
   report: runReport,
   blast: runBlast,
   scope: runScope,
+  verify: runVerify,
 };
+
+/**
+ * kiln's own errors are answers to the user, so they print as a sentence. Anything
+ * else is a bug in kiln, and a stack trace is the only useful thing to hand over.
+ */
+const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError"]);
+
+function reportFailure(error) {
+  const named = error instanceof Error && EXPECTED.has(error.constructor.name);
+  process.stderr.write(named ? `${error.message}\n` : `kiln failed unexpectedly. This is a bug in kiln.\n${error?.stack ?? error}\n`);
+  return 1;
+}
 
 export function main(argv) {
   const [command, ...rest] = argv;
   const run = COMMANDS[command];
-  if (run) return run(rest);
-  out(USAGE);
-  return command === undefined || command === "--help" ? 0 : 1;
+  if (!run) {
+    out(USAGE);
+    return command === undefined || command === "--help" ? 0 : 1;
+  }
+  try {
+    return run(rest);
+  } catch (error) {
+    return reportFailure(error);
+  }
 }
 
 const invokedDirectly = process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
