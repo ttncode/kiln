@@ -1,25 +1,36 @@
 # kiln
 
-kiln takes one unit of work — a ticket reference, or just a sentence — and drives it to a
-reviewed, verified, ship-ready change. While it does that, it blocks unsafe actions at runtime
-instead of asking the agent nicely not to take them.
+[![ci](https://github.com/ttncode/kiln/actions/workflows/ci.yml/badge.svg)](https://github.com/ttncode/kiln/actions/workflows/ci.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node](https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen.svg)](package.json)
 
-**Status: not built yet.** The design is finished and the repository currently holds only that.
-See [What exists today](#what-exists-today).
+kiln takes one unit of work — a ticket reference, or just a sentence — and drives it to a
+reviewed, verified pull request. While it does that, it **blocks** unsafe actions instead of
+asking the agent nicely not to take them.
+
+A skill library raises the floor on what your agent can do. kiln is about what happens when
+it is wrong.
+
+**Status: pre-release.** Everything below runs and is covered by 203 tests. It has not yet
+been through the six real-world acceptance runs its own release bar requires — see
+[Status](#status).
 
 ## Table of Contents
 
-- [Why this exists](#why-this-exists)
-- [What exists today](#what-exists-today)
-- [The shape of a run](#the-shape-of-a-run)
+- [Why blocking is different](#why-blocking-is-different)
+- [Install](#install)
+- [Your first run](#your-first-run)
+- [The three paths](#the-three-paths)
+- [What it blocks](#what-it-blocks)
+- [Configuration](#configuration)
+- [Adding a stack](#adding-a-stack)
 - [What it refuses to do](#what-it-refuses-to-do)
+- [Status](#status)
 - [Design documents](#design-documents)
+- [Contributing](#contributing)
 - [License](#license)
 
-## Why this exists
-
-Skill libraries raise the floor on what an agent *can do*. kiln is about what happens when the
-agent is **wrong**.
+## Why blocking is different
 
 |  | Raises the quality floor | Blocks a wrong action | State survives the session | Project memory |
 |---|---|---|---|---|
@@ -28,59 +39,208 @@ agent is **wrong**.
 | [BMAD](https://github.com/bmad-code-org/bmad-method) | yes | — | spec frontmatter | — |
 | **kiln** | inherits both | **hooks block at runtime** | **one state file, resumable** | **grep → DNA** |
 
-Column three is measured, not claimed. A `PreToolUse` hook returning exit 2 blocks a real write in
-Claude Code 2.1.270 — including under `bypassPermissions`, and including inside a subagent. A
-harness permission prompt is bypassable; a hook guard is not.
+Column three was measured, not assumed. A `PreToolUse` hook returning exit 2 blocks a real
+write in Claude Code 2.1.270 — including under `bypassPermissions`, and including inside a
+subagent. A harness permission prompt is bypassable; a hook guard is not.
 
-## What exists today
+When the probe agent was blocked from writing a file, its **first unprompted retry** was
+`echo "hello" > <path>` through the shell. That is why the guards watch shell write verbs too.
 
-1. **The design** — locked, with 85 decision entries, each carrying its rationale.
-2. **The audit** — five review passes, the evidence behind every decision, and the findings each
-   pass produced.
-3. **The user view** — the same design described from the seat of someone using it.
-4. **The verification plan** — four test tiers and the scenario matrix.
-5. **No code.** Construction starts at P0, the walking skeleton.
+## Install
 
-## The shape of a run
+Requires Node 20.10 or newer. Nothing else — kiln has **zero runtime dependencies**.
 
-Seven stages, and ceremony scales to the work rather than being fixed:
+```
+/plugin marketplace add ttncode/kiln
+/plugin install kiln
+/kiln init
+```
 
-1. **INVESTIGATE** → `brief.md`. Ends by classifying how much ceremony this work needs, out loud,
-   and you can override it.
-2. **SPEC** → `spec.md`. The heaviest path only.
-3. **PLAN** → `plan.md`, plus a change preview whose every row comes from the plan, never from a
-   guess about what the coder will do.
-4. **IMPLEMENT** → source. The approved plan's gate is what unlocks writing it.
-5. **REVIEW** → `review.md`, plus one line reconciling the files the plan predicted against the
-   files the diff actually touched.
-6. **VERIFY** → each step's exit code, recorded. Standard output is never parsed for a verdict.
-7. **SHIP** → a pull request on your branch.
+`init` reads your project, proposes a config, and asks at most three questions — each with a
+default, so answering none of them still leaves you working. It writes `.kiln/config.json`,
+an empty rules router, and one `.gitignore` line. It never overwrites a file you already have.
 
-Three paths decide how many of those you get: `spike` (1 gate, answers a question, cannot ship),
-`bounded` (2 gates), `full` (4 gates). The ratchet only goes up.
+**No token. No Docker. No Python. No CI.** Any of those appearing in `init` is a bug.
+
+## Your first run
+
+```
+/kiln "the export button on the reports page does nothing"
+```
+
+kiln investigates, says out loud how much ceremony it thinks the work needs, and stops at a
+gate. This is a real transcript of the parts you can check yourself:
+
+```
+$ kiln doctor
+  [ ok ] node on PATH: v20.20.2
+  [ ok ] config schema: current
+  [ ok ] stack: node — every step has its command
+  [ ok ] rules routing: 0 rule file(s), all routed
+  [ ok ] rules budget: 20 of 200 lines
+  [ ok ] work: 0 work director(ies)
+
+Ready.
+```
+
+A gate is where you act, and "sounds good" is not an approval:
+
+```
+$ kiln gate 42 plan --artifact plan.md --answer "sounds good"
+{ "recorded": false,
+  "ask": "Pick one: (1) approve this plan as written, or (2) tell me what to change." }
+exit=2
+```
+
+Before the gate, the agent cannot touch your source — and the block is the same through a
+shell redirect:
+
+```
+kiln blocked a source edit: the plan gate is not approved.
+Go back to the gate. The block is the message, not an obstacle to route around.
+```
+
+Afterwards, a test that lies about itself still cannot report a pass:
+
+```
+$ kiln verify 42
+  pass  typecheck  exit 0  3ms
+  FAIL  unit       exit 1  160ms
+
+> echo "All tests passed" && exit 1
+All tests passed
+```
+
+The verdict is the exit code. Standard output is never read for a decision.
+
+## The three paths
+
+Ceremony scales to the work rather than being fixed. kiln classifies after investigating,
+says which path out loud, and you can override it.
+
+| Path | When | Gates | Ships |
+|---|---|:--:|---|
+| `spike` | a feasibility question whose output is an answer | 1 | **no** |
+| `bounded` | a well-scoped change to code already here | 2 | yes |
+| `full` | a new subsystem, or anything that moves interfaces | 4 | yes |
+
+The ratchet only goes **up**. Ratcheting out of a spike halts, prints the uncommitted work it
+found, and touches none of it: deleting your probe would destroy data you did not ask kiln to
+destroy, and carrying it forward silently would launder pre-plan code past a gate.
+
+## What it blocks
+
+Seven promises, seven tests. [`tests/d7.test.mjs`](tests/d7.test.mjs) is the whole list in one
+file — read it there rather than trusting this table.
+
+| # | Promise | How |
+|---|---|---|
+| 1 | never pushes to a protected branch | covers `HEAD:v3-master` from a feature branch, `--force`, `-C <dir>`, and chained commands |
+| 2 | never destroys data unasked | `rm -rf` outside the repo, `git clean -xfd`, destructive DDL in a migration |
+| 3 | never reports a failing test as passing | verdict from the exit code; stdout is never parsed |
+| 4 | no source edit without a gate record matching the **current** artifact | including through `>`, `tee`, `sed -i`, `cp` and `mv` |
+| 5 | never writes outside its sandbox | resolved paths compared by segment; a symlink leaf is rejected, not followed |
+| 6 | kiln's own code performs no network egress | a **static** check, and its test says so |
+| 7 | the agent cannot approve its own gate | `state.json` and `config.json` are not writable by the agent |
+
+Three limits are stated rather than papered over, and each has a test asserting the limit:
+
+- **Interpreters and heredocs.** `python -c` and a heredoc into a script edit source without
+  going through a watched verb. Closing that needs shell parsing, which kiln does not do.
+- **A failure that stops the dispatcher fails open.** If `node` is missing from `PATH`, a hook
+  never starts, and a hook that never starts is allowed. `kiln doctor` checks for it, because
+  nothing at runtime can.
+- **A hook that exceeds its timeout allows the tool.** Measured. So nothing in the list above
+  depends on a timeout.
+
+## Configuration
+
+One file, `.kiln/config.json`, and exactly one environment variable (`KILN_ROOT`).
+
+```jsonc
+{
+  "vcs":   { "provider": "github", "protected": ["main"], "integration_branch": "main" },
+  "stack": { "id": "node",
+             "cmd":   { "test": "npm test" },
+             "steps": [{ "id": "unit", "run": "${cmd.test}" }] },
+  "auto":  { "bounded": false },
+  "work":  { "committed": true }
+}
+```
+
+- `init` writes the `steps` it can actually satisfy — a `typecheck` step appears when you have
+  a `tsconfig.json`, a `lint` step when you have a lint script.
+- Under a multi-module workspace, `integration_branch` also accepts a per-module map.
+- A step whose `${cmd.x}` is unset **refuses to run** rather than skipping quietly, and
+  `kiln doctor` says so before you hit it.
+
+## Adding a stack
+
+A stack adapter is a JSON file. `stacks/node.json` is ten lines and zero code:
+
+```json
+{
+  "id": "node",
+  "detect": ["package.json"],
+  "steps": [{ "id": "unit", "run": "${cmd.test}" }],
+  "effects": [],
+  "guards": []
+}
+```
+
+`stacks/php-ci3.json` adds a `migrate` effect and two guard scripts. **Guards are the only
+code a stack may contain**, and a test counts the difference: any `.mjs` under `stacks/` that
+no stack declares as a guard fails the build.
 
 ## What it refuses to do
 
-- **Ship clients for your tracker, forge or browser.** Your agent already has MCP and `gh`/`glab`.
+- **Ship clients for your tracker, forge or browser.** Your agent already has MCP and
+  `gh`/`glab`. Writing a client re-implements those and inherits their maintenance.
 - **Require a tracker.** The primary entry point is one sentence.
-- **Require Docker, a database, a browser, Python, or CI.** Those are facts about your project,
-  declared in one config file.
-- **Improvise around a broken environment.** A missing module stops the run and prints the tool's
-  own error, verbatim.
-- **Require a git worktree for isolation.** Submodule layouts and fixed build paths cannot provide
-  one.
+- **Require Docker, a database, a browser, Python, or CI.**
+- **Improvise around a broken environment.** A missing module stops the run and prints the
+  tool's own error, verbatim.
+- **Require a git worktree for isolation.** Submodule layouts and fixed build paths cannot
+  provide one.
+
+## Status
+
+| | |
+|---|---|
+| Tests | 203, green on every pull request |
+| Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
+| Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
+| Platform | Linux, WSL2, macOS |
+| **Not done** | the six real-world acceptance runs the release bar requires, on three subjects across all three paths |
+
+Until those runs happen, kiln is honest about what it is: the machine-checkable half of its
+own promise, with the human-graded half outstanding. The
+[verification plan](docs/design/2026-09-20-verification-plan.md) says exactly which four
+questions only a person can answer, and why.
 
 ## Design documents
 
+kiln was designed before it was written, and the design is in the repository.
+
 | File | Holds |
 |---|---|
-| [`docs/design/2026-09-19-kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and all 85 decisions |
-| [`docs/design/2026-09-19-design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes, and the evidence behind each |
-| [`docs/design/2026-09-20-user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
-| [`docs/design/2026-09-20-verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 85 decisions with their rationale |
+| [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
+| [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
+| [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
 
-Start with the architecture file. Nothing in it needs to be re-derived.
+Start with the architecture file. Every decision carries why it was made, so you can disagree
+with the reasoning rather than only the result.
+
+## Contributing
+
+Pull requests run the conformance suite. That is the whole gate: `npm run lint && npm test`.
+
+Acceptance runs need a real repository, a real ticket and a human grader, so they are not
+asked of contributors.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Third-party provenance is recorded in [NOTICE](NOTICE).
+MIT — see [LICENSE](LICENSE). kiln forks five skills from
+[Superpowers](https://github.com/obra/superpowers) (MIT); [NOTICE](NOTICE) records the fork
+commit and, per file, exactly what changed.
