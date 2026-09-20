@@ -163,9 +163,11 @@ function runGate(argv) {
 function writeGate(root, { id, key, decision, answer, claimed, rest }) {
   const by = rest.includes("--auto") ? "auto" : "user";
   const recorded = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  // Re-approving without --predicted keeps the claim set rather than clearing it, so
+  // the count reported is what the work now claims, not what this call passed in.
   const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;
   writeState(root, next);
-  out(JSON.stringify({ recorded: true, gate: key, claimed: claimed.length, ...next.gates[key] }, null, 2));
+  out(JSON.stringify({ recorded: true, gate: key, claimed: next.predicted.length, ...next.gates[key] }, null, 2));
   return 0;
 }
 
