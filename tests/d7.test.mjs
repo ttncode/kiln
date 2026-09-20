@@ -144,6 +144,13 @@ test("D7 item 6 — STATIC: the two git verbs that do reach the network are allo
 });
 
 /**
+ * Assembled rather than written out, because this file is itself scanned: spelling the
+ * host literally here made the check fail on its own source. Local runs passed anyway —
+ * `git ls-files` does not list a file that is not committed yet — so only CI saw it.
+ */
+const BRAND_HOST = ["primeradiant", "com"].join(".");
+
+/**
  * Scoped to what ships. `docs/` records the decision to remove the hotlink and has to be
  * able to name it; a design note explaining a removal is the opposite of the problem.
  */
@@ -155,7 +162,7 @@ test("D7 item 6 — STATIC: the upstream brand hotlink is absent from everything
   for (const relative of tracked.filter(SHIPPED)) {
     const path = join(root, relative);
     if (!statSync(path).isFile() || statSync(path).size > 2_000_000) continue;
-    assert.equal(readFileSync(path, "utf8").includes("primeradiant.com"), false, `${relative} hotlinks a brand image`);
+    assert.equal(readFileSync(path, "utf8").includes(BRAND_HOST), false, `${relative} hotlinks a brand image`);
   }
 });
 
