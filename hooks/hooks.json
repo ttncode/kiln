@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 5,
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.mjs\" pre-edit"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 5,
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.mjs\" pre-bash"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 5,
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch.mjs\" post-edit"
+          }
+        ]
+      }
+    ]
+  }
+}
