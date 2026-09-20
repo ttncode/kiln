@@ -168,3 +168,19 @@ test("B11: listWork reports an unreadable state rather than hiding it", () => {
 test("listWork on a project with no work yet is empty, not an error", () => {
   assert.deepEqual(listWork(tempRoot()), []);
 });
+
+test("a description that names an existing work says so, without claiming to be it", () => {
+  const root = tempRoot();
+  writeState(root, newWork({ id: "c3-spike", sessionId: "s", base: "aaa" }));
+
+  const resolved = resolveArgument({ arg: "Work id c3-spike, open, path spike, probe approved", root });
+
+  assert.equal(resolved.kind, "description", "D24's order stands: a sentence is a description");
+  assert.notEqual(resolved.id, "c3-spike", "and it still mints its own id");
+  assert.deepEqual(resolved.mentions, ["c3-spike"], "but a second work created by accident is visible");
+});
+
+test("a description that names nothing carries no hint", () => {
+  const resolved = resolveArgument({ arg: "the export button does nothing", root: tempRoot() });
+  assert.equal("mentions" in resolved, false);
+});
