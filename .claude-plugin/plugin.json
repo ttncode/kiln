@@ -1,0 +1,9 @@
+{
+  "name": "kiln",
+  "description": "One unit of work to a reviewed pull request, with unsafe actions blocked at runtime",
+  "version": "0.0.0",
+  "homepage": "https://github.com/ttncode/kiln",
+  "repository": "https://github.com/ttncode/kiln",
+  "license": "MIT",
+  "keywords": ["pipeline", "guards", "hooks", "code-review", "workflow"]
+}
