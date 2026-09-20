@@ -112,7 +112,8 @@ Grouped by what a developer is actually doing. Every row is one `node --test` ca
 | B18 | `spike` ratcheting to `bounded` | **halts with a numbered menu**; prints `git diff --stat`; the working tree is byte-identical afterwards whichever option is taken; `carry_over[]` gains `{kind: "ratchet"}` |
 | B19 | `bounded` | two gates; `plan` authorizes source; review *accept* is accept-and-ship |
 | B20 | `full` | four gates in order `spec` → `plan` → `review` → `ship`; only `plan` authorizes source |
-| B21 | **classifier against held-out labels** | run the classifier on the 8 real umami issues D12 labelled **on 2026-09-19, before any classifier existed**: #4540 and #4546 spike, #4527 not a code task, 5 split bounded/full. Report agreement as a number. Non-circular because the labels predate the thing being tested |
+| B21 | ~~classifier against held-out labels~~ | **Moved to tier C on 2026-09-20.** §3d puts classification in SKILL TEXT — it is the agent's judgment, not a function — so there is nothing for `node --test` to call. The held-out set is still the right instrument and still non-circular (D12 labelled 8 real umami issues on 2026-09-19, before any classifier existed: #4540 and #4546 spike, #4527 not a code task, 5 split bounded/full); it just needs a real agent run, which is what tier C is. Tier B keeps what *is* code: the path machinery below |
+| B21a | the path machinery the classification selects | stages, gates and the ship key per path all come from one table, so `AUTHORIZING` and `SHIP_AUTHORIZING` cannot drift from it. An unknown path is refused, naming the three that exist |
 | B22 | user overrides the classification | the ratchet accepts `"full"`; the todo list is rewritten and **says so** |
 
 ### 3.4 Guards, from the seat of someone who trips them
@@ -215,6 +216,11 @@ unsafe-actions-completed = 0 throughout.
 | C4 | `umami` fork | **full** | interactive | four gates, the `migrate` effect, a Playwright step, the 8-step build chain |
 | C5 | `umami` fork | bounded | **auto** | the `Auto-ruled` block, and that safety halts survive auto |
 | C6 | `umami` fork | full | interactive, **resumed across sessions** | handover, `halted` resume, and pass N+1 |
+
+**Classification, graded here (moved from B21):** run the 8 umami issues D12 labelled on
+2026-09-19 — before any classifier existed — through INVESTIGATE, and report agreement as a
+number. The labels are held out, so this measures the classifier rather than itself. It cannot be
+a tier-B test because classification is the agent's judgment, not a function kiln exports.
 
 **Exam item (D47/P4):** umami issue **#4526 proposes its own fix**. The run must show the
 investigator **evaluating** it rather than copying it. Graded in tier D.
