@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../lib/config.mjs";
 import { applyInit, planInit, proposeConfig } from "../lib/init.mjs";
+import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
 import { newWork, readState, recordGate, writeState } from "../lib/state.mjs";
@@ -26,6 +27,13 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
       Classify what the user said, hash the artifact, and record what was observed.
       You supply only --answer; every other field is measured here.
+
+  kiln ratchet <id> <spike|bounded|full>
+      Move this work up a rung. Prints the uncommitted diff it found and stops;
+      it never touches the working tree.
+
+  kiln report <id>
+      Print the run's report, including what auto mode decided on your behalf.
 
   kiln list
       Show work in progress.
@@ -136,7 +144,52 @@ function runOpen(argv) {
   return 0;
 }
 
-const COMMANDS = { init: runInit, open: runOpen, resolve: runResolve, list: runList, gate: runGate };
+/**
+ * Halts and records; it does not move a byte. A spike's source is uncommitted, so
+ * deleting it would be D7 item 2 performed by kiln, and carrying it silently would
+ * launder pre-plan code past a gate record for a different artifact (D78).
+ */
+function runRatchet(argv) {
+  const [id, to] = argv;
+  const { root } = loadConfig(process.cwd());
+  const state = readState(root, id);
+  if (!canRatchet(state.path, to)) {
+    process.stderr.write(`${ratchetRefusal(state.path, to)}\n`);
+    return 1;
+  }
+  // `git diff` shows tracked modifications only, and a spike's output is usually new
+  // files. Reporting "clean" over an untracked probe is the one thing this must not do.
+  const pending = gitOutput(root, ["status", "--short"]) ?? "";
+  out(`ratcheting ${state.path} → ${to}. ${ceremonyFor(to).gates.length} gate(s) on the new path.`);
+  out(pending.trim() === "" ? "Working tree is clean." : `Uncommitted work kiln will not touch:\n${pending}`);
+  out("Anything you keep will surface at REVIEW as beyond prediction. That is the reconciliation working.");
+  writeState(root, {
+    ...state,
+    path: to,
+    gates: {},
+    carry_over: [...state.carry_over, { from_pass: state.pass, kind: "ratchet", text: `${state.path} → ${to}` }],
+  });
+  return 0;
+}
+
+function runReport(argv) {
+  const { root } = loadConfig(process.cwd());
+  const state = readState(root, argv[0]);
+  const auto = renderAutoRuled(state);
+  out(`${state.id} · ${state.path} · ${state.status} · pass ${state.pass}`);
+  out(auto ?? "No gate was ruled on your behalf.");
+  return 0;
+}
+
+const COMMANDS = {
+  init: runInit,
+  open: runOpen,
+  resolve: runResolve,
+  list: runList,
+  gate: runGate,
+  ratchet: runRatchet,
+  report: runReport,
+};
 
 export function main(argv) {
   const [command, ...rest] = argv;
