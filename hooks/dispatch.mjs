@@ -5,7 +5,7 @@ import { gitOutput } from "../lib/init.mjs";
 import { relative } from "node:path";
 import { resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
-import { claimOwner, workForSession } from "../lib/guards/context.mjs";
+import { claimOwner, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
@@ -44,7 +44,9 @@ function rootAndBranches(cwd) {
 function context(payload) {
   const cwd = payload.cwd ?? process.cwd();
   const { root, protectedBranches, stackId } = rootAndBranches(cwd);
-  return { cwd, root, protectedBranches, stackId, state: workForSession(root, payload.session_id) };
+  const state = workForSession(root, payload.session_id);
+  const takenOver = state ? null : displacedFrom(root, payload.session_id);
+  return { cwd, root, protectedBranches, stackId, state, takenOver };
 }
 
 /**
@@ -123,6 +125,9 @@ function guardSandboxBash(payload, ctx) {
 function guardGateFile(payload, ctx) {
   const path = payload.tool_input?.file_path ?? payload.tool_input?.notebook_path;
   if (!path) return ALLOW;
+  if (ctx.takenOver) {
+    return block(gateMessage("a source edit", `work ${ctx.takenOver.id} was taken over by another session`));
+  }
   const verdict = sourceEditVerdict(ctx.root, { state: ctx.state, target: resolveTarget(path, ctx.cwd) });
   return verdict.blocked ? block(gateMessage("a source edit", verdict.reason)) : ALLOW;
 }
