@@ -3,7 +3,9 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../lib/config.mjs";
 import { applyInit, planInit, proposeConfig } from "../lib/init.mjs";
+import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
+import { claimConflicts } from "../lib/guards/context.mjs";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
 import { newWork, readState, recordGate, writeState } from "../lib/state.mjs";
@@ -27,6 +29,12 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
       Classify what the user said, hash the artifact, and record what was observed.
       You supply only --answer; every other field is measured here.
+
+  kiln blast <term> [<term> ...]
+      Tier-0 blast radius: which files mention these terms.
+
+  kiln scope <id>
+      Reconcile what the plan predicted against what the diff actually touched.
 
   kiln ratchet <id> <spike|bounded|full>
       Move this work up a rung. Prints the uncommitted diff it found and stops;
@@ -123,11 +131,53 @@ function runGate(argv) {
     out(JSON.stringify({ recorded: false, ...reAskFor(key) }, null, 2));
     return 2;
   }
+  const claimed = (flag(rest, "--predicted") ?? "").split(",").map((path) => path.trim()).filter(Boolean);
+  const conflicts = claimConflicts(root, { paths: claimed, forId: id });
+  if (conflicts.length > 0) {
+    process.stderr.write(`${describeConflicts(conflicts)}\n`);
+    return 2;
+  }
+  return writeGate(root, { id, key, decision, answer, claimed, rest });
+}
+
+function writeGate(root, { id, key, decision, answer, claimed, rest }) {
   const by = rest.includes("--auto") ? "auto" : "user";
-  const next = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  const recorded = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;
   writeState(root, next);
-  out(JSON.stringify({ recorded: true, gate: key, ...next.gates[key] }, null, 2));
+  out(JSON.stringify({ recorded: true, gate: key, claimed: claimed.length, ...next.gates[key] }, null, 2));
   return 0;
+}
+
+/**
+ * D72: the refusal belongs where the claim is made. Two overlapping claims that first
+ * meet at write time block each other, which is a deadlock with two messages rather
+ * than the clear conflict BMAD #2849 asks for.
+ */
+function describeConflicts(conflicts) {
+  const rows = conflicts.map((row) => `  ${row.path} — claimed by work ${row.owner}`).join("\n");
+  return `this plan claims paths another active work already claimed:\n${rows}\nFinish or park that work first. kiln will not split a file between two runs.`;
+}
+
+function runBlast(argv) {
+  const { root } = loadConfig(process.cwd());
+  const rows = grepBlastRadius(root, argv);
+  if (rows.length === 0) return out("No file mentions those terms.") ?? 0;
+  for (const row of rows.slice(0, 20)) out(`  ${row.hits}\t${row.path}`);
+  return 0;
+}
+
+function runScope(argv) {
+  const { root } = loadConfig(process.cwd());
+  const state = readState(root, argv[0]);
+  const result = reconcile({ predicted: state.predicted, actual: actualChanged(root, state.last_verified) });
+  out(reconciliationLine(result));
+  if (result.beyond.length > 0) out(`  beyond: ${result.beyond.slice(0, 8).join(" · ")}`);
+
+  const verdict = reconcileVerdict(result);
+  if (!verdict.halt) return 0;
+  process.stderr.write(`HALT: ${verdict.reason}\n`);
+  return 2;
 }
 
 /** Records the base it observed rather than being told one. */
@@ -189,6 +239,8 @@ const COMMANDS = {
   gate: runGate,
   ratchet: runRatchet,
   report: runReport,
+  blast: runBlast,
+  scope: runScope,
 };
 
 export function main(argv) {
