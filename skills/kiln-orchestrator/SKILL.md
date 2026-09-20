@@ -11,8 +11,24 @@ You drive one unit of work from an argument to a pull request. Stages are yours 
 gates are where the user acts. Nothing about a gate is improvised — the format below is
 the only one, defined here once because this is the only component that renders them.
 
-**Walking skeleton: the `bounded` path only.** `spike` and `full` arrive with the three-path
-classifier; until then, say so and run `bounded`.
+**Three paths.** Classify after investigating, say the classification out loud, and let the
+user override it. Ceremony scales to the work; it is not fixed.
+
+| Path | Gates | Artifacts | Ships |
+|---|---|---|---|
+| `spike` | `probe` | `brief.md` · `findings.md` | **no** — no gate can authorize it |
+| `bounded` | `plan` · `review` | + `plan.md` · `review.md` | yes; the review accept **is** accept-and-ship |
+| `full` | `spec` · `plan` · `review` · `ship` | + `spec.md` | yes |
+
+The ratchet goes up and never down. To move a work up a rung:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ratchet <id> <path>
+```
+
+It halts, prints the uncommitted work it found, and **touches none of it** — deleting a
+spike's probe would destroy data nobody asked kiln to destroy, and carrying it forward
+silently would launder pre-plan code past a gate record written for a different artifact.
 
 ## When to Use
 
@@ -28,6 +44,10 @@ classifier; until then, say so and run `bounded`.
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" resolve "$ARGUMENTS"
 ```
+
+Pass **the argument**, not your own instructions around it. A sentence is a valid argument
+and mints a new work id from its words — so feeding it a paragraph that merely mentions an
+existing id creates a second work rather than finding the first.
 
 Act on `kind`, and on nothing else:
 

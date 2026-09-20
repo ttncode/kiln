@@ -126,3 +126,17 @@ test("the plugin manifest parses and names the repository", () => {
   assert.equal(manifest.name, "kiln");
   assert.equal(manifest.license, "MIT");
 });
+
+/**
+ * A skill that describes a narrower product than the one that ships tells every user the
+ * feature is missing. The orchestrator said "bounded only" for three phases after the
+ * three paths landed, and an acceptance run caught it rather than a reader.
+ */
+test("the orchestrator describes every path the code actually supports", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  for (const path of ["spike", "bounded", "full"]) {
+    assert.match(body, new RegExp(`\`${path}\``), `the orchestrator never mentions ${path}`);
+  }
+  assert.doesNotMatch(body, /walking skeleton/i, "a phase note that outlived its phase");
+  assert.match(body, /ratchet/, "the way up a rung has to be in the skill that renders the paths");
+});
