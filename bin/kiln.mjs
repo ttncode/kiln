@@ -3,7 +3,10 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "../lib/config.mjs";
 import { applyInit, planInit, proposeConfig } from "../lib/init.mjs";
+import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
+import { newWork, readState, recordGate, writeState } from "../lib/state.mjs";
+import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
@@ -16,6 +19,13 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln resolve [<arg>]
       Decide what <arg> means - a URL, a work in progress, a ticket ref, or a
       description - and print the decision as JSON. Writes nothing.
+
+  kiln open <id> [--session <session-id>] [--path bounded]
+      Create the work directory and record the commit it starts from.
+
+  kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
+      Classify what the user said, hash the artifact, and record what was observed.
+      You supply only --answer; every other field is measured here.
 
   kiln list
       Show work in progress.
@@ -86,7 +96,47 @@ function runList() {
   return 0;
 }
 
-const COMMANDS = { init: runInit, resolve: runResolve, list: runList };
+function flag(argv, name) {
+  const at = argv.indexOf(name);
+  return at >= 0 ? argv[at + 1] : undefined;
+}
+
+/**
+ * No verb sets a gate. This one reads an answer, measures the artifact, classifies
+ * what was said, and records only that — the shape task-done uses (D65, D71).
+ */
+function runGate(argv) {
+  const [id, key, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  const answer = flag(rest, "--answer") ?? "";
+  const decision = rest.includes("--auto") ? DECISION.approved : classifyAnswer(answer);
+
+  if (decision === DECISION.notAYes) {
+    out(JSON.stringify({ recorded: false, ...reAskFor(key) }, null, 2));
+    return 2;
+  }
+  const by = rest.includes("--auto") ? "auto" : "user";
+  const next = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  writeState(root, next);
+  out(JSON.stringify({ recorded: true, gate: key, ...next.gates[key] }, null, 2));
+  return 0;
+}
+
+/** Records the base it observed rather than being told one. */
+function runOpen(argv) {
+  const [id, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  const base = gitOutput(root, ["rev-parse", "HEAD"]);
+  if (!base) {
+    process.stderr.write("no commit to start from. Make one first — a run needs a base.\n");
+    return 1;
+  }
+  const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path: flag(rest, "--path") ?? "bounded" });
+  out(writeState(root, state));
+  return 0;
+}
+
+const COMMANDS = { init: runInit, open: runOpen, resolve: runResolve, list: runList, gate: runGate };
 
 export function main(argv) {
   const [command, ...rest] = argv;
