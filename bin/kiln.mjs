@@ -7,7 +7,7 @@ import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/ini
 import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
-import { loadStack } from "../lib/stack.mjs";
+import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
 import { recordFullVerified, recordVerify } from "../lib/state.mjs";
 import { join } from "node:path";
@@ -97,7 +97,7 @@ function reportInit(result) {
 }
 
 function warnUnsatisfied(config) {
-  const gaps = unsatisfiedSteps(loadStack(config.stack.id), config.stack.cmd);
+  const gaps = unsatisfiedSteps({ steps: effectiveSteps(loadStack(config.stack.id), config) }, config.stack.cmd);
   for (const gap of gaps) {
     process.stderr.write(`note: step "${gap.step}" needs stack.cmd.${gap.key}, which is not set. It will refuse to run until you set it, or remove the step.\n`);
   }
@@ -210,7 +210,7 @@ function runVerify(argv) {
   const phase = flag(rest, "--phase") ?? "full";
   const state = readState(root, id);
   const head = gitOutput(root, ["rev-parse", "HEAD"]) ?? state.base;
-  const planned = planSteps(loadStack(config.stack.id).steps, { phase, effects: effectsInPlay(rest) });
+  const planned = planSteps(effectiveSteps(loadStack(config.stack.id), config), { phase, effects: effectsInPlay(rest) });
 
   const result = runPhase(planned, {
     cwd: root,
@@ -253,7 +253,11 @@ function runBlast(argv) {
 function runScope(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
-  const result = reconcile({ predicted: state.predicted, actual: actualChanged(root, state.last_verified) });
+  const result = reconcile({
+    predicted: state.predicted,
+    actual: actualChanged(root, state.last_verified),
+    dirtyAtOpen: state.dirty_at_open,
+  });
   out(reconciliationLine(result));
   if (result.beyond.length > 0) out(`  beyond: ${result.beyond.slice(0, 8).join(" · ")}`);
 
@@ -272,7 +276,13 @@ function runOpen(argv) {
     process.stderr.write("no commit to start from. Make one first — a run needs a base.\n");
     return 1;
   }
-  const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path: flag(rest, "--path") ?? "bounded" });
+  const state = newWork({
+    id,
+    sessionId: flag(rest, "--session") ?? null,
+    base,
+    path: flag(rest, "--path") ?? "bounded",
+    dirtyAtOpen: actualChanged(root, base),
+  });
   out(writeState(root, state));
   return 0;
 }

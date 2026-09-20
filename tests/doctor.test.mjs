@@ -36,7 +36,7 @@ test("D54: node on PATH is checked here, because nothing can check it at runtime
 });
 
 test("D60.1: a step with no command fails, and names the key to set", () => {
-  const root = project({ stack: { cmd: { test: "npm test" } } });
+  const root = project({ stack: { cmd: { test: "npm test" }, steps: [{ id: "typecheck", run: "${cmd.typecheck}" }] } });
   const [stack] = row(root, "stack");
   assert.equal(stack.status, STATUS.fail);
   assert.match(stack.detail, /stack\.cmd\.typecheck/);
@@ -86,7 +86,7 @@ test("D33: an unreadable state fails, because it blocks every guarded write", ()
 });
 
 test("doctor exits non-zero on a failure, so a wrapper can gate on it", () => {
-  const root = project({ stack: { cmd: {} } });
+  const root = project({ stack: { cmd: {}, steps: [{ id: "unit", run: "${cmd.test}" }] } });
   const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
   const run = spawnSync(process.execPath, [bin, "doctor"], { cwd: root, encoding: "utf8" });
 
