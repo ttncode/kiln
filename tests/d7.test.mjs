@@ -13,7 +13,8 @@ import { dispatch } from "../hooks/dispatch.mjs";
 import { protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
 import { newWork, openNextPass, readState, recordVerify, writeState } from "../lib/state.mjs";
-import { cleanupFixtures, tempRoot } from "./helpers/fixture.mjs";
+import { DEFAULTS } from "../lib/config.mjs";
+import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 import { kilnProject, payload } from "./helpers/project.mjs";
 
 after(cleanupFixtures);
@@ -178,4 +179,29 @@ test("D7 item 7 — the agent cannot approve its own gate or disarm its own guar
 test("D7 item 7 — the control files stay closed in a session kiln does not drive", async () => {
   const project = kilnProject();
   assert.equal(await edit(join(project.root, ".kiln", "config.json"), project, "unrelated"), BLOCK);
+});
+
+/**
+ * Item 3 is "never reports a failing test as passing", and the shape that defeated it on a
+ * real project was not a lying test — it was a config with no steps at all. `kiln verify`
+ * printed `green`, exit 0, having run nothing.
+ */
+test("D7 item 3: a phase with no steps refuses; it does not report green", () => {
+  assert.equal(isGreen({ entries: [], failed: null }, "full"), false, "nothing ran, so nothing passed");
+
+  const root = tempRoot("kiln-d7-nosteps-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  writeConfig(root, { ...DEFAULTS, stack: { id: "node", cmd: { test: "true" }, steps: [] } });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const cli = (...args) => spawnSync(process.execPath, [bin, ...args], { cwd: root, encoding: "utf8" });
+  cli("open", "w1");
+
+  const run = cli("verify", "w1");
+  assert.equal(run.status, 1, `verify exited ${run.status}: ${run.stdout}${run.stderr}`);
+  assert.match(run.stderr, /no .* step/);
+  assert.doesNotMatch(run.stdout, /green/);
 });
