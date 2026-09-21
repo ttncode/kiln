@@ -129,14 +129,35 @@ function reportDetection(stack) {
   }
 }
 
+/**
+ * A question kiln prepared and nobody answered became a value nobody chose, silently. It is
+ * named here so a person running the CLI directly sees what was decided for them, and so an
+ * agent that skipped `--propose` still leaves the user something to correct.
+ */
+function reportUnasked(questions, argv) {
+  const answered = new Set(argv.filter((_, index) => argv[index - 1] === "--set").map((pair) => pair.split("=")[0]));
+  const open = questions.filter((question) => !answered.has(question.key));
+  if (open.length === 0) return;
+  out("\nkiln decided these for you. `--set <key>=<value>` to change one:");
+  for (const question of open) out(`  ${question.key} = ${JSON.stringify(question.default)}   ${question.ask}`);
+}
+
 function reportInit(result) {
   for (const path of result.kept) out(`  kept    ${path}`);
   for (const path of result.written) out(`  wrote   ${path}`);
   out(result.written.length > 0 ? "\nRun `kiln doctor` to check it." : "\nAlready set up. Run `kiln doctor --write` to repair paths.");
 }
 
+/**
+ * A project kiln cannot identify is a supported starting point — `stack.id` is `unknown`
+ * and the user sets it. Loading that stack threw, so `kiln init` ended in a StackError and
+ * exit 1 on exactly the projects that most needed it to finish. Naming the gap is doctor's
+ * job either way.
+ */
 function warnUnsatisfied(config) {
-  const gaps = unsatisfiedSteps({ steps: effectiveSteps(loadStack(config.stack.id), config) }, config.stack.cmd);
+  const stack = stackOrNull(config.stack.id);
+  if (!stack) return 0;
+  const gaps = unsatisfiedSteps({ steps: effectiveSteps(stack, config) }, config.stack.cmd);
   for (const gap of gaps) {
     process.stderr.write(`note: step "${gap.step}" needs stack.cmd.${gap.key}, which is not set. It will refuse to run until you set it, or remove the step.\n`);
   }
@@ -163,6 +184,7 @@ function runInit(argv) {
   const final = applyOverrides(config, argv);
   reportInit(applyInit(root, final));
   for (const path of installFloor(root)) out(`  wrote   ${path}`);
+  reportUnasked(questions, argv);
   return warnUnsatisfied(final);
 }
 

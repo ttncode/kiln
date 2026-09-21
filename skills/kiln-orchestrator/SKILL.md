@@ -49,7 +49,30 @@ question.
 - `/kiln <anything>` — always start here, before reading any file.
 - Any later turn of work that already has a `.kiln/work/<id>/`.
 
-**When NOT to use:** `/kiln init` and `/kiln doctor` are commands, not work. Run them and stop.
+**When NOT to use:** `/kiln init` and `/kiln doctor` are commands, not work. Run them and stop
+— but `init` has one step before it writes, below.
+
+### `/kiln init` — propose, ask, then write
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" init --propose
+```
+
+That writes nothing. It returns `config`, `detected`, and **`questions`** — at most five,
+each carrying the answer kiln would use anyway. **Ask them.** Then write the answers in:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" init --set stack.cmd.test="<their answer>" --set …
+```
+
+A question kiln computed and nobody asked is a value nobody chose. On the first real setup,
+`init` was run bare; every question it had prepared went unasked, and `kiln doctor` then had
+to come back and ask the same things after the file was already on disk — including which
+branch pull requests target, which is a safety answer.
+
+Only ask what `questions` actually contains. `stack.id` appears only when the checkout looks
+like several stacks; `vcs.integration_branch` only when nothing in the repository names a
+default branch. Detection answers the rest.
 
 ## Process
 
