@@ -3,7 +3,7 @@ description: Drive one unit of work — a sentence, a ticket ref, or a URL — t
 argument-hint: "[<sentence> | <ticket-ref> | <url> | init | doctor]"
 ---
 
-## /kiln $ARGUMENTS
+## /kiln:kiln $ARGUMENTS
 
 Use the **kiln-orchestrator** skill. Give it `$ARGUMENTS` verbatim; it resolves what the
 argument means before deciding anything.

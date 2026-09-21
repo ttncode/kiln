@@ -101,3 +101,16 @@ test("the README's decision count matches the decision log", () => {
   const highest = Math.max(...numbers);
   assert.match(README, new RegExp(`${highest} decisions`), `the log runs to D${highest}`);
 });
+
+/**
+ * A plugin command carries its plugin's namespace. The README's first instruction was
+ * `/kiln init`, and a real user got `Unknown command: /kiln` — the documented first step
+ * failing at step one, which is the whole of D6's first ten minutes.
+ */
+test("the documented invocation is the one that resolves", () => {
+  for (const file of ["README.md", join("docs", "design", "2026-09-20-user-view.md")]) {
+    const text = readFileSync(join(ROOT, file), "utf8");
+    const bare = [...text.matchAll(/(?<![:\w])\/kiln(?![:\w-])/g)];
+    assert.equal(bare.length, 0, `${file} tells the reader to type /kiln, which may not resolve`);
+  }
+});
