@@ -591,12 +591,25 @@ function runShip(argv) {
   return 0;
 }
 
+/**
+ * A work can ship having verified nothing — the user says "no need to run the suite" and
+ * the gate records their words, which is their call to make. What is not their call is
+ * finding out later. `verify: []` said nothing here, so the only account of it was
+ * whatever the agent chose to mention.
+ */
+function verifiedLine(state) {
+  const ran = (state.verify ?? []).filter((entry) => !entry.skipped);
+  if (ran.length === 0) return "Verified: never — no step has run for this work.";
+  const green = state.last_verified && state.last_verified !== state.base;
+  return `Verified: ${ran.length} step(s) ran${green ? ` · green at ${state.last_verified.slice(0, 9)}` : " · not green"}.`;
+}
+
 function runReport(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
-  const auto = renderAutoRuled(state);
   out(`${state.id} · ${state.path} · ${state.status} · pass ${state.pass}`);
-  out(auto ?? "No gate was ruled on your behalf.");
+  out(verifiedLine(state));
+  out(renderAutoRuled(state) ?? "No gate was ruled on your behalf.");
   return 0;
 }
 
