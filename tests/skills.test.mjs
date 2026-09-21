@@ -221,3 +221,9 @@ test("the orchestrator says how to write, because a stage report is read for its
   assert.match(body, /Tables, numbered steps, short bullets/);
   assert.match(body, /Quote a tool's own error verbatim/);
 });
+
+test("the orchestrator knows auto mode exists and what a refusal means", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /--auto/, "the flag existed and nothing passed it");
+  assert.match(body, /A refusal means ask\s+the user/, "a refused ruling is not a reason to record it another way");
+});

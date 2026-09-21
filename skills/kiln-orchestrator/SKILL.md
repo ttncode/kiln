@@ -226,6 +226,30 @@ question is asking for a decision nobody can make yet.
 Recommendation first, numbered options after. Print the artifact's **absolute path** the
 moment it is written, so the user can open it.
 
+### 5b. Auto mode, when the project has turned it on
+
+`kiln open` prints one of these, and it is the whole answer:
+
+```
+auto mode is off for bounded (auto.bounded is off) — every gate stops for you.
+auto mode is ON for bounded: kiln will rule its gates and say so in `kiln report`.
+```
+
+When it is **on**, record the gate with `--auto` instead of stopping:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" gate <id> plan \
+  --artifact .kiln/work/<id>/plan.md --auto --predicted src/a.ts,src/b.ts
+```
+
+Still render the gate block first. A ruling nobody can see is worse than a question nobody
+was asked, so say which gate you ruled and why, in the same words you would have used to
+recommend it.
+
+kiln checks the rule itself and refuses when it does not hold — a spike is never eligible,
+`full` needs its own opt-in, and a halted work is never ruled past. **A refusal means ask
+the user**; it is not a reason to record the gate another way.
+
 Then record what the user actually said:
 
 ```bash

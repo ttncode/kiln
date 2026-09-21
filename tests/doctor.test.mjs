@@ -267,3 +267,18 @@ test("doctor fails a step whose required effect nothing in its phase provides", 
   assert.match(row.detail, /no full-phase step provides/);
   assert.match(row.detail, /can never run/);
 });
+
+/**
+ * Auto mode rules gates on the user's behalf and is off by default, so the one thing that
+ * must never happen is finding out afterwards. It is reported whichever way it is set.
+ */
+test("doctor says whether kiln will rule a gate for you", () => {
+  const off = runChecks(project(), loadConfig(project())).filter((r) => r.title === "auto mode");
+  assert.equal(off.length, 1);
+
+  const root = project({ auto: { bounded: true } });
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "auto mode");
+  assert.equal(row.status, STATUS.warn);
+  assert.match(row.detail, /ON for bounded/);
+  assert.match(row.detail, /kiln report/, "the finding names where to see what it decided");
+});

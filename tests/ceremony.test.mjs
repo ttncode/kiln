@@ -225,3 +225,66 @@ test("open refuses a ceremony path that does not exist", () => {
   assert.equal(run.status, 1);
   assert.match(run.stderr, /no ceremony path named "heavy"/);
 });
+
+/**
+ * `--auto` meant "record approved, no questions asked", and `autoEligible` — the rule
+ * saying when that is allowed — had no caller outside this file. A flag that approves on
+ * request is not auto mode; it is a way past the gate. These go through the real CLI,
+ * because calling the predicate was exactly what kept the hole open.
+ */
+function autoProject(auto) {
+  const root = initRepo(tempRoot("kiln-auto-"));
+  writeFile(join(root, "package.json"), '{"name":"d","scripts":{"test":"echo ok"}}');
+  commitAll(root, "init");
+  writeConfig(root, { ...DEFAULTS, auto });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n");
+  writeState(root, newWork({ id: "42", sessionId: "s", base: "aaa", path: "bounded" }));
+  return root;
+}
+
+const autoGate = (root, id = "42") => kiln(root, ["gate", id, "plan", "--artifact", `.kiln/work/${id}/plan.md`, "--auto"]);
+
+test("B58: with auto on, the gate is ruled and the report says so", () => {
+  const root = autoProject({ bounded: true });
+  assert.equal(autoGate(root).status, 0);
+
+  assert.equal(readState(root, "42").gates.plan.by, "auto");
+  const report = kiln(root, ["report", "42"]);
+  assert.match(report.stdout, /Auto-ruled 1 gate/);
+  assert.match(report.stdout, /plan → approved/);
+});
+
+test("B58: with auto off — the default — the same call is refused", () => {
+  const run = autoGate(autoProject({}));
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /auto\.bounded is off/);
+  assert.match(run.stderr, /Ask the user/);
+});
+
+test("B60/B61: a spike is never eligible and full needs its own opt-in", () => {
+  const spike = autoProject({ bounded: true, full: true });
+  writeState(spike, { ...readState(spike, "42"), path: "spike" });
+  assert.match(autoGate(spike).stderr, /not a change/);
+
+  const full = autoProject({ bounded: true });
+  writeState(full, { ...readState(full, "42"), path: "full" });
+  assert.match(autoGate(full).stderr, /explicit opt-in/);
+});
+
+test("B59: auto does not rule past a halt", () => {
+  const root = autoProject({ bounded: true });
+  kiln(root, ["halt", "42", "--reason", "DROP COLUMN in the plan"]);
+
+  const run = autoGate(root);
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /halted/);
+});
+
+test("open says whether a gate will be ruled for you, at the moment the path is chosen", () => {
+  const off = autoProject({});
+  assert.match(kiln(off, ["open", "w2"]).stdout, /auto mode is off for bounded/);
+
+  const on = autoProject({ bounded: true });
+  assert.match(kiln(on, ["open", "w2", "--path", "bounded"]).stdout, /auto mode is ON for bounded/);
+});
