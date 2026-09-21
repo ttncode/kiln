@@ -133,3 +133,27 @@ test("doctor --write on a healthy project repairs nothing and says so", () => {
   const run = spawnSync(process.execPath, [bin, "doctor", "--write"], { cwd: root, encoding: "utf8" });
   assert.match(run.stdout, /Nothing to repair/);
 });
+
+test("D81: a per-module map outside a multi-repo config is named, not resolved silently", () => {
+  const root = project();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: { admin: "v3-master" } } });
+  const found = runChecks(root, { config: loadConfig(root).config, migrated: false })
+    .find((row) => row.title === "integration branch");
+
+  assert.equal(found.status, STATUS.fail);
+  assert.match(found.detail, /repo\.kind "multi"/);
+});
+
+test("D81: a map under a multi-repo config says which branch every v1 reader actually gets", () => {
+  const root = project();
+  writeConfig(root, {
+    ...DEFAULTS,
+    repo: { kind: "multi", root: null },
+    vcs: { ...DEFAULTS.vcs, integration_branch: { admin: "v3-master" } },
+  });
+  const found = runChecks(root, { config: loadConfig(root).config, migrated: false })
+    .find((row) => row.title === "integration branch");
+
+  assert.equal(found.status, STATUS.warn);
+  assert.match(found.detail, /every reader gets "main"/);
+});
