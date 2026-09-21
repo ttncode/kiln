@@ -139,7 +139,7 @@ file — read it there rather than trusting this table.
 
 | # | Promise | How |
 |---|---|---|
-| 1 | never pushes to a protected branch | covers `HEAD:v3-master` from a feature branch, `--force`, `-C <dir>`, and chained commands |
+| 1 | never pushes to a protected branch | the ref is **resolved by git**, not matched as text, in the repository the command actually runs in — `HEAD`, `@`, `+main`, `HEAD:v3-master`, `--force`, `-C <dir>`, `cd <dir> &&`, and a submodule on its own branch |
 | 2 | never destroys data unasked | `rm -rf` outside the repo, `git clean -xfd`, destructive DDL in a migration |
 | 3 | never reports a failing test as passing | verdict from the exit code; stdout is never parsed |
 | 4 | no source edit without a gate record matching the **current** artifact | including through `>`, `tee`, `sed -i`, `cp` and `mv` |
@@ -213,7 +213,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 275, green on every pull request |
+| Tests | 282, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
