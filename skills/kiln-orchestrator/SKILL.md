@@ -122,10 +122,16 @@ GATE — plan · <id>
 
 Recommendation: approve. <one sentence saying why>
 
-  1. Approve as written
-  2. Change something — tell me what
-  3. Stop here
+Reply `approve` to record it, or tell me what to change.
 ```
+
+**Do not number the options at a gate.** A numbered menu invites a number, and a bare `1`
+is a click rather than evidence anyone read the artifact — so kiln refuses it, and the user
+has typed the thing the menu offered and been told no. That happened on the first real run,
+twice in a row, before they tried a word.
+
+Numbered menus belong at **halts**, where the options are genuinely actions to choose
+between. A gate asks for a word.
 
 When a blocking unknown is what stands in the way, say so in place of the recommendation
 and offer answering it as option 1 — a gate that recommends approval over an unanswered
@@ -138,10 +144,17 @@ Then record what the user actually said:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" gate <id> plan \
-  --artifact .kiln/work/<id>/plan.md --answer "<their words, verbatim>"
+  --artifact .kiln/work/<id>/plan.md --answer "<their words, verbatim>" \
+  --predicted src/a.ts,src/b.ts
 ```
 
-You supply only `--answer`. kiln hashes the artifact itself and classifies the answer.
+You supply only `--answer` and `--predicted`. kiln hashes the artifact itself and
+classifies the answer.
+
+`--predicted` is **the files the change preview named**, and at the plan gate it is not
+optional: it is the claim set a concurrent work is checked against, and it is what REVIEW
+reconciles the real diff with. Leaving it out does not fail — it quietly leaves both with
+nothing to compare, which is how the first real run finished with `predicted: []`.
 
 **These are not approvals,** and kiln will refuse them: *"whatever you think"*, *"sounds
 good"*, *"sure let's go"*, *"up to you"*, silence. When kiln reports `not_a_yes`, re-ask as
