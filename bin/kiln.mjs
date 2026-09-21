@@ -247,6 +247,10 @@ function runVerify(argv) {
   const state = readState(root, id);
   const head = gitOutput(root, ["rev-parse", "HEAD"]) ?? state.base;
   const planned = planSteps(effectiveSteps(loadStack(config.stack.id), config), { phase, effects: effectsInPlay(rest) });
+  if (planned.length === 0) {
+    process.stderr.write(`${noStepsMessage(config, phase)}\n`);
+    return 1;
+  }
 
   const result = runPhase(planned, {
     cwd: root,
@@ -255,6 +259,18 @@ function runVerify(argv) {
     range: `${state.base}..${head}`,
   });
   return recordRun({ root, state, phase, head, result });
+}
+
+/**
+ * A step whose `${cmd.x}` is unset refuses to run rather than skipping quietly (D60.1).
+ * No steps at all is the same law one level up: it printed `green`, exit 0, on a real
+ * project whose config had `"steps": []` — a pass nobody earned and nobody could see was
+ * empty.
+ */
+function noStepsMessage(config, phase) {
+  return `kiln will not report a result for a phase with no steps.
+stack "${config.stack.id}" has no ${phase} step in .kiln/config.json — "steps" is empty, so there is nothing to run.
+Set stack.steps, or run \`kiln init --set stack.cmd.test="<command>"\` in a project kiln has not configured yet.`;
 }
 
 function effectsInPlay(rest) {
