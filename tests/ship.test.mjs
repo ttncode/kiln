@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
 import { branchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
+import { slugOfId } from "../lib/resolve.mjs";
 import { newWork } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 
@@ -72,4 +73,25 @@ test("a branch pattern the work cannot fill says so instead of shipping the plac
   const partial = branchName({ vcs: { branch_pattern: "${type}/${id}" } }, state);
   assert.deepEqual(partial.unfilled, ["type"]);
   assert.match(renderShipPlan({ topic: "w-1", branch: partial, modules: [] }), /still contains \$\{type\}/);
+});
+
+/**
+ * `slug` was filled with the id, which is not a shorthand for it. The default pattern
+ * `${type}/${id}-${slug}` then produced the id twice — ninety characters of branch name,
+ * with `${type}` still in it as literal text, on a real run.
+ */
+test("the slug is the id's descriptive tail, not the id again", () => {
+  assert.equal(slugOfId("20260921-invalid-id-returns-404"), "invalid-id-returns-404");
+  assert.equal(slugOfId("admin-page-20260921-invalid-id-returns-404"), "invalid-id-returns-404");
+  assert.equal(slugOfId("PROJ-1919"), null, "a ticket ref has no slug to take");
+
+  const state = { id: "20260921-invalid-id-returns-404" };
+  assert.equal(branchName({ vcs: { branch_pattern: DEFAULTS.vcs.branch_pattern } }, state), state.id);
+  assert.match(branchName({ vcs: { branch_pattern: "${type}/${slug}" } }, state).rendered, /\$\{type\}\/invalid-id-returns-404/);
+});
+
+test("a pattern that asks for the id and the slug is told it repeats itself", () => {
+  const plan = { topic: "w", modules: [], branch: branchName({ vcs: { branch_pattern: "${id}-${slug}" } }, { id: "20260921-a-b" }) };
+  assert.match(renderShipPlan(plan, "${id}-${slug}"), /already ends with the slug/);
+  assert.doesNotMatch(renderShipPlan({ ...plan, branch: "x" }, "${id}"), /repeats/);
 });

@@ -215,3 +215,20 @@ test("a halt without a reason is refused — a stop nobody can act on", () => {
   assert.equal(run.status, 1);
   assert.match(run.stderr, /Pass --reason/);
 });
+
+/**
+ * `/kiln full This route returns a 500` minted
+ * `20260921-full-route-http-localhost-2380-admin` — every id from then on carrying a word
+ * that describes kiln's process rather than the work.
+ */
+test("a leading ceremony word is an instruction, not part of what is asked", () => {
+  const now = new Date("2026-09-21T00:00:00Z");
+  assert.equal(mintId({ text: "full This route returns a 500 error", now }), "20260921-route-returns-500-error");
+  assert.equal(mintId({ text: "spike — can we use the new API?", now }), "20260921-can-we-use-new-api");
+  assert.equal(mintId({ text: "This route returns a 500 error", now }), "20260921-route-returns-500-error");
+});
+
+test("a ceremony word inside the sentence is somebody's actual subject", () => {
+  const now = new Date("2026-09-21T00:00:00Z");
+  assert.match(mintId({ text: "the full export is empty", now }), /full/);
+});

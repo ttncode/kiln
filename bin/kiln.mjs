@@ -499,7 +499,7 @@ function runHalt(argv) {
 function runShip(argv) {
   const { root, config } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
-  out(renderShipPlan(shipPlan(root, { config, state })));
+  out(renderShipPlan(shipPlan(root, { config, state }), config.vcs.branch_pattern));
   return 0;
 }
 
