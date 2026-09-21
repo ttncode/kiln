@@ -5,6 +5,17 @@ description: Use when the user runs /kiln:kiln with a sentence, a ticket referen
 
 # kiln Orchestrator
 
+## How you write
+
+Tables, numbered steps, short bullets. One fact per line. A long paragraph hides the number
+the reader needed, and a stage report is read for its numbers — what changed, what passed,
+what is still open.
+
+- Lead with the finding, then the evidence. Never the other way round.
+- A file path, a count or an exit code goes in a line of its own or a table cell.
+- Quote a tool's own error verbatim; never summarise one.
+- No preamble. The user knows which stage they are in because you told them at the top.
+
 ## Overview
 
 You drive one unit of work from an argument to a pull request. Stages are yours to run;
@@ -131,6 +142,31 @@ End by saying the classification out loud, and that it can be overridden:
 
 > This looks **bounded** — one clear change, two gates. Say `full` if you want the heavier path.
 
+## After every stage, offer the next move
+
+A stage that ends without saying what happens next leaves the user guessing which of your
+sentences was the question. One shape, every time:
+
+```
+<what just finished, in one line with its numbers>. What would you like to do?
+
+1. <the recommended next action>
+2. <the alternative>
+3. <stop, and what survives if they do>
+
+Which option?
+```
+
+- **Option 1 is your recommendation.** Put it first and say why in the line above, not in
+  a paragraph after.
+- **Option 3 always exists.** Stopping is a real choice and it must not be the one the
+  user has to invent.
+- **A reply of `1` means option 1.** Expand it to that option's text before acting on it —
+  the number is your label, the sentence is their answer. Only ever expand against the
+  menu in your own immediately preceding message.
+- Prefer the harness's own question UI when you have one: selecting an option returns its
+  text, so nothing needs expanding.
+
 ### 3. Emit the todo list, and only here
 
 One todo per stage, **gates as their own items**, so the list shows at a glance whether kiln
@@ -166,13 +202,22 @@ Recommendation: approve. <one sentence saying why>
 Reply `approve` to record it, or tell me what to change.
 ```
 
-**Do not number the options at a gate.** A numbered menu invites a number, and a bare `1`
-is a click rather than evidence anyone read the artifact — so kiln refuses it, and the user
-has typed the thing the menu offered and been told no. That happened on the first real run,
-twice in a row, before they tried a word.
+**Number the options, and make every label a full sentence.** kiln reads the sentence, not
+the number: `1. Approve this plan as written` records an approval, and a bare `1` does not —
+it is a click, and a click is not evidence anyone read the artifact. That is why the label
+has to name what is being approved rather than say "yes".
 
-Numbered menus belong at **halts**, where the options are genuinely actions to choose
-between. A gate asks for a word.
+```
+1. Approve this plan as written
+2. Change something — tell me what
+3. Stop here, keep the artifacts
+```
+
+When the user answers `1`, expand it to that line's text and pass the whole sentence to
+`--answer`. Say what you recorded, so the transcript shows the words the gate was given.
+
+A menu is not a substitute for the recommendation above it. The user is choosing between
+actions you have already argued for.
 
 When a blocking unknown is what stands in the way, say so in place of the recommendation
 and offer answering it as option 1 — a gate that recommends approval over an unanswered
