@@ -321,3 +321,36 @@ test("--auto satisfies full's opt-in, and never reaches a spike", () => {
   assert.equal(spike.status, 2);
   assert.match(spike.stderr, /not a change/);
 });
+
+/**
+ * Two works shared one session on a real run, and `workForSession` returns whichever the
+ * filesystem lists first — so which work's gates authorise an edit became arbitrary.
+ * `claimUnbound` already refuses to guess when two works are unowned; this is the same law
+ * from the other side, refused at open rather than at the first edit.
+ */
+test("a session drives one unit of work", () => {
+  const root = autoProject({});
+  assert.equal(kiln(root, ["open", "w1", "--session", "s9"]).status, 0);
+
+  const second = kiln(root, ["open", "w2", "--session", "s9"]);
+  assert.equal(second.status, 1);
+  assert.match(second.stderr, /already drives work w1/);
+  assert.match(second.stderr, /kiln halt w1/, "the way out is named, not left to guess");
+
+  kiln(root, ["halt", "w1", "--reason", "parked"]);
+  const after = kiln(root, ["open", "w2", "--session", "s9"]);
+  assert.equal(after.status, 0, `the refusal names halt as the way out, so halt has to be one: ${after.stderr}`);
+});
+
+test("claiming an unowned work is not taking one from anybody", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "w3"]);
+
+  const claimed = kiln(root, ["open", "w3", "--session", "s1"]);
+  assert.match(claimed.stdout, /claimed work w3, which had no session/);
+  assert.doesNotMatch(claimed.stdout, /will be blocked/, "there was no previous session to warn about");
+
+  const taken = kiln(root, ["open", "w3", "--session", "s2"]);
+  assert.match(taken.stdout, /took over work w3 from session s1/);
+  assert.match(taken.stdout, /next source edit will be blocked/);
+});
