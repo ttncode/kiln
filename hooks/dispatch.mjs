@@ -7,6 +7,7 @@ import { resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, removalTargets, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
+import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { isControlFile, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
@@ -97,15 +98,21 @@ async function stackGuardsOnBashWrites(payload, ctx) {
  * 5-second timeout and a hook that exceeds it ALLOWS, so every git call on this path is
  * bought with the promise it keeps.
  */
+function repoFor(part, { root, cwd }) {
+  return {
+    branches: branchesFor(part, { root, cwd }),
+    resolveRef: (spec) => (cwd === null ? null : gitOutput(dirOf(part, cwd), ["rev-parse", "--abbrev-ref", spec])),
+  };
+}
+
 function guardProtectedBranch(payload, ctx) {
   const command = payload.tool_input?.command;
   if (!command.includes("git")) return ALLOW;
-  const currentBranch = gitOutput(ctx.cwd, ["symbolic-ref", "--short", "HEAD"]);
+  const chain = cwdChain(command, ctx.cwd);
   const violation = protectedBranchViolation({
     command,
     protectedBranches: ctx.protectedBranches,
-    currentBranch,
-    resolveRef: (spec) => gitOutput(ctx.cwd, ["rev-parse", "--abbrev-ref", spec]),
+    repoFor: (part, index) => repoFor(part, { root: ctx.root, cwd: chain[index] ?? ctx.cwd }),
   });
   return violation ? block(protectedBranchMessage(violation)) : ALLOW;
 }
