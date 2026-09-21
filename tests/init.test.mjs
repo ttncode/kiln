@@ -1,6 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { applyInit, detectStack, detectVcs, gitOutput, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
@@ -187,4 +188,43 @@ test("with no remote, the branch you are on is the best answer there is", () => 
   gitOutput(root, ["checkout", "-q", "-b", "v3-master"]);
 
   assert.equal(detectVcs(root).integration_branch, "v3-master");
+});
+
+/**
+ * The config a real setup run produced: both commands answered through `--set`, and
+ * `"steps": []` written beside them, because the derivation ran inside proposeConfig
+ * before any override was read. `kiln verify` then reported green over the empty list.
+ */
+test("--set stack.cmd.* reaches the step list", () => {
+  const root = initRepo(tempRoot("kiln-init-set-"));
+  writeFile(join(root, "composer.json"), JSON.stringify({ require: { "codeigniter/framework": "3.1" } }));
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(
+    process.execPath,
+    [bin, "init", "--set", "stack.id=php-ci3", "--set", "stack.cmd.test=make test", "--set", "stack.cmd.migrate=curl -sf http://localhost/admin/migrate"],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.equal(run.status, 0, run.stderr);
+
+  const written = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+  assert.deepEqual(written.stack.steps.map((step) => step.id), ["migrate", "unit"], "the adapter's own steps, both satisfiable");
+});
+
+test("a step the commands cannot satisfy is not written", () => {
+  const root = initRepo(tempRoot("kiln-init-partial-"));
+  writeFile(join(root, "composer.json"), JSON.stringify({ require: { "codeigniter/framework": "3.1" } }));
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  spawnSync(process.execPath, [bin, "init", "--set", "stack.id=php-ci3", "--set", "stack.cmd.test=make test"], { cwd: root, encoding: "utf8" });
+
+  const written = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+  assert.deepEqual(written.stack.steps.map((step) => step.id), ["unit"], "migrate needs cmd.migrate, which nobody set");
+});
+
+test("init --help says what init does instead of doing it", () => {
+  const root = initRepo(tempRoot("kiln-init-help-"));
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "init", "--help"], { cwd: root, encoding: "utf8" });
+
+  assert.equal(run.status, 0);
+  assert.equal(existsSync(join(root, ".kiln")), false, "it wrote a whole .kiln/ into the plugin's own cache on a real run");
 });

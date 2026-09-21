@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, writeFileSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
-import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
+import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
@@ -88,11 +88,31 @@ export function setPath(target, assignment) {
   return target;
 }
 
+/**
+ * `steps` is derived from `cmd`, and D86 has init write only the steps it can satisfy —
+ * but the derivation ran inside `proposeConfig`, against the commands *detection* found,
+ * before `--set` was read. So a project whose commands kiln cannot detect (`make test`,
+ * a migrate endpoint) got them recorded under `cmd` and `"steps": []` beside them, which
+ * is the config a real setup run produced and `kiln verify` then reported green over.
+ *
+ * Re-deriving only when the answer is still empty keeps a hand-written `--set
+ * stack.steps=...` authoritative.
+ */
 function applyOverrides(config, argv) {
   for (let i = 0; i < argv.length - 1; i += 1) {
     if (argv[i] === "--set") setPath(config, argv[i + 1]);
   }
+  if (config.stack.steps.length === 0) config.stack.steps = stepsFor(config.stack.cmd, stackOrNull(config.stack.id));
   return config;
+}
+
+/** `--set stack.id=` may name a stack that does not exist; that is doctor's finding to report. */
+function stackOrNull(id) {
+  try {
+    return loadStack(id);
+  } catch {
+    return null;
+  }
 }
 
 function reportInit(result) {
@@ -111,6 +131,13 @@ function warnUnsatisfied(config) {
 
 function runInit(argv) {
   const root = process.cwd();
+  // `kiln init --help` wrote a whole .kiln/ into whatever directory it was run from —
+  // on the first real setup, the plugin's own cache. A flag asking what a command does
+  // must not be the command doing it.
+  if (argv.includes("--help")) {
+    out(USAGE);
+    return 0;
+  }
   const { config, questions, detected } = proposeConfig(root);
   if (argv.includes("--propose")) {
     out(JSON.stringify({ config, questions, detected }, null, 2));
@@ -119,8 +146,9 @@ function runInit(argv) {
   out(`stack: ${detected.stack.id}${detected.stack.evidence ? ` (${detected.stack.evidence})` : ""}`);
   out(`integration branch: ${integrationBranch(detected)}`);
   out(`${planInit(root).missing.length} file(s) to write`);
-  reportInit(applyInit(root, applyOverrides(config, argv)));
-  return warnUnsatisfied(config);
+  const final = applyOverrides(config, argv);
+  reportInit(applyInit(root, final));
+  return warnUnsatisfied(final);
 }
 
 function runResolve(argv) {
