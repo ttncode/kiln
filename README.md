@@ -204,10 +204,19 @@ One file, `.kiln/config.json`, and exactly one environment variable (`KILN_ROOT`
   would open a pull request against is one it must not push to.
 - A step whose `${cmd.x}` is unset **refuses to run** rather than skipping quietly, and
   `kiln doctor` says so before you hit it.
-- `auto` lets kiln rule a path's gates itself. Off by default, `full` needs its own opt-in,
-  a spike is never eligible, and a halted work is never ruled past. `kiln open` says which
-  way it is set, `kiln doctor` reports it, and `kiln report <id>` lists every gate it
-  decided — a ruling nobody can see is worse than a question nobody was asked.
+- `auto` lets kiln rule a path's gates itself. Two levers, and the run's own beats the
+  standing one:
+
+  ```
+  /kiln:kiln --auto the export button does nothing    # this run only
+  "auto": { "bounded": true }                         # every bounded run
+  ```
+
+  Off by default. A spike is never eligible, a halted work is never ruled past, and
+  `--auto` satisfies `full`'s opt-in because typing it is the deliberate act that opt-in
+  was asking for. `kiln open` says which way it is set, `kiln doctor` reports it, and
+  `kiln report <id>` lists every gate it decided — a ruling nobody can see is worse than a
+  question nobody was asked.
 
 ## Adding a stack
 
@@ -246,7 +255,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 333, green on every pull request |
+| Tests | 336, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

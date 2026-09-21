@@ -90,20 +90,20 @@ test("a refused ratchet says which direction it refused", () => {
 // ------------------------------------------------------------------ auto mode
 
 test("D16: a spike is never eligible for auto mode", () => {
-  const verdict = autoEligible("spike", { auto: { bounded: true, full: true } });
+  const verdict = autoEligible("spike", { config: { auto: { bounded: true, full: true } } });
   assert.equal(verdict.eligible, false);
   assert.match(verdict.reason, /a question/);
 });
 
 test("D16: bounded is eligible only when it is switched on, and default is off", () => {
-  assert.equal(autoEligible("bounded", { auto: { bounded: true } }).eligible, true);
-  assert.equal(autoEligible("bounded", { auto: { bounded: false } }).eligible, false);
+  assert.equal(autoEligible("bounded", { config: { auto: { bounded: true } } }).eligible, true);
+  assert.equal(autoEligible("bounded", { config: { auto: { bounded: false } } }).eligible, false);
   assert.equal(autoEligible("bounded", {}).eligible, false, "default off");
 });
 
 test("D16: full needs its own opt-in, which bounded's does not grant", () => {
-  assert.equal(autoEligible("full", { auto: { bounded: true } }).eligible, false);
-  assert.equal(autoEligible("full", { auto: { bounded: true, full: true } }).eligible, true);
+  assert.equal(autoEligible("full", { config: { auto: { bounded: true } } }).eligible, false);
+  assert.equal(autoEligible("full", { config: { auto: { bounded: true, full: true } } }).eligible, true);
 });
 
 test("B58: a run that ruled on the user's behalf must print what it decided", () => {
@@ -258,7 +258,7 @@ test("B58: with auto on, the gate is ruled and the report says so", () => {
 test("B58: with auto off — the default — the same call is refused", () => {
   const run = autoGate(autoProject({}));
   assert.equal(run.status, 2);
-  assert.match(run.stderr, /auto\.bounded is off/);
+  assert.match(run.stderr, /auto is off/);
   assert.match(run.stderr, /Ask the user/);
 });
 
@@ -287,4 +287,37 @@ test("open says whether a gate will be ruled for you, at the moment the path is 
 
   const on = autoProject({ bounded: true });
   assert.match(kiln(on, ["open", "w2", "--path", "bounded"]).stdout, /auto mode is ON for bounded/);
+});
+
+/**
+ * The user typed `/kiln --auto Remove this filter …` unprompted. kiln minted
+ * `20260921-auto-remove-filter-…` and turned nothing on: the instruction became a word in
+ * the id. The flag is also the only lever an agent can honour — the harness refuses an
+ * agent editing the config that governs its own gates, by name, as [Self-Modification].
+ */
+test("--auto in the request rules this run's gates, and config is not touched", () => {
+  const root = autoProject({});
+  assert.match(kiln(root, ["open", "w2", "--path", "bounded", "--auto"]).stdout, /auto mode is ON for bounded \(the --auto in your request\)/);
+  assert.equal(readState(root, "w2").auto, true);
+
+  writeFile(join(root, ".kiln", "work", "w2", "plan.md"), "# plan\n");
+  const ruled = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--auto"]);
+  assert.equal(ruled.status, 0, ruled.stderr);
+  assert.equal(readState(root, "w2").gates.plan.by, "auto");
+
+  const config = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+  assert.equal(config.auto.bounded, undefined, "a run's flag never writes the standing default");
+});
+
+test("--auto satisfies full's opt-in, and never reaches a spike", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "wf", "--path", "full", "--auto"]);
+  writeFile(join(root, ".kiln", "work", "wf", "spec.md"), "# spec\n");
+  assert.equal(kiln(root, ["gate", "wf", "spec", "--artifact", ".kiln/work/wf/spec.md", "--auto"]).status, 0);
+
+  kiln(root, ["open", "ws", "--path", "spike", "--auto"]);
+  writeFile(join(root, ".kiln", "work", "ws", "brief.md"), "# brief\n");
+  const spike = kiln(root, ["gate", "ws", "probe", "--artifact", ".kiln/work/ws/brief.md", "--auto"]);
+  assert.equal(spike.status, 2);
+  assert.match(spike.stderr, /not a change/);
 });

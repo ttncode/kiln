@@ -31,7 +31,7 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Decide what <arg> means - a URL, a work in progress, a ticket ref, or a
       description - and print the decision as JSON. Writes nothing.
 
-  kiln open <id> [--session <session-id>] [--path bounded]
+  kiln open <id> [--session <session-id>] [--path bounded] [--auto]
       Create the work directory and record the commit it starts from.
 
   kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
@@ -231,7 +231,7 @@ function flag(argv, name) {
 function autoRefusal(root, { id, config }) {
   const state = readState(root, id);
   if (state.status === WORK_STATUS.halted) return `this work is halted — auto mode does not rule past a halt`;
-  const verdict = autoEligible(state.path, config);
+  const verdict = autoEligible(state.path, { config, state });
   return verdict.eligible ? null : verdict.reason;
 }
 
@@ -461,9 +461,10 @@ function runOpen(argv) {
     process.stderr.write(`no ceremony path named "${path}". One of: ${PATHS.join(", ")}.\n`);
     return 1;
   }
-  const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path, dirtyAtOpen: actualChanged(root, base) });
+  const auto = rest.includes("--auto");
+  const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path, auto, dirtyAtOpen: actualChanged(root, base) });
   out(writeState(root, state));
-  out(autoLine(path, config));
+  out(autoLine(path, { config, state }));
   return 0;
 }
 
@@ -473,10 +474,10 @@ function runOpen(argv) {
  * because a run that decides for someone without telling them first is the failure the
  * gates exist to prevent.
  */
-function autoLine(path, config) {
-  const verdict = autoEligible(path, config);
+function autoLine(path, { config, state }) {
+  const verdict = autoEligible(path, { config, state });
   return verdict.eligible
-    ? `auto mode is ON for ${path}: kiln will rule its gates and say so in \`kiln report\`.`
+    ? `auto mode is ON for ${path} (${verdict.from}): kiln will rule its gates and say so in \`kiln report\`.`
     : `auto mode is off for ${path} (${verdict.reason}) — every gate stops for you.`;
 }
 
