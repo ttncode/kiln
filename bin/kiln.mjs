@@ -209,7 +209,7 @@ const MARK = { ok: " ok ", warn: "warn", fail: "FAIL" };
 
 /** Writes config, which no tool may edit — so kiln's own code is the only writer (D48). */
 function applyRepairs({ root, config }) {
-  const repair = repairs(root, config);
+  const repair = repairs(config);
   if (!repair) return out("Nothing to repair.") ?? 0;
   writeFileSync(configPath(root), `${JSON.stringify(repair.config, null, 2)}\n`, "utf8");
   out(`repaired: ${repair.what}`);

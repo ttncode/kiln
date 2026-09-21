@@ -167,3 +167,57 @@ test("doctor says when a work has no owner, because its gate enforces nothing", 
   assert.equal(row.status, STATUS.fail, "two unowned works cannot be claimed automatically");
   assert.match(row.detail, /enforces nothing/);
 });
+
+test("doctor trusts the declared shipping branch, not a detection fallback", () => {
+  const root = tempRoot("kiln-doctor-declared-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  git(root, ["checkout", "-q", "-b", "fix/some-feature"]);
+  writeConfig(root, {
+    ...DEFAULTS,
+    vcs: { ...DEFAULTS.vcs, integration_branch: "v3-develop-tps", protected: ["v3-develop-tps", "v3-master"] },
+    stack: { id: "node", cmd: { test: "t" }, steps: [{ id: "unit", run: "${cmd.test}" }] },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "protected branches");
+  assert.equal(row.status, STATUS.ok, "origin/HEAD is unset here, and the branch you stand on is not the answer");
+});
+
+test("doctor still fails when the declared shipping branch is unprotected", () => {
+  const root = tempRoot("kiln-doctor-undeclared-");
+  initRepo(root);
+  writeConfig(root, {
+    ...DEFAULTS,
+    vcs: { ...DEFAULTS.vcs, integration_branch: "release", protected: ["main"] },
+    stack: { id: "node", cmd: { test: "t" }, steps: [{ id: "unit", run: "${cmd.test}" }] },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "protected branches");
+  assert.equal(row.status, STATUS.fail);
+  assert.match(row.detail, /ships from "release"/);
+});
+
+test("a remote default that disagrees with the declaration is a warning, not a failure", () => {
+  const root = tempRoot("kiln-doctor-remote-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  const origin = tempRoot("kiln-doctor-origin-");
+  git(origin, ["init", "-q", "--bare"]);
+  git(root, ["remote", "add", "origin", origin]);
+  git(root, ["push", "-q", "origin", "HEAD:main"]);
+  git(root, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  writeConfig(root, {
+    ...DEFAULTS,
+    vcs: { ...DEFAULTS.vcs, integration_branch: "v3-develop-tps", protected: ["v3-develop-tps"] },
+    stack: { id: "node", cmd: { test: "t" }, steps: [{ id: "unit", run: "${cmd.test}" }] },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "protected branches");
+  assert.equal(row.status, STATUS.warn);
+  assert.match(row.detail, /remote's default is "main"/);
+});
