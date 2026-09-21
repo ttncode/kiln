@@ -147,6 +147,16 @@ file — read it there rather than trusting this table.
 | 6 | kiln's own code performs no network egress | a **static** check, and its test says so |
 | 7 | the agent cannot approve its own gate, or switch off what judges it | `state.json` and `config.json` are not writable by the agent; neither are the repository's git hooks, and `--no-verify` / `core.hooksPath` are refused |
 
+Item 1 has a second layer. kiln installs a `pre-push` hook in every checkout, and git
+hands that hook the **resolved** destination — after `HEAD`, `push.default`, aliases, `-C`
+and the working directory have all been worked out. Nothing is parsed. It is a floor, not
+a ceiling: `--no-verify` and `core.hooksPath` switch it off, so kiln refuses those, and
+`.git/hooks/` is not writable by the run. A hook you already have is reported, never
+replaced.
+
+The layer above both is your forge's own branch protection. kiln does not set it and
+cannot; a command that never reaches your machine's git is the one case neither layer sees.
+
 Three limits are stated rather than papered over, and each has a test asserting the limit:
 
 - **Interpreters and heredocs.** `python -c` and a heredoc into a script edit source without
@@ -213,7 +223,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 282, green on every pull request |
+| Tests | 288, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
@@ -231,7 +241,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 89 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 90 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, writeFileSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
+import { installFloor } from "../lib/floor.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { PATHS, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
@@ -148,6 +149,7 @@ function runInit(argv) {
   out(`${planInit(root).missing.length} file(s) to write`);
   const final = applyOverrides(config, argv);
   reportInit(applyInit(root, final));
+  for (const path of installFloor(root)) out(`  wrote   ${path}`);
   return warnUnsatisfied(final);
 }
 
@@ -237,8 +239,10 @@ const MARK = { ok: " ok ", warn: "warn", fail: "FAIL" };
 
 /** Writes config, which no tool may edit — so kiln's own code is the only writer (D48). */
 function applyRepairs({ root, config }) {
+  const installed = installFloor(root);
+  for (const path of installed) out(`repaired: installed ${path}`);
   const repair = repairs(config);
-  if (!repair) return out("Nothing to repair.") ?? 0;
+  if (!repair) return out(installed.length > 0 ? "Done." : "Nothing to repair.") ?? 0;
   writeFileSync(configPath(root), `${JSON.stringify(repair.config, null, 2)}\n`, "utf8");
   out(`repaired: ${repair.what}`);
   return 0;
