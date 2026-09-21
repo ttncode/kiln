@@ -14,7 +14,12 @@ import {
 } from "../lib/resolve.mjs";
 import { STATUS, newWork, statePath, writeState } from "../lib/state.mjs";
 import { listWork } from "../lib/work.mjs";
-import { cleanupFixtures, tempRoot } from "./helpers/fixture.mjs";
+import { spawnSync } from "node:child_process";
+import { DEFAULTS } from "../lib/config.mjs";
+import { readState } from "../lib/state.mjs";
+import { cleanupFixtures, tempRoot, writeConfig } from "./helpers/fixture.mjs";
+
+const writeConfigFor = (root) => writeConfig(root, DEFAULTS);
 
 after(cleanupFixtures);
 
@@ -183,4 +188,30 @@ test("a description that names an existing work says so, without claiming to be 
 test("a description that names nothing carries no hint", () => {
   const resolved = resolveArgument({ arg: "the export button does nothing", root: tempRoot() });
   assert.equal("mentions" in resolved, false);
+});
+
+test("D58: a halted work re-presents its halt, and something can now set it", () => {
+  const root = tempRoot();
+  writeState(root, newWork({ id: "42", sessionId: "s", base: "aaa" }));
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  writeConfigFor(root);
+  const run = spawnSync(process.execPath, [bin, "halt", "42", "--reason", "blocking unknown: which backend"], { cwd: root, encoding: "utf8" });
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(readState(root, "42").status, STATUS.halted);
+  assert.deepEqual(readState(root, "42").carry_over.map((r) => r.text), ["blocking unknown: which backend"]);
+  assert.equal(resolveArgument({ arg: "42", root }).action, "present_halt");
+});
+
+test("a halt without a reason is refused — a stop nobody can act on", () => {
+  const root = tempRoot();
+  writeConfigFor(root);
+  writeState(root, newWork({ id: "42", sessionId: "s", base: "aaa" }));
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "halt", "42"], { cwd: root, encoding: "utf8" });
+
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /Pass --reason/);
 });

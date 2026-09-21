@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
-import { loadConfig } from "../lib/config.mjs";
-import { STATUS, runChecks, worstStatus } from "../lib/doctor.mjs";
+import { existsSync, writeFileSync } from "node:fs";
+import { configPath, loadConfig } from "../lib/config.mjs";
+import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
@@ -14,7 +14,7 @@ import { recordFullVerified, recordVerify } from "../lib/state.mjs";
 import { join } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
-import { adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
+import { STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 
@@ -36,8 +36,9 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Classify what the user said, hash the artifact, and record what was observed.
       You supply only --answer; every other field is measured here.
 
-  kiln doctor
+  kiln doctor [--write]
       Check this project's setup and say what would stop a run.
+      --write  repair what can be repaired without guessing.
 
   kiln verify <id> [--phase fast|full]
       Run the stack's steps for that phase, record every exit code, and stop at
@@ -48,6 +49,9 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
 
   kiln scope <id>
       Reconcile what the plan predicted against what the diff actually touched.
+
+  kiln halt <id> --reason "<why>"
+      Stop this work and record why. Source edits block until it is resumed.
 
   kiln ratchet <id> <spike|bounded|full>
       Move this work up a rung. Prints the uncommitted diff it found and stops;
@@ -195,12 +199,22 @@ function describeConflicts(conflicts) {
 
 const MARK = { ok: " ok ", warn: "warn", fail: "FAIL" };
 
+/** Writes config, which no tool may edit — so kiln's own code is the only writer (D48). */
+function applyRepairs({ root, config }) {
+  const repair = repairs(root, config);
+  if (!repair) return out("Nothing to repair.") ?? 0;
+  writeFileSync(configPath(root), `${JSON.stringify(repair.config, null, 2)}\n`, "utf8");
+  out(`repaired: ${repair.what}`);
+  return 0;
+}
+
 /**
  * Exits non-zero on a failure so a wrapper can gate on it. A warning is a thing to know,
  * not a thing to stop for.
  */
-function runDoctor() {
+function runDoctor(argv) {
   const loaded = loadConfig(process.cwd());
+  if (argv.includes("--write")) return applyRepairs(loaded);
   const results = runChecks(loaded.root, loaded);
   for (const row of results) out(`  [${MARK[row.status]}] ${row.title}: ${row.detail}`);
 
@@ -350,6 +364,29 @@ function runRatchet(argv) {
   return 0;
 }
 
+/**
+ * `resolve` branches on `halted` and `guard-gate` blocks on it, and until now nothing
+ * could set it — a state two components read and none could write. A halt is a thing
+ * that happened, so recording it is the side effect of stopping (D65).
+ */
+function runHalt(argv) {
+  const [id, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  const reason = flag(rest, "--reason") ?? "";
+  if (!reason) {
+    process.stderr.write("a halt without a reason is a stop nobody can act on. Pass --reason.\n");
+    return 1;
+  }
+  const state = readState(root, id);
+  writeState(root, {
+    ...state,
+    status: WORK_STATUS.halted,
+    carry_over: [...state.carry_over, { from_pass: state.pass, kind: flag(rest, "--kind") ?? "halt", text: reason }],
+  });
+  out(`halted ${id}: ${reason}\nSource edits are blocked until this is resumed.`);
+  return 0;
+}
+
 function runReport(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
@@ -366,6 +403,7 @@ const COMMANDS = {
   list: runList,
   gate: runGate,
   ratchet: runRatchet,
+  halt: runHalt,
   report: runReport,
   blast: runBlast,
   scope: runScope,

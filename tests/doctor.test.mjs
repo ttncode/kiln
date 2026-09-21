@@ -108,3 +108,28 @@ test("D7 item 1: doctor fails when the branch the repo ships from is unprotected
   assert.equal(row.status, STATUS.fail);
   assert.match(row.detail, /ships from "main"/);
 });
+
+test("D88: doctor --write repairs the one thing it can repair without guessing", () => {
+  const root = tempRoot("kiln-repair-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  git(root, ["remote", "add", "origin", "https://github.com/acme/app.git"]);
+  git(root, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, protected: ["feat/x"] } });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "doctor", "--write"], { cwd: root, encoding: "utf8" });
+
+  assert.equal(run.status, 0);
+  assert.match(run.stdout, /add "main" to vcs.protected/);
+  assert.deepEqual(loadConfig(root).config.vcs.protected, ["feat/x", "main"]);
+});
+
+test("doctor --write on a healthy project repairs nothing and says so", () => {
+  const root = project();
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "doctor", "--write"], { cwd: root, encoding: "utf8" });
+  assert.match(run.stdout, /Nothing to repair/);
+});

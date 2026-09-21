@@ -1,15 +1,15 @@
 {
   "name": "kiln",
-  "description": "One unit of work to a reviewed pull request, with unsafe actions blocked at runtime",
+  "description": "Let an AI coding agent work a whole ticket without watching every command it runs.",
   "version": "1.0.0-rc.1",
   "homepage": "https://github.com/ttncode/kiln",
   "repository": "https://github.com/ttncode/kiln",
   "license": "MIT",
   "keywords": [
-    "pipeline",
-    "guards",
+    "guardrails",
     "hooks",
     "code-review",
-    "workflow"
+    "ai-safety",
+    "coding-agent"
   ]
 }
