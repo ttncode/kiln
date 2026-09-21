@@ -1,7 +1,7 @@
 {
   "name": "kiln",
-  "version": "1.0.0-rc.1",
-  "description": "A harness plugin that drives one unit of work to a reviewed, verified, ship-ready change, and blocks unsafe actions at runtime.",
+  "version": "1.0.0-rc.2",
+  "description": "Let an AI coding agent work a whole ticket without watching every command it runs.",
   "license": "MIT",
   "type": "module",
   "private": true,
