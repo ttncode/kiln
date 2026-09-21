@@ -210,7 +210,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 249, green on every pull request |
+| Tests | 251, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
@@ -240,6 +240,12 @@ with the reasoning rather than only the result.
 ## Contributing
 
 Pull requests run the conformance suite. That is the whole gate: `npm run lint && npm test`.
+[CONTRIBUTING.md](CONTRIBUTING.md) says what a pull request has to carry, and how to disagree
+with a decision in the log rather than around it.
+
+A guard that **allows** what it promises to block is a vulnerability, not an issue.
+[SECURITY.md](SECURITY.md) says where that goes, and lists the ceilings that are documented
+limits rather than holes. [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) covers the rest.
 
 Acceptance runs need a real repository, a real ticket and a human grader, so they are not
 asked of contributors.

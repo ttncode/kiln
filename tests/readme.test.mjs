@@ -62,3 +62,25 @@ test("the README does not claim a release bar it has not met", () => {
   assert.match(README, /Status: pre-release/);
   assert.match(README, /acceptance runs/, "the outstanding half has to stay visible");
 });
+
+/**
+ * D6 puts kiln at the strictest public-repository bar. These three files are what a stranger
+ * looks for before trusting code that runs inside their session, and SECURITY.md is the one
+ * that matters most here: hooks are a supply-chain surface.
+ */
+test("the community files exist and the README routes to them", () => {
+  for (const file of ["CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md"]) {
+    assert.ok(existsSync(join(ROOT, file)), `${file} is missing`);
+    assert.match(README, new RegExp(`\\(${file}\\)`), `the README does not link ${file}`);
+  }
+});
+
+test("every relative link in the community files points at a file that exists", () => {
+  for (const file of ["CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md"]) {
+    const text = readFileSync(join(ROOT, file), "utf8");
+    const links = [...text.matchAll(/\]\((?!https?:|#)([^)]+)\)/g)].map((m) => m[1].split("#")[0]);
+    for (const target of new Set(links.filter(Boolean))) {
+      assert.ok(existsSync(join(ROOT, target)), `${file} links to ${target}, which does not exist`);
+    }
+  }
+});
