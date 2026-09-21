@@ -178,3 +178,27 @@ test("the orchestrator names the flag that carries a path override", () => {
   assert.match(body, /open <id> --path/, "the override has to have a route into state");
   assert.match(body, /defaults to `bounded`/, "the default is a choice the agent makes silently otherwise");
 });
+
+/**
+ * D69 checks that every file a skill points at came with it. The reverse went unchecked,
+ * and two subagent prompts shipped that nothing dispatched: the spec reviewer was
+ * referenced by nothing at all, and the code reviewer was linked as reading material, so
+ * on the first real full-path run the implementer reviewed its own diff.
+ */
+test("every file that came with a skill is pointed at by it", () => {
+  for (const name of skillNames()) {
+    const body = frontmatter(name).body;
+    const orphans = readdirSync(join(SKILLS, name))
+      .filter((file) => file.endsWith(".md") && file !== "SKILL.md")
+      .filter((file) => !body.includes(file));
+    assert.deepEqual(orphans, [], `${name} ships ${orphans.join(", ")} and points at nothing`);
+  }
+});
+
+test("a prompt written for a subagent is dispatched, not read aloud", () => {
+  for (const [skill, prompt] of [["kiln-review", "code-reviewer.md"], ["kiln-brainstorming", "spec-document-reviewer-prompt.md"]]) {
+    const template = readFileSync(join(SKILLS, skill, prompt), "utf8");
+    assert.match(template, /dispatching a .* subagent/, `${prompt} no longer says it is a subagent prompt`);
+    assert.match(frontmatter(skill).body, /Task\(subagent_type/, `${skill} reads ${prompt} instead of dispatching it`);
+  }
+});
