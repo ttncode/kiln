@@ -11,7 +11,7 @@ import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationL
 import { PATHS, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
-import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
+import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
 import { recordFullVerified, recordVerify } from "../lib/state.mjs";
 import { join } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
@@ -312,6 +312,19 @@ function runVerify(argv) {
  * project whose config had `"steps": []` — a pass nobody earned and nobody could see was
  * empty.
  */
+/**
+ * Every step skipped is the same emptiness as no steps at all, and it reads as success
+ * unless it is said out loud. The reasons are printed because the fix is in them: a
+ * `requires` nothing satisfies is either a missing `--effects` or a preset that chained a
+ * step behind an effect it should only have been ordered after.
+ */
+function nothingRanMessage(result) {
+  const reasons = result.entries.map((entry) => `  ${entry.id} — ${entry.skipped}`);
+  return `kiln will not call this green: every step was skipped, so nothing verified anything.
+${reasons.join("\n")}
+Declare the effect this change produces with --effects, or fix the step's \`requires\` if it is ordering rather than a precondition.`;
+}
+
 function noStepsMessage(config, phase) {
   return `kiln will not report a result for a phase with no steps.
 stack "${config.stack.id}" has no ${phase} step in .kiln/config.json — "steps" is empty, so there is nothing to run.
@@ -331,6 +344,10 @@ function recordRun({ root, state, phase, head, result }) {
   writeState(root, next);
 
   result.entries.forEach(reportStep);
+  if (!result.failed && ranSteps(result).length === 0) {
+    process.stderr.write(`${nothingRanMessage(result)}\n`);
+    return 1;
+  }
   if (!result.failed) {
     out(phase === "full" ? "green" : "fast pass — not green; the project's suite defines that");
     return 0;
