@@ -36,4 +36,5 @@ test("every manifest carries the description the repository advertises", () => {
   const manifest = JSON.parse(readFileSync(new URL("../.claude-plugin/plugin.json", import.meta.url), "utf8"));
   const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
   assert.ok(readme.includes(manifest.description), "a manifest describing an older product is a second front page");
+  assert.equal(pkg.description, manifest.description, "package.json is a third front page and drifts the same way");
 });
