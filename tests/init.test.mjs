@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { applyInit, detectStack, detectVcs, gitOutput, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
-import { cleanupFixtures, commitAll, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
+import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
 
@@ -88,9 +88,18 @@ test("the tracker provider follows the remote rather than a hardcoded default", 
   assert.equal(proposeConfig(root).config.tracker.provider, "gitlab");
 });
 
-test("B01: init asks at most three questions, and every one carries a default", () => {
+/**
+ * D92 replaced a fixed three with "ask what detection cannot answer". The count is not the
+ * law — not interrogating the user is — and on a real setup the fixed three did not reduce
+ * the questions, it moved them into `kiln doctor` after the file was already written.
+ */
+test("B01: init asks only what it cannot detect, and every question carries a default", () => {
   const { questions } = proposeConfig(nodeProject());
-  assert.ok(questions.length <= 3, `asked ${questions.length}`);
+  assert.deepEqual(
+    questions.map((row) => row.key).sort(),
+    ["stack.cmd.test", "tracker.provider", "vcs.integration_branch", "vcs.protected"],
+    "no remote here, so the forge and the default branch are both unreadable",
+  );
   for (const question of questions) {
     assert.notEqual(question.default, undefined, `${question.key} has no default`);
   }
@@ -227,4 +236,68 @@ test("init --help says what init does instead of doing it", () => {
 
   assert.equal(run.status, 0);
   assert.equal(existsSync(join(root, ".kiln")), false, "it wrote a whole .kiln/ into the plugin's own cache on a real run");
+});
+
+/**
+ * On the first real setup, `init` was run bare and every question it had prepared went
+ * unasked. `kiln doctor` then came back and asked the same things after the file was on
+ * disk — including which branch pull requests target, which is a safety answer.
+ */
+test("init names what it decided for you when nobody answered", () => {
+  const root = initRepo(tempRoot("kiln-init-unasked-"));
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "init"], { cwd: root, encoding: "utf8" });
+
+  assert.equal(run.status, 0, "a project kiln cannot identify is a supported starting point");
+  assert.match(run.stdout, /kiln decided these for you/);
+  assert.match(run.stdout, /vcs\.protected/);
+  assert.doesNotMatch(run.stdout, /stack\.id/, "only one stack is detectable here, so there is nothing to ask");
+});
+
+test("an answered question is not reported as decided for you", () => {
+  const root = initRepo(tempRoot("kiln-init-answered-"));
+  writeFile(join(root, "package.json"), JSON.stringify({ name: "a", scripts: { test: "vitest run" } }));
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "init", "--set", "tracker.provider=gitlab"], { cwd: root, encoding: "utf8" });
+
+  assert.doesNotMatch(run.stdout, /tracker\.provider =/);
+  assert.match(run.stdout, /vcs\.protected/);
+});
+
+/**
+ * A superproject often has no remote of its own — every one belongs to a submodule. Reading
+ * only the root answered `github` and `main` for a checkout whose modules all live on a
+ * GitLab host, and doctor had to correct both after the fact.
+ */
+test("the remote is read from a module when the superproject has none", () => {
+  const sub = initRepo(tempRoot("kiln-init-vcssub-"));
+  writeFile(join(sub, "a.txt"), "a");
+  commitAll(sub, "sub");
+
+  const root = initRepo(tempRoot("kiln-init-vcssuper-"));
+  writeFile(join(root, "README.md"), "super");
+  commitAll(root, "super");
+  git(root, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "AdminPage"]);
+  commitAll(root, "add submodule");
+
+  // The checkout git created is its own working tree; the remote belongs to that one.
+  const checkout = join(root, "AdminPage");
+  git(checkout, ["remote", "set-url", "origin", "git@gitlab.example.jp:team/app.git"]);
+  git(checkout, ["update-ref", "refs/remotes/origin/v3-develop", "HEAD"]);
+  git(checkout, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/v3-develop"]);
+
+  const vcs = detectVcs(root);
+  assert.equal(vcs.provider, "gitlab", "the superproject has no remote; the module does");
+  assert.equal(vcs.integration_branch, "v3-develop");
+  assert.equal(vcs.guessed, false);
+});
+
+test("a branch nothing names is marked a guess, so init can ask instead of pretending", () => {
+  const root = initRepo(tempRoot("kiln-init-guess-"));
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+
+  assert.equal(detectVcs(root).guessed, true, "origin/HEAD is unset, so the branch you stand on is not a fact");
+  const asked = proposeConfig(root).questions.map((row) => row.key);
+  assert.ok(asked.includes("vcs.integration_branch"));
 });
