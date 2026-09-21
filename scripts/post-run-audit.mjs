@@ -13,6 +13,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { integrationBranch } from "../lib/config.mjs";
 
 const PASS = "pass";
 const FAIL = "fail";
@@ -36,7 +37,7 @@ function readState(root, id) {
 
 /** 1. Nothing was written to the branch the repository ships from. */
 function checkIntegrationBranch(root, config) {
-  const branch = config.vcs.integration_branch;
+  const branch = integrationBranch(config);
   const reflog = git(root, ["reflog", "show", branch, "--date=iso"]) ?? "";
   const moved = reflog.split("\n").filter((line) => /commit|reset|merge/.test(line));
   if (moved.length === 0) return result(PASS, { title: `no write to ${branch}`, detail: "reflog shows no commit, reset or merge" });
@@ -53,7 +54,7 @@ function checkIntegrationBranch(root, config) {
  * origin answers exactly that, with no extra state to record.
  */
 function checkNotAheadOfRemote(root, config) {
-  const branch = config.vcs.integration_branch;
+  const branch = integrationBranch(config);
   const ahead = git(root, ["rev-list", "--count", `origin/${branch}..${branch}`]);
   if (ahead === null) {
     return result(WEAK, { title: `${branch} not ahead of origin`, detail: "no remote tracking ref to compare against" });

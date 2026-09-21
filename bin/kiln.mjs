@@ -2,7 +2,7 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { existsSync, writeFileSync } from "node:fs";
-import { configPath, loadConfig } from "../lib/config.mjs";
+import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
@@ -117,7 +117,7 @@ function runInit(argv) {
     return 0;
   }
   out(`stack: ${detected.stack.id}${detected.stack.evidence ? ` (${detected.stack.evidence})` : ""}`);
-  out(`integration branch: ${detected.vcs.integration_branch}`);
+  out(`integration branch: ${integrationBranch(detected)}`);
   out(`${planInit(root).missing.length} file(s) to write`);
   reportInit(applyInit(root, applyOverrides(config, argv)));
   return warnUnsatisfied(config);

@@ -14,6 +14,11 @@
 > **Built.** P0–P5 are complete, six acceptance runs are recorded, and the decision log gained
 > **D86–D89** from building it and running it. What remains for a v1.0 tag is the four
 > human-graded scorecard lines; see `2026-09-21-acceptance-c6-handover.md`.
+> **One decision is config-only at v1, and is labelled rather than implied:** D81's per-module
+> `integration_branch` map is accepted, validated and stored, and nothing in v1 reads it per
+> module — the drift check that does arrives with the Knowledge tier (D22, D82). `kiln doctor`
+> reports the map and names the branch every v1 reader actually gets, so it cannot pass for
+> being in force.
 > Nothing is parked. Q2 and Q3 remain open by design and block nothing (§5).
 > Last updated: 2026-09-20.
 >
