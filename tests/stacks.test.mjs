@@ -4,11 +4,13 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatch } from "../hooks/dispatch.mjs";
 import { effectIds, effectiveSteps, guardsFor, loadStack, stacksDir, StackError } from "../lib/stack.mjs";
-import { planSteps } from "../lib/steps.mjs";
+import { planSteps, unreachableSteps } from "../lib/steps.mjs";
 import { cleanupFixtures } from "./helpers/fixture.mjs";
 import { kilnProject, payload } from "./helpers/project.mjs";
 
 after(cleanupFixtures);
+
+const stackIds = () => readdirSync(stacksDir()).filter((name) => name.endsWith(".json")).map((name) => name.replace(/\.json$/, ""));
 
 const BLOCK = 2;
 const ALLOW = 0;
@@ -55,19 +57,39 @@ test("D61: the effect point is exercised by a second adapter, not just one", () 
   assert.equal(loadStack("php-ci3").effects.length, 1);
 });
 
+/** The mechanism, tested on its own steps: a preset's contents are not the contract. */
 test("D29: a step whose required effect is absent is skipped with a reason, not failed", () => {
-  const steps = loadStack("php-ci3").steps;
-  const without = planSteps(steps, { phase: "full", effects: [] });
-  assert.equal(without[0].skipped, "requires migrate");
+  const steps = [
+    { id: "migrate", run: "m", provides: "migrate" },
+    { id: "smoke", run: "s", requires: ["migrate"] },
+  ];
+  assert.equal(planSteps(steps, { phase: "full", effects: [] })[1].skipped, "requires migrate");
+  assert.equal(planSteps(steps, { phase: "full", effects: ["migrate"] })[1].skipped, undefined);
+});
 
-  const withEffect = planSteps(steps, { phase: "full", effects: ["migrate"] });
-  assert.equal(withEffect[0].skipped, undefined);
+/**
+ * `unit` shipped as `requires: ["migrate"]`, which reads "run the tests only when this
+ * change has a migration" — the opposite of what was meant, and the migrate step that
+ * provides the effect is in a different phase, so in the phase that decides green the
+ * project's only test step could never run. It did not, on a real project.
+ */
+test("no shipped stack carries a step that can never run", () => {
+  for (const id of stackIds()) {
+    const stranded = unreachableSteps(loadStack(id).steps);
+    assert.deepEqual(stranded, [], `${id}: ${stranded.map((row) => `${row.step} requires ${row.effect}`).join(", ")}`);
+  }
+});
+
+test("the full phase of php-ci3 runs its tests without waiting for a migration", () => {
+  const planned = planSteps(loadStack("php-ci3").steps, { phase: "full", effects: [] });
+  assert.deepEqual(planned.map((row) => row.step.id), ["unit"]);
+  assert.equal(planned[0].skipped, undefined, "ordering comes from the array; requires comes from the change");
 });
 
 test("D29: phase splits which steps run inside IMPLEMENT", () => {
   const steps = loadStack("php-ci3").steps;
   assert.deepEqual(planSteps(steps, { phase: "fast", effects: [] }).map((p) => p.step.id), ["migrate"]);
-  assert.deepEqual(planSteps(steps, { phase: "full", effects: ["migrate"] }).map((p) => p.step.id), ["unit"]);
+  assert.deepEqual(planSteps(steps, { phase: "full", effects: [] }).map((p) => p.step.id), ["unit"]);
 });
 
 test("an unknown stack names the one thing you have to write", () => {

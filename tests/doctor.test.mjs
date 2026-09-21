@@ -240,3 +240,30 @@ test("a remote default that disagrees with the declaration is a warning, not a f
   assert.equal(row.status, STATUS.warn);
   assert.match(row.detail, /remote's default is "main"/);
 });
+
+/**
+ * A stack adapter is a JSON file anyone may write, and the shipped php-ci3 one carried a
+ * step that could never run in the phase that decides green. Nothing checked, so nothing
+ * said — and `kiln verify` printed green over it on a real project.
+ */
+test("doctor fails a step whose required effect nothing in its phase provides", () => {
+  const root = tempRoot("kiln-doctor-stranded-");
+  initRepo(root);
+  writeConfig(root, {
+    ...DEFAULTS,
+    stack: {
+      id: "node",
+      cmd: { test: "t", migrate: "m" },
+      steps: [
+        { id: "migrate", run: "${cmd.migrate}", provides: "migrate", phase: "fast" },
+        { id: "unit", run: "${cmd.test}", requires: ["migrate"] },
+      ],
+    },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "stack");
+  assert.equal(row.status, STATUS.fail);
+  assert.match(row.detail, /no full-phase step provides/);
+  assert.match(row.detail, /can never run/);
+});
