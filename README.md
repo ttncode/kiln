@@ -4,14 +4,17 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen.svg)](package.json)
 
-kiln takes one unit of work — a ticket reference, or just a sentence — and drives it to a
-reviewed, verified pull request. While it does that, it **blocks** unsafe actions instead of
-asking the agent nicely not to take them.
+**Let an AI coding agent work a whole ticket without watching every command it runs.**
 
-A skill library raises the floor on what your agent can do. kiln is about what happens when
-it is wrong.
+You can already tell an agent not to push to `main`. kiln makes it unable to — the command
+does not run, rather than being discouraged. So you can hand it one unit of work — a ticket
+reference, or just a sentence — and get back a reviewed, verified pull request without
+reading over its shoulder.
 
-**Status: pre-release.** Everything below runs and is covered by 203 tests. It has not yet
+A skill library raises the floor on what your agent *can* do. kiln decides what happens when
+it is **wrong**.
+
+**Status: pre-release.** Everything below runs, and every promise it makes has a test. It has not yet
 been through the six real-world acceptance runs its own release bar requires — see
 [Status](#status).
 
@@ -207,7 +210,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 203, green on every pull request |
+| Tests | 240, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

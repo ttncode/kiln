@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
@@ -38,6 +38,24 @@ test("the README's countable claims still hold", () => {
 
   const stack = JSON.parse(readFileSync(join(ROOT, "stacks", "node.json"), "utf8"));
   assert.deepEqual(stack.steps.map((s) => s.id), ["unit"], "the README prints this file verbatim");
+});
+
+/**
+ * The count drifted from 203 to 239 unnoticed, because the test compared the claims it
+ * could and not this one. It now lives in exactly one place: a number that has to be
+ * hand-edited in two places on every test-adding PR is a maintenance cost the claim does
+ * not earn, so the prose says what is true without a number and the table carries the
+ * count alone.
+ */
+test("the README's test count matches the suite", () => {
+  const dir = join(ROOT, "tests");
+  const actual = readdirSync(dir)
+    .filter((name) => name.endsWith(".test.mjs"))
+    .reduce((sum, name) => sum + (readFileSync(join(dir, name), "utf8").match(/^test\(/gm) ?? []).length, 0);
+
+  const claimed = Number(/\| Tests \| (\d+),/.exec(README)[1]);
+  assert.equal(claimed, actual, `the status table says ${claimed}, the suite has ${actual}`);
+  assert.doesNotMatch(README, /\b\d{2,4} tests\b/, "the count belongs in one place, not scattered through the prose");
 });
 
 test("the README does not claim a release bar it has not met", () => {
