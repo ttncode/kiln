@@ -10,6 +10,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatch } from "../hooks/dispatch.mjs";
+import { gitOutput } from "../lib/init.mjs";
 import { protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
 import { newWork, openNextPass, readState, recordVerify, writeState } from "../lib/state.mjs";
@@ -34,6 +35,46 @@ test("D7 item 1 — kiln never pushes to a protected branch", async () => {
   assert.ok(protectedBranchViolation({ command: "git push --force origin HEAD:v3-master", ...onFeature }), "a forced refspec");
   assert.ok(protectedBranchViolation({ command: "git -C /elsewhere commit -m x", ...onMain }), "-C moves the repo, not the risk");
   assert.equal(protectedBranchViolation({ command: "git checkout -b feat/y", ...onMain }), null, "moving around stays allowed");
+});
+
+/**
+ * The spellings that were ALLOWED on a real repository while standing on a protected
+ * branch. Every one is a name git resolves and the scan compared as text — so the fix is
+ * to ask git, not to add another pattern. `resolveRef` stands in for that here; the real
+ * one is `git rev-parse --abbrev-ref`, exercised against a real repository below.
+ */
+test("D7 item 1 — a ref git resolves is not a string kiln may compare", () => {
+  const onMain = {
+    protectedBranches: ["main"],
+    currentBranch: "main",
+    resolveRef: (spec) => (["HEAD", "@"].includes(spec) ? "main" : spec),
+  };
+  for (const command of [
+    "git push origin HEAD",
+    "git push origin @",
+    "git push -u origin HEAD",
+    "git push --force origin HEAD",
+    "git push origin +main",
+    "git push origin",
+  ]) {
+    assert.ok(protectedBranchViolation({ command, ...onMain }), `ALLOWED: ${command}`);
+  }
+
+  const onFeature = { ...onMain, currentBranch: "feat/x", resolveRef: (spec) => (spec === "HEAD" ? "feat/x" : spec) };
+  assert.equal(protectedBranchViolation({ command: "git push origin HEAD", ...onFeature }), null, "a feature branch still pushes");
+  assert.equal(protectedBranchViolation({ command: "git push origin feat/x", ...onFeature }), null);
+});
+
+test("D7 item 1 — the real resolver answers from a real repository", () => {
+  const root = tempRoot("kiln-d7-refspec-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  const resolveRef = (spec) => gitOutput(root, ["rev-parse", "--abbrev-ref", spec]);
+
+  assert.equal(resolveRef("HEAD"), "main");
+  assert.equal(resolveRef("@"), "main");
+  assert.ok(protectedBranchViolation({ command: "git push origin HEAD", protectedBranches: ["main"], currentBranch: "main", resolveRef }));
 });
 
 // ---------------------------------------------------------- 2. destroys data

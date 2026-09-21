@@ -90,11 +90,22 @@ async function stackGuardsOnBashWrites(payload, ctx) {
   return ALLOW;
 }
 
+/**
+ * `resolveRef` is asked for at most one ref per refspec, and only for a push that names
+ * one — so an ordinary command adds no subprocess. That budget matters: the hook has a
+ * 5-second timeout and a hook that exceeds it ALLOWS, so every git call on this path is
+ * bought with the promise it keeps.
+ */
 function guardProtectedBranch(payload, ctx) {
   const command = payload.tool_input?.command;
   if (!command.includes("git")) return ALLOW;
   const currentBranch = gitOutput(ctx.cwd, ["symbolic-ref", "--short", "HEAD"]);
-  const violation = protectedBranchViolation({ command, protectedBranches: ctx.protectedBranches, currentBranch });
+  const violation = protectedBranchViolation({
+    command,
+    protectedBranches: ctx.protectedBranches,
+    currentBranch,
+    resolveRef: (spec) => gitOutput(ctx.cwd, ["rev-parse", "--abbrev-ref", spec]),
+  });
   return violation ? block(protectedBranchMessage(violation)) : ALLOW;
 }
 
