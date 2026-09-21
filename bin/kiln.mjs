@@ -448,11 +448,16 @@ function runOpen(argv) {
  * deleting it would be D7 item 2 performed by kiln, and carrying it silently would
  * launder pre-plan code past a gate record for a different artifact (D78).
  */
+/** Nothing to launder past a gate: no gate, and no change attributable to this work. */
+function nothingRecorded(root, state) {
+  return Object.keys(state.gates ?? {}).length === 0 && actualChanged(root, state.base).length === 0;
+}
+
 function runRatchet(argv) {
   const [id, to] = argv;
   const { root } = loadConfig(process.cwd());
   const state = readState(root, id);
-  if (!canRatchet(state.path, to)) {
+  if (!canRatchet(state.path, { to, untouched: nothingRecorded(root, state) })) {
     process.stderr.write(`${ratchetRefusal(state.path, to)}\n`);
     return 1;
   }

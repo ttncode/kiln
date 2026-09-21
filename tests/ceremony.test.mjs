@@ -70,13 +70,16 @@ test("an unknown path is refused with the three that exist", () => {
 });
 
 test("D12: the ratchet goes up and never down", () => {
-  assert.equal(canRatchet("spike", "bounded"), true);
-  assert.equal(canRatchet("spike", "full"), true);
-  assert.equal(canRatchet("bounded", "full"), true);
+  assert.equal(canRatchet("spike", { to: "bounded" }), true);
+  assert.equal(canRatchet("spike", { to: "full" }), true);
+  assert.equal(canRatchet("bounded", { to: "full" }), true);
 
-  assert.equal(canRatchet("full", "bounded"), false);
-  assert.equal(canRatchet("bounded", "spike"), false);
-  assert.equal(canRatchet("bounded", "bounded"), false);
+  assert.equal(canRatchet("full", { to: "bounded" }), false);
+  assert.equal(canRatchet("bounded", { to: "spike" }), false);
+  assert.equal(canRatchet("bounded", { to: "bounded" }), false, "the same rung is not a move, recorded or not");
+  assert.equal(canRatchet("bounded", { to: "bounded", untouched: true }), false);
+
+  assert.equal(canRatchet("full", { to: "spike", untouched: true }), true, "nothing recorded, nothing to launder");
 });
 
 test("a refused ratchet says which direction it refused", () => {
@@ -185,13 +188,30 @@ test("D78: the ratchet clears the old path's gates and records itself", () => {
   assert.deepEqual(state.carry_over.map((row) => row.kind), ["ratchet"]);
 });
 
-test("D12: a downward ratchet is refused at the command, not just in the library", () => {
+/**
+ * The ban on going down stops a task that proved large becoming cheap again, and stops
+ * pre-plan code being laundered past a gate written for a different artifact. Both need
+ * something to launder — so it starts applying once there is one.
+ */
+test("D12: a downward ratchet is refused once a gate is recorded", () => {
   const root = spikeProject();
   kiln(root, ["ratchet", "42", "full"]);
+  writeFile(join(root, ".kiln", "work", "42", "spec.md"), "# spec\n");
+  const recorded = kiln(root, ["gate", "42", "spec", "--artifact", ".kiln/work/42/spec.md", "--answer", "approve"]);
+  assert.match(recorded.stdout, /"recorded": true/, recorded.stderr);
 
   const run = kiln(root, ["ratchet", "42", "bounded"]);
-  assert.equal(run.status, 1);
+  assert.equal(run.status, 1, run.stdout);
   assert.match(run.stderr, /only goes up/);
+});
+
+test("before a gate exists, the path moves in either direction", () => {
+  const root = spikeProject();
+  assert.equal(kiln(root, ["ratchet", "42", "full"]).status, 0);
+
+  const down = kiln(root, ["ratchet", "42", "spike"]);
+  assert.equal(down.status, 0, `${down.stdout}${down.stderr}`);
+  assert.equal(readState(root, "42").path, "spike", "classification happens after open, so it has to be correctable");
 });
 
 test("open refuses a ceremony path that does not exist", () => {
