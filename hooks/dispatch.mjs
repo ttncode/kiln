@@ -6,7 +6,7 @@ import { gitOutput } from "../lib/init.mjs";
 import { relative } from "node:path";
 import { resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, removalTargets, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
-import { claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
+import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
@@ -194,12 +194,27 @@ const CHAINS = {
   "post-edit": [],
 };
 
+/**
+ * A state kiln cannot read may be a gate record someone damaged, so it blocks (D33). The
+ * conversion lives here rather than only in main(), so the decision is the dispatcher's and
+ * the same whichever entry point called it.
+ */
+function contextOrBlock(payload) {
+  try {
+    return context(payload);
+  } catch (error) {
+    if (!(error instanceof GuardStateError)) throw error;
+    return block(`${error.message}\nDelete that directory or restore the file; \`kiln list\` shows which work it is.`);
+  }
+}
+
 /** Core guards first, fixed order, hardcoded. Stack guards only after all of them. */
 export async function dispatch(phase, payload) {
   if (!CHAINS[phase]) return ALLOW;
   if (phase !== "pre-edit" && phase !== "post-edit" && !payload.tool_input?.command) return ALLOW;
 
-  const ctx = context(payload);
+  const ctx = contextOrBlock(payload);
+  if (ctx === BLOCK) return BLOCK;
   for (const guard of CHAINS[phase]) {
     if (guard(payload, ctx) === BLOCK) return BLOCK;
   }

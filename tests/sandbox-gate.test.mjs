@@ -5,7 +5,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { dispatch } from "../hooks/dispatch.mjs";
@@ -253,4 +253,41 @@ test("two unowned works are a guess, and a guess about ownership is worse than n
 
   const { claimUnbound } = await import("../lib/guards/context.mjs");
   assert.equal(claimUnbound(project.root, "a-session"), null);
+});
+
+/**
+ * Measured on a real run. The agent wrote `brief.md` into a work directory before running
+ * `kiln open` — the order kiln's own skill documented. The directory then existed with no
+ * `state.json`, every read of it threw, the dispatcher turned the throw into a block, and
+ * EVERY Bash call in the session was refused, including the `kiln doctor` the error message
+ * told the user to run. The only way out was deleting the directory from another terminal.
+ */
+test("a half-made work directory does not brick the session", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  mkdirSync(join(root, ".kiln", "work", "half-made"), { recursive: true });
+
+  assert.equal(await dispatch("pre-bash", payload({ command: "npm test", root })), 0, "no state to read is not a reason to stop everything");
+  assert.equal(await dispatch("pre-edit", payload({ file: join(root, "src", "app.ts"), root })), 0);
+});
+
+test("a corrupt state still blocks, because that is the shape D33 is about", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  mkdirSync(join(root, ".kiln", "work", "corrupt"), { recursive: true });
+  writeFileSync(join(root, ".kiln", "work", "corrupt", "state.json"), "{ not json", "utf8");
+
+  assert.equal(await dispatch("pre-bash", payload({ command: "npm test", root })), 2);
+});
+
+test("a work directory belongs to the work that owns it, and to nobody with none open", async () => {
+  const { root, id } = kilnProject({ gates: { plan: "approved" } });
+  const mine = join(root, ".kiln", "work", id, "brief.md");
+  const theirs = join(root, ".kiln", "work", "someone-else", "brief.md");
+
+  assert.equal(await dispatch("pre-edit", payload({ file: mine, root })), 0);
+  assert.equal(await dispatch("pre-edit", payload({ file: theirs, root })), 2, "this is how a work with no state came to exist");
+  assert.equal(
+    await dispatch("pre-edit", payload({ file: theirs, root, session: "a-session-with-nothing-open" })),
+    2,
+    "having no work open is not permission to invent one",
+  );
 });

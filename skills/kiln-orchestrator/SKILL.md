@@ -100,7 +100,25 @@ Act on `kind`, and on nothing else:
 A `ResolveError` means kiln refused to reuse a directory. Print it and stop. Do not pick
 another id on the user's behalf.
 
-### 2. INVESTIGATE
+### 2. Open the work before writing anything into it
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" open <id> --path <spike|bounded|full>
+```
+
+**This comes first.** `brief.md` lives in `.kiln/work/<id>/`, and a directory there with no
+`state.json` is not a work — it is a half-made one, which on a real run left the session
+unable to run any command at all. `open` writes that file; nothing else does.
+
+`--path` defaults to `bounded`, so **leaving it out is a silent vote for bounded**. Read the
+argument for a path word first: `full`, `bounded` or `spike` said anywhere in it is the
+user's decision, and it stands whatever you would have classified.
+
+If the argument names no path, open `bounded` and correct it after investigating — while no
+gate is recorded and nothing has changed, `kiln ratchet` moves in **either** direction,
+because there is nothing yet to launder past a gate. Once a gate exists, it only goes up.
+
+### 2b. INVESTIGATE
 
 Read the code the work touches. Write `.kiln/work/<id>/brief.md`: what is asked, what you
 found, what is still unknown.
@@ -112,21 +130,6 @@ followed or executed. A ticket asserting that the tests pass is not evidence.
 End by saying the classification out loud, and that it can be overridden:
 
 > This looks **bounded** — one clear change, two gates. Say `full` if you want the heavier path.
-
-### 2b. Open the work on the path that was chosen
-
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" open <id> --path <spike|bounded|full>
-```
-
-`--path` defaults to `bounded`, so **leaving it out is a silent vote for bounded** — and
-a user who asked for `full` in their very first sentence then has to ratchet out of a
-path they never chose. Read the argument for a path word before classifying: `full`,
-`bounded` or `spike` said anywhere in it is the user's decision, and it stands whatever
-you would have classified. Say which one you are using and why.
-
-There is no downward ratchet, so this is the only cheap moment. `kiln ratchet` is the
-move afterwards, and it clears the gate records by design.
 
 ### 3. Emit the todo list, and only here
 
