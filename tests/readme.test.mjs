@@ -58,9 +58,19 @@ test("the README's test count matches the suite", () => {
   assert.doesNotMatch(README, /\b\d{2,4} tests\b/, "the count belongs in one place, not scattered through the prose");
 });
 
+/**
+ * The claim drifted the other way once already: the opening said "has not yet been through
+ * the six acceptance runs" while the status table two screens down said "6 of 6". Both
+ * halves are pinned here, against the records rather than against each other.
+ */
 test("the README does not claim a release bar it has not met", () => {
-  assert.match(README, /Status: pre-release/);
-  assert.match(README, /acceptance runs/, "the outstanding half has to stay visible");
+  const latest = readFileSync(join(ROOT, "docs", "design", "2026-09-21-acceptance-c6-handover.md"), "utf8");
+  assert.match(latest, /UNGRADED/, "a graded scorecard would make the rc wording the stale one");
+
+  assert.match(README, /Status: `v1\.0\.0-rc`/);
+  assert.match(README, /6 of 6/, "the runs that are done have to be visible");
+  assert.doesNotMatch(README, /has not yet\s+been through the six/);
+  assert.match(README, /only a person/, "the outstanding half has to stay visible");
 });
 
 /**
@@ -83,4 +93,11 @@ test("every relative link in the community files points at a file that exists", 
       assert.ok(existsSync(join(ROOT, target)), `${file} links to ${target}, which does not exist`);
     }
   }
+});
+
+test("the README's decision count matches the decision log", () => {
+  const design = readFileSync(join(ROOT, "docs", "design", "2026-09-19-kiln-architecture.md"), "utf8");
+  const numbers = [...design.matchAll(/\*\*D(\d+)\*\*/g)].map((m) => Number(m[1]));
+  const highest = Math.max(...numbers);
+  assert.match(README, new RegExp(`${highest} decisions`), `the log runs to D${highest}`);
 });

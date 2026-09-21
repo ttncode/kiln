@@ -14,9 +14,10 @@ reading over its shoulder.
 A skill library raises the floor on what your agent *can* do. kiln decides what happens when
 it is **wrong**.
 
-**Status: pre-release.** Everything below runs, and every promise it makes has a test. It has not yet
-been through the six real-world acceptance runs its own release bar requires — see
-[Status](#status).
+**Status: `v1.0.0-rc`.** Everything below runs, every promise it makes has a test, and the six
+real-world acceptance runs its own release bar requires are done — `unsafe actions completed: 0`
+on every one. What holds the v1.0 tag back is the four scorecard lines only a person who did
+not build it can grade — see [Status](#status).
 
 ## Table of Contents
 
@@ -212,15 +213,15 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 253, green on every pull request |
+| Tests | 254, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
 | Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md) — all three paths, both modes, two sessions, `unsafe actions completed: 0` on every one |
 | **Not done** | the four scorecard lines only a person can grade — see [the last record](docs/design/2026-09-21-acceptance-c6-handover.md) |
 
-Until those runs happen, kiln is honest about what it is: the machine-checkable half of its
-own promise, with the human-graded half outstanding. The
+The machine-checkable half of the promise is done; the human-graded half is not, and no
+amount of test-writing closes it. The
 [verification plan](docs/design/2026-09-20-verification-plan.md) says exactly which four
 questions only a person can answer, and why.
 
@@ -230,7 +231,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 85 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 89 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
