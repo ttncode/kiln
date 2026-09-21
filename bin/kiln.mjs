@@ -9,7 +9,7 @@ import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { PATHS, autoEligible, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
-import { claimConflicts } from "../lib/guards/context.mjs";
+import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
 import { recordFullVerified, recordVerify } from "../lib/state.mjs";
@@ -439,32 +439,77 @@ function runScope(argv) {
  * over, and says so. The session it replaced is recorded, so its next guarded write is
  * blocked rather than allowed by a guard that could not tell it had been replaced.
  */
+/**
+ * Claiming an unowned work and taking one from a live session are different events, and
+ * saying the second when the first happened is a false alarm: "took over work X from
+ * session none. The previous session's next source edit will be blocked" warned a user
+ * about a session that did not exist.
+ */
 function adoptExisting(root, { id, sessionId }) {
-  const adopted = adoptSession(readState(root, id), sessionId);
+  const before = readState(root, id);
+  const adopted = adoptSession(before, sessionId);
   writeState(root, adopted);
-  out(`took over work ${id} from session ${adopted.displaced.at(-1) ?? "none"}. The previous session's next source edit will be blocked.`);
+  out(before.session_id
+    ? `took over work ${id} from session ${before.session_id}. That session's next source edit will be blocked.`
+    : `claimed work ${id}, which had no session. Nothing was taken from anyone.`);
   return 0;
 }
 
 /** Records the base it observed rather than being told one. */
+/**
+ * A session drives one unit of work. With two, `workForSession` returns whichever the
+ * filesystem lists first — so which work's gates authorise an edit becomes arbitrary, and
+ * `claimOwner` checks the wrong claim set. Measured: two works shared one session and the
+ * guard picked by directory order.
+ *
+ * `claimUnbound` already refuses to guess when two works are unowned. This is the same law
+ * from the other side, and it is refused here rather than at the first edit, where the
+ * answer would arrive after the work had started.
+ */
+function alreadyDriving(root, { id, sessionId }) {
+  if (!sessionId) return null;
+  // Only a running work drives the session. A halted one is parked, which is what the
+  // refusal tells you to do — a remedy that did not release the session would be the
+  // deadlock shape again, with the way out named and shut.
+  const other = activeWorks(root)
+    .filter((state) => state.status === WORK_STATUS.inProgress)
+    .find((state) => state.session_id === sessionId && state.id !== id);
+  return other
+    ? `this session already drives work ${other.id}. A session drives one unit of work, or kiln cannot tell which gate authorises an edit.
+Finish it, or park it with \`kiln halt ${other.id} --reason "<why>"\`.`
+    : null;
+}
+
+function refuseOpen(reason) {
+  process.stderr.write(`${reason}\n`);
+  return 1;
+}
+
+function openRefusal(root, { id, rest }) {
+  const taken = alreadyDriving(root, { id, sessionId: flag(rest, "--session") });
+  if (taken) return taken;
+  const path = flag(rest, "--path") ?? "bounded";
+  if (!PATHS.includes(path)) return `no ceremony path named "${path}". One of: ${PATHS.join(", ")}.`;
+  return gitOutput(root, ["rev-parse", "HEAD"]) ? null : "no commit to start from. Make one first — a run needs a base.";
+}
+
 function runOpen(argv) {
   const [id, ...rest] = argv;
   const { root, config } = loadConfig(process.cwd());
+  const refusal = openRefusal(root, { id, rest });
+  if (refusal) return refuseOpen(refusal);
   if (existsSync(statePath(root, id))) return adoptExisting(root, { id, sessionId: flag(rest, "--session") });
-  const base = gitOutput(root, ["rev-parse", "HEAD"]);
-  if (!base) {
-    process.stderr.write("no commit to start from. Make one first — a run needs a base.\n");
-    return 1;
-  }
-  const path = flag(rest, "--path") ?? "bounded";
-  if (!PATHS.includes(path)) {
-    process.stderr.write(`no ceremony path named "${path}". One of: ${PATHS.join(", ")}.\n`);
-    return 1;
-  }
-  const auto = rest.includes("--auto");
-  const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path, auto, dirtyAtOpen: actualChanged(root, base) });
+
+  const state = newWork({
+    id,
+    sessionId: flag(rest, "--session") ?? null,
+    base: gitOutput(root, ["rev-parse", "HEAD"]),
+    path: flag(rest, "--path") ?? "bounded",
+    auto: rest.includes("--auto"),
+    dirtyAtOpen: actualChanged(root, gitOutput(root, ["rev-parse", "HEAD"])),
+  });
   out(writeState(root, state));
-  out(autoLine(path, { config, state }));
+  out(autoLine(state.path, { config, state }));
   return 0;
 }
 
