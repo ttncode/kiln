@@ -1,6 +1,6 @@
 ---
 name: kiln-orchestrator
-description: Use when the user runs /kiln with a sentence, a ticket reference, or a URL, and for every stage of that work until a pull request exists. Drives investigate, plan, implement, review, verify and ship, renders every gate, and is the only component that creates todos.
+description: Use when the user runs /kiln:kiln with a sentence, a ticket reference, or a URL, and for every stage of that work until a pull request exists. Drives investigate, plan, implement, review, verify and ship, renders every gate, and is the only component that creates todos.
 ---
 
 # kiln Orchestrator
@@ -46,13 +46,13 @@ question.
 
 ## When to Use
 
-- `/kiln <anything>` — always start here, before reading any file.
+- `/kiln:kiln <anything>` — always start here, before reading any file.
 - Any later turn of work that already has a `.kiln/work/<id>/`.
 
-**When NOT to use:** `/kiln init` and `/kiln doctor` are commands, not work. Run them and stop
+**When NOT to use:** `/kiln:kiln init` and `/kiln:kiln doctor` are commands, not work. Run them and stop
 — but `init` has one step before it writes, below.
 
-### `/kiln init` — propose, ask, then write
+### `/kiln:kiln init` — propose, ask, then write
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" init --propose

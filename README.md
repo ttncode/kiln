@@ -57,8 +57,11 @@ Requires Node 20.10 or newer. Nothing else — kiln has **zero runtime dependenc
 ```
 /plugin marketplace add ttncode/kiln
 /plugin install kiln
-/kiln init
+/kiln:kiln init
 ```
+
+A plugin command carries its plugin's namespace, so `/kiln:kiln` is the form that always
+resolves. The short form without the namespace works only where nothing else claims it.
 
 `init` reads your project, proposes a config, and asks at most three questions — each with a
 default, so answering none of them still leaves you working. It writes `.kiln/config.json`,
@@ -69,7 +72,7 @@ an empty rules router, and one `.gitignore` line. It never overwrites a file you
 ## Your first run
 
 ```
-/kiln "the export button on the reports page does nothing"
+/kiln:kiln "the export button on the reports page does nothing"
 ```
 
 kiln investigates, says out loud how much ceremony it thinks the work needs, and stops at a
@@ -229,7 +232,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 317, green on every pull request |
+| Tests | 318, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
