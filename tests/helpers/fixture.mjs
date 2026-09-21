@@ -36,8 +36,13 @@ export function initRepo(root) {
   return root;
 }
 
+/**
+ * The identity is passed per command rather than assumed: a submodule checkout inside a
+ * fixture is a repository nothing ran `initRepo` on, and CI runners carry no global one,
+ * so `git commit` there fails with "empty ident name".
+ */
 export function commitAll(root, message) {
   git(root, ["add", "-A"]);
-  git(root, ["commit", "--quiet", "-m", message]);
+  git(root, ["-c", "user.email=fixture@example.invalid", "-c", "user.name=fixture", "commit", "--quiet", "-m", message]);
   return git(root, ["rev-parse", "HEAD"]);
 }
