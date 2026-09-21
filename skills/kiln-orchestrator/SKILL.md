@@ -125,6 +125,17 @@ unable to run any command at all. `open` writes that file; nothing else does.
 argument for a path word first: `full`, `bounded` or `spike` said anywhere in it is the
 user's decision, and it stands whatever you would have classified.
 
+`kiln resolve` reads the leading modifiers for you and returns them — `path`, and `auto`
+when the request begins with `--auto`. Pass both on:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" open <id> --path full --auto
+```
+
+`--auto` is the user asking kiln to rule this run's gates. It is a **human instruction in
+their own message**, which is why it outranks `auto.*` in config and satisfies `full`'s
+opt-in — and why you must never add it yourself. A `spike` is still never eligible.
+
 If the argument names no path, open `bounded` and correct it after investigating — while no
 gate is recorded and nothing has changed, `kiln ratchet` moves in **either** direction,
 because there is nothing yet to launder past a gate. Once a gate exists, it only goes up.
@@ -235,7 +246,8 @@ auto mode is off for bounded (auto.bounded is off) — every gate stops for you.
 auto mode is ON for bounded: kiln will rule its gates and say so in `kiln report`.
 ```
 
-When it is **on**, record the gate with `--auto` instead of stopping:
+`--auto` in the request turns it on for that run alone; `auto.*` in config is the standing
+default. When it is **on**, record the gate with `--auto` instead of stopping:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" gate <id> plan \

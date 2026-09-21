@@ -5,6 +5,7 @@ import {
   RESERVED,
   ResolveError,
   isUrl,
+  modifiersOf,
   looksLikeTicketRef,
   mintId,
   modulePrefixFor,
@@ -231,4 +232,17 @@ test("a leading ceremony word is an instruction, not part of what is asked", () 
 test("a ceremony word inside the sentence is somebody's actual subject", () => {
   const now = new Date("2026-09-21T00:00:00Z");
   assert.match(mintId({ text: "the full export is empty", now }), /full/);
+});
+
+test("--auto is read as an instruction, not as part of the subject", () => {
+  const now = new Date("2026-09-21T00:00:00Z");
+  assert.equal(mintId({ text: "--auto Remove this filter", now }), "20260921-remove-this-filter");
+  assert.equal(mintId({ text: "--auto full Rebuild the importer", now }), "20260921-rebuild-the-importer");
+
+  assert.deepEqual(
+    { auto: modifiersOf("--auto full x").auto, path: modifiersOf("--auto full x").path },
+    { auto: true, path: "full" },
+  );
+  assert.equal(modifiersOf("the auto-save filter is broken").auto, false, "a hyphenated word is somebody's subject");
+  assert.equal(modifiersOf("Remove the filter").path, null);
 });
