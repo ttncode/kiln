@@ -270,3 +270,30 @@ test("removal stays narrow: an ordinary file is still the harness's call", async
   const { root } = kilnProject({ gates: { plan: "approved" } });
   assert.equal(await dispatch("pre-bash", payload({ command: "rm -f build/out.log", root })), 0);
 });
+
+/**
+ * Git's own hooks see a command after git has resolved directory, branch and config — the
+ * runtime classes no scan of a command line reaches. Measured with a failing hook
+ * installed, every line below let the operation through, and kiln guarded none of them.
+ */
+test("D7 item 7 — verification cannot be switched off from inside the run", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  for (const command of [
+    "git push --no-verify origin feat/x",
+    "git commit --no-verify -m x",
+    "git commit -n -m x",
+    "git -c core.hooksPath=/dev/null push origin feat/x",
+    "git config core.hooksPath /dev/null",
+    "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git push origin feat/x",
+    "rm -f .git/hooks/pre-push",
+    "echo x > .git/hooks/pre-push",
+  ]) {
+    assert.equal(await bash(command, { root }), BLOCK, `ALLOWED: ${command}`);
+  }
+});
+
+test("the disarm matcher stays literal: -n is --dry-run for push, and git rejects the abbreviations", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  assert.equal(await bash("git push -n origin feat/x", { root }), ALLOW, "-n is --dry-run here, and the hook still runs");
+  assert.equal(await bash("git commit -m 'no verify needed'", { root }), ALLOW, "the words are not the flag");
+});

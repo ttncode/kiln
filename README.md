@@ -145,7 +145,7 @@ file — read it there rather than trusting this table.
 | 4 | no source edit without a gate record matching the **current** artifact | including through `>`, `tee`, `sed -i`, `cp` and `mv` |
 | 5 | never writes outside its sandbox | resolved paths compared by segment; a symlink leaf is rejected, not followed |
 | 6 | kiln's own code performs no network egress | a **static** check, and its test says so |
-| 7 | the agent cannot approve its own gate | `state.json` and `config.json` are not writable by the agent |
+| 7 | the agent cannot approve its own gate, or switch off what judges it | `state.json` and `config.json` are not writable by the agent; neither are the repository's git hooks, and `--no-verify` / `core.hooksPath` are refused |
 
 Three limits are stated rather than papered over, and each has a test asserting the limit:
 
@@ -213,7 +213,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 273, green on every pull request |
+| Tests | 275, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
