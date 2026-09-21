@@ -220,12 +220,16 @@ no stack declares as a guard fails the build.
   tool's own error, verbatim.
 - **Require a git worktree for isolation.** Submodule layouts and fixed build paths cannot
   provide one.
+- **Promise that several repositories merge together.** A ticket spanning a superproject and
+  its submodules ships as a topic — one pull request each, sharing the work id, the way
+  Gerrit and Android's `repo` do it. `kiln ship` prints what to open and says plainly that a
+  partial merge is possible and the order is yours.
 
 ## Status
 
 | | |
 |---|---|
-| Tests | 295, green on every pull request |
+| Tests | 299, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
@@ -243,7 +247,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 90 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 91 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
