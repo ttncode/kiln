@@ -229,6 +229,12 @@ test("D7 item 7 — the control files stay closed in a session kiln does not dri
  */
 test("D7 item 3: a phase with no steps refuses; it does not report green", () => {
   assert.equal(isGreen({ entries: [], failed: null }, "full"), false, "nothing ran, so nothing passed");
+  assert.equal(
+    isGreen({ entries: [{ id: "unit", skipped: "requires migrate" }], failed: null }, "full"),
+    false,
+    "a skipped step is an entry, and an entry is not evidence",
+  );
+  assert.equal(isGreen({ entries: [{ id: "unit", exit: 0 }], failed: null }, "full"), true);
 
   const root = tempRoot("kiln-d7-nosteps-");
   initRepo(root);
@@ -296,4 +302,45 @@ test("the disarm matcher stays literal: -n is --dry-run for push, and git reject
   const { root } = kilnProject({ gates: { plan: "approved" } });
   assert.equal(await bash("git push -n origin feat/x", { root }), ALLOW, "-n is --dry-run here, and the hook still runs");
   assert.equal(await bash("git commit -m 'no verify needed'", { root }), ALLOW, "the words are not the flag");
+});
+
+
+/**
+ * Measured on a real run. The only full-phase step was `unit` with `requires: ["migrate"]`,
+ * the change produced no migration, and kiln printed:
+ *
+ *     skip  unit — requires migrate
+ *     green
+ *
+ * Nothing executed and no test lied. The earlier guard asked whether there were entries;
+ * a skipped step is one.
+ */
+test("D7 item 3: every step skipped is not a pass", () => {
+  const root = tempRoot("kiln-d7-allskipped-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  writeConfig(root, {
+    ...DEFAULTS,
+    stack: {
+      id: "node",
+      cmd: { test: "true" },
+      steps: [{ id: "unit", run: "${cmd.test}", requires: ["migrate"] }],
+    },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const cli = (...args) => spawnSync(process.execPath, [bin, ...args], { cwd: root, encoding: "utf8" });
+  cli("open", "w1");
+
+  const skipped = cli("verify", "w1");
+  assert.equal(skipped.status, 1, `verify exited ${skipped.status}: ${skipped.stdout}${skipped.stderr}`);
+  assert.doesNotMatch(skipped.stdout, /green/);
+  assert.match(skipped.stderr, /every step was skipped/);
+  assert.match(skipped.stderr, /unit — requires migrate/, "the reason is the fix");
+
+  const ran = cli("verify", "w1", "--effects", "migrate");
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.match(ran.stdout, /green/);
 });
