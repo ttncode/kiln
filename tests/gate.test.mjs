@@ -62,3 +62,19 @@ test("a delegation is turned back into two concrete options", () => {
   assert.equal(again.gate, "plan");
   assert.match(again.ask, /\(1\).*\(2\)/s, "two options, not a re-worded question");
 });
+
+/**
+ * A menu prints numbered options, and a person answering one may send the label back with
+ * the marker attached. The marker is the menu's, not theirs — but a bare number is still a
+ * click, which is the part D21 is about.
+ */
+test("a menu label is read as the answer; the number alone is not", () => {
+  assert.equal(classifyAnswer("1. Approve this plan as written"), DECISION.approved);
+  assert.equal(classifyAnswer("2) Approve it"), DECISION.approved);
+  assert.equal(classifyAnswer("- approve"), DECISION.approved);
+  assert.equal(classifyAnswer("3. Stop here, keep the artifacts"), DECISION.rejected);
+
+  assert.equal(classifyAnswer("1"), DECISION.notAYes, "a click is not evidence anyone read it");
+  assert.equal(classifyAnswer("1."), DECISION.notAYes);
+  assert.equal(classifyAnswer("2"), DECISION.notAYes);
+});

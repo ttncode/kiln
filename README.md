@@ -90,6 +90,16 @@ $ kiln doctor
 Ready.
 ```
 
+Every stage ends by offering the next move, and stopping is always one of the options:
+
+```
+Spec complete — 7 requirements, 4 acceptance criteria. What would you like to do?
+
+1. Write the plan
+2. Edit the spec
+3. Stop here, keep the artifacts
+```
+
 A gate is where you act, and "sounds good" is not an approval:
 
 ```
@@ -232,7 +242,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 322, green on every pull request |
+| Tests | 326, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

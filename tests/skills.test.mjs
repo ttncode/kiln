@@ -202,3 +202,22 @@ test("a prompt written for a subagent is dispatched, not read aloud", () => {
     assert.match(frontmatter(skill).body, /Task\(subagent_type/, `${skill} reads ${prompt} instead of dispatching it`);
   }
 });
+
+test("the orchestrator offers a next move after a stage, and stopping is one of them", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /What would you like to do\?/);
+  assert.match(body, /Option 3 always exists/, "stopping must not be the choice the user has to invent");
+  assert.match(body, /Expand it to that option's text/, "a number is a label, not an answer");
+});
+
+test("a gate's options are sentences, because kiln reads the sentence", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /1\. Approve this plan as written/);
+  assert.match(body, /a bare `1` does not/, "the option text is what the gate records");
+});
+
+test("the orchestrator says how to write, because a stage report is read for its numbers", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /Tables, numbered steps, short bullets/);
+  assert.match(body, /Quote a tool's own error verbatim/);
+});
