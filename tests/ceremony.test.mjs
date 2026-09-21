@@ -354,3 +354,21 @@ test("claiming an unowned work is not taking one from anybody", () => {
   assert.match(taken.stdout, /took over work w3 from session s1/);
   assert.match(taken.stdout, /next source edit will be blocked/);
 });
+
+/**
+ * Three works shipped or reached VERIFY with `verify: []`, and `kiln report` said nothing
+ * about it — the only account of "no test ran on this change" was whatever the agent chose
+ * to mention. Shipping unverified is the user's call; finding out afterwards is not.
+ */
+test("the report says whether anything was verified", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "wv"]);
+  assert.match(kiln(root, ["report", "wv"]).stdout, /Verified: never/);
+
+  const skipped = { ...readState(root, "wv"), verify: [{ id: "unit", skipped: "requires migrate" }] };
+  writeState(root, skipped);
+  assert.match(kiln(root, ["report", "wv"]).stdout, /Verified: never/, "a skipped step is not a step that ran");
+
+  writeState(root, { ...skipped, verify: [{ id: "unit", exit: 0 }], last_verified: "deadbeef123" });
+  assert.match(kiln(root, ["report", "wv"]).stdout, /Verified: 1 step\(s\) ran · green at deadbeef1/);
+});

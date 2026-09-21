@@ -95,3 +95,37 @@ test("a pattern that asks for the id and the slug is told it repeats itself", ()
   assert.match(renderShipPlan(plan, "${id}-${slug}"), /already ends with the slug/);
   assert.doesNotMatch(renderShipPlan({ ...plan, branch: "x" }, "${id}"), /repeats/);
 });
+
+/**
+ * `kiln scope` subtracts what was already uncommitted at open; this did not. On a real run
+ * the plan listed three repositories to ship when the work touched one — the other two were
+ * the user's own dirty tree, recorded in `dirty_at_open` before the work started.
+ */
+test("the ship plan counts this run's files, not the tree's existing dirt", () => {
+  const { root, base } = monorepo();
+  writeFile(join(root, "AdminPage.php"), "<?php // mine\n");
+  writeFile(join(root, "Makefile"), "# theirs, and already dirty\n");
+  writeFile(join(root, "submodules", "common-models", "src", "User.php"), "<?php // theirs\n");
+
+  const state = {
+    ...newWork({ id: "w-1", base, path: "bounded" }),
+    dirty_at_open: ["Makefile", "submodules/common-models/src/User.php"],
+    predicted: [{ path: "AdminPage.php" }],
+  };
+  const plan = shipPlan(root, { config, state });
+
+  assert.deepEqual(plan.modules.map((row) => row.path), ["."], "one repository, not three");
+  assert.deepEqual(plan.modules[0].files, ["AdminPage.php"]);
+});
+
+test("a file the plan claimed ships even if it was dirty at open", () => {
+  const { root, base } = monorepo();
+  writeFile(join(root, "AdminPage.php"), "<?php // edited\n");
+
+  const state = {
+    ...newWork({ id: "w-2", base, path: "bounded" }),
+    dirty_at_open: ["AdminPage.php"],
+    predicted: [{ path: "AdminPage.php" }],
+  };
+  assert.deepEqual(shipPlan(root, { config, state }).modules[0].files, ["AdminPage.php"], "the plan gate took responsibility for it");
+});
