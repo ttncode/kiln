@@ -11,7 +11,7 @@
  */
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ALLOW, BLOCK } from "./helpers/verdict.mjs";
 import { SESSION, bash, config, edit, kiln, monorepo, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
@@ -334,4 +334,144 @@ test("J8.8 the floor refuses a real push, through real git", () => {
   assert.equal(push.status, 1, push.stderr);
   assert.match(push.stderr, /main is a protected branch/);
   assert.match(push.stderr, /git resolved the destination to refs\/heads\/main/);
+});
+
+// ─────────────────── J9 · where two separate fixes could describe two different runs
+
+test("J9.1 an auto run on full reaches a pull request with no human gate, as designed", async () => {
+  const root = nodeProject({ name: "j91" });
+  ok(root, ["open", "w1", "--path", "full", "--session", SESSION, "--auto"]);
+
+  for (const key of ["spec", "plan", "review", "ship"]) {
+    writeFile(join(root, ".kiln", "work", "w1", `${key === "review" ? "review" : key}.md`), `# ${key}\n`);
+    assert.equal(ok(root, ["gate", "w1", key, "--artifact", `.kiln/work/w1/${key}.md`, "--auto"]).status, 0, key);
+  }
+  assert.equal(await bash(root, "gh pr create --fill"), ALLOW, "the design says the PR becomes the gate");
+  assert.match(ok(root, ["report", "w1"]).stdout, /Auto-ruled 4 gates/, "and every one of them is named");
+});
+
+test("J9.2 a session drives one work, and halt actually gives it back", () => {
+  const root = nodeProject({ name: "j92" });
+  ok(root, ["open", "w1", "--session", "s-j92"]);
+
+  const second = kiln(root, ["open", "w2", "--session", "s-j92"]);
+  assert.equal(second.status, 1);
+  assert.match(second.stderr, /already drives work w1/);
+
+  ok(root, ["halt", "w1", "--reason", "parked"]);
+  assert.equal(kiln(root, ["open", "w2", "--session", "s-j92"]).status, 0, "the refusal named halt, so halt has to work");
+
+  const claimed = ok(root, ["open", "w3"]);
+  assert.doesNotMatch(claimed.stdout, /took over/, "opening a fresh work takes nothing from anyone");
+});
+
+test("J9.3 the free ratchet closes the moment the tree changes", () => {
+  const root = nodeProject({ name: "j93" });
+  ok(root, ["open", "w1", "--path", "full", "--session", SESSION]);
+  assert.equal(kiln(root, ["ratchet", "w1", "bounded"]).status, 0, "nothing recorded, nothing to launder");
+
+  ok(root, ["ratchet", "w1", "full"]);
+  writeFile(join(root, "src", "app.js"), "export const a = 3;\n");
+  const down = kiln(root, ["ratchet", "w1", "bounded"]);
+  assert.equal(down.status, 1, "a changed tree is something to launder");
+  assert.match(down.stderr, /only goes up/);
+});
+
+test("J9.4 a work directory with no state warns, and the session keeps running", async () => {
+  const root = nodeProject({ name: "j94" });
+  throughPlanGate(root, "w1");
+  mkdirSync(join(root, ".kiln", "work", "half-made"), { recursive: true });
+
+  assert.equal(await bash(root, "npm test"), ALLOW, "one half-made directory does not stop everything");
+  assert.equal(await edit(root, "src/app.js"), ALLOW);
+
+  const doctor = kiln(root, ["doctor"]);
+  assert.match(doctor.stdout, /artifacts but no state.json/);
+  assert.match(ok(root, ["list"]).stdout, /half-made\s+unopened/);
+});
+
+test("J9.5 a config init wrote is a config that verifies", () => {
+  const root = initRepo(tempRoot("kiln-j95-"));
+  writeFile(join(root, "package.json"), JSON.stringify({ name: "app", scripts: { test: "true", lint: "true" } }));
+  commitAll(root, "first");
+
+  ok(root, ["init"]);
+  assert.match(ok(root, ["doctor"]).stdout, /Ready\./, "what init writes, doctor accepts");
+
+  ok(root, ["open", "w1", "--session", SESSION]);
+  assert.match(ok(root, ["verify", "w1"]).stdout, /green/, "and what doctor accepts, verify can run");
+});
+
+test("J9.6 scope and ship agree about which files are this run's", () => {
+  const root = monorepo();
+  ok(root, ["init", "--set", "stack.id=node", "--set", "stack.cmd.test=true"]);
+  writeFile(join(root, "README.md"), "dirty before the work started\n");
+
+  ok(root, ["open", "w1", "--session", SESSION]);
+  writeFile(join(root, "AdminPage", "src", "User.php"), "<?php // mine\n");
+
+  const scope = ok(root, ["scope", "w1"]).stdout;
+  const ship = ok(root, ["ship", "w1"]).stdout;
+  assert.match(scope, /actual 1/, "the pre-existing README is not this run's doing");
+  assert.match(ship, /Ship — 1 repository/, "and the ship plan says the same number");
+  assert.doesNotMatch(ship, /README/);
+});
+
+test("J9.7 a skipped step is not a pass, in all three places that say so", () => {
+  const root = nodeProject({ name: "j97", steps: [{ id: "unit", run: "${cmd.test}", requires: ["migrate"] }] });
+  ok(root, ["open", "w1", "--session", SESSION]);
+
+  const run = kiln(root, ["verify", "w1"]);
+  assert.equal(run.status, 1);
+  assert.doesNotMatch(run.stdout, /green/);
+  assert.match(ok(root, ["report", "w1"]).stdout, /Verified: never/, "the report agrees with the verdict");
+  assert.match(kiln(root, ["doctor"]).stdout, /can never run/, "and doctor said so before either");
+});
+
+/**
+ * The invariant, not the contents: whatever `doctor` prints as protected is what the guard
+ * refuses. A branch a submodule merely sits on is not a shipping branch, so it is
+ * deliberately absent — `vcs.integration_branch` says where a pull request goes.
+ */
+test("J9.8 every branch doctor calls protected is one the guard refuses", async () => {
+  const root = monorepo({ modules: [["AdminPage", "AdminPage", "v3-master"]] });
+  ok(root, ["init", "--set", "stack.id=node", "--set", "stack.cmd.test=true", "--set", "vcs.integration_branch=v3-develop"]);
+
+  const printed = ok(root, ["doctor"]).stdout.match(/protected branches: (.+)/)[1].split(", ");
+  assert.ok(printed.includes("v3-develop"), "the declared shipping branch is protected without being listed");
+
+  for (const branch of printed) {
+    assert.equal(await bash(root, `git push origin ${branch}`), BLOCK, `printed but allowed: ${branch}`);
+  }
+  assert.equal(
+    await bash(root, "git -C AdminPage push origin v3-master"),
+    ALLOW,
+    "a branch a checkout sits on is not a branch kiln ships to",
+  );
+});
+
+test("J9.9 an auto-ruled gate records words, not a click", () => {
+  const root = nodeProject({ name: "j99" });
+  ok(root, ["open", "w1", "--session", SESSION, "--auto"]);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  ok(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--auto"]);
+
+  const record = state(root, "w1").gates.plan;
+  assert.equal(record.by, "auto");
+  assert.match(record.answer, /ruled by auto mode, not by the user/, "the record says who decided");
+  assert.notEqual(record.artifact_sha, null, "and which document it decided about");
+});
+
+test("J9.10 the floor and the guard protect the same branches", () => {
+  const root = nodeProject({ name: "j910" });
+  ok(root, ["init", "--set", "vcs.protected=main", "--set", "stack.cmd.test=true"]);
+  ok(root, ["doctor", "--write"]);
+
+  const remote = tempRoot("kiln-j910-remote-");
+  git(remote, ["init", "-q", "--bare"]);
+  git(root, ["remote", "add", "origin", remote]);
+
+  const push = spawnSync("git", ["push", "origin", "HEAD"], { cwd: root, encoding: "utf8" });
+  assert.equal(push.status, 1, "the floor reads the same vcs.protected the guard does");
+  assert.match(push.stderr, /main is a protected branch/);
 });

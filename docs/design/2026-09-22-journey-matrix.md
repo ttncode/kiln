@@ -130,16 +130,28 @@ The point of this file. Each row crosses two features that were fixed separately
 
 | # | Interaction | The question it asks | Status |
 |---|---|---|---|
-| J9.1 | `--auto` × `full` × ship | does an auto run reach a remote with no human at all, and is that what the design says? | open |
-| J9.2 | session ownership × takeover × claim | after #69, can a second work still be opened, and does halt release the session? | open |
-| J9.3 | ratchet free-move × dirty tree | does an untouched-work move stop being free the moment the tree changes? | open |
-| J9.4 | half-made work × doctor × list | is a directory with no state a warning, and does the session keep running? | open |
-| J9.5 | init ambiguity × step derivation × verify | if detection is ambiguous, does the config it writes still verify? | open |
-| J9.6 | submodule × scope × ship × dirty_at_open | do `scope` and `ship` agree about which files are this run's? | open |
-| J9.7 | skipped step × isGreen × report | do the three agree that nothing ran? | open |
-| J9.8 | protected set × modules × doctor | does the derived set agree with what the guard enforces? | open |
-| J9.9 | `--auto` × gate classifier × menu number | does an auto-ruled gate record words rather than a click? | open |
-| J9.10 | pre-push floor × protected set × submodule | does the floor use the same protected set the guard does? | open |
+| J9.1 | `--auto` × `full` × ship | does an auto run reach a remote with no human at all, and is that what the design says? | pass |
+| J9.2 | session ownership × takeover × claim | after #69, can a second work still be opened, and does halt release the session? | pass |
+| J9.3 | ratchet free-move × dirty tree | does an untouched-work move stop being free the moment the tree changes? | pass |
+| J9.4 | half-made work × doctor × list | is a directory with no state a warning, and does the session keep running? | pass |
+| J9.5 | init ambiguity × step derivation × verify | if detection is ambiguous, does the config it writes still verify? | pass |
+| J9.6 | submodule × scope × ship × dirty_at_open | do `scope` and `ship` agree about which files are this run's? | pass |
+| J9.7 | skipped step × isGreen × report | do the three agree that nothing ran? | pass |
+| J9.8 | protected set × modules × doctor | does the derived set agree with what the guard enforces? | pass |
+| J9.9 | `--auto` × gate classifier × menu number | does an auto-ruled gate record words rather than a click? | pass |
+| J9.10 | pre-push floor × protected set × submodule | does the floor use the same protected set the guard does? | pass |
+
+## What the first run found
+
+| # | Defect | Where it hid |
+|---|---|---|
+| J3.6 | a rejected gate exited 0 and printed `"recorded": true` | every menu now ends in "Stop here", so a rejection became the common answer and nothing reading the status could tell it from a yes |
+| J6.1 | `kiln report` said "not green" after a run that was green | greenness was inferred from `last_verified !== base`, and the two are equal until something is committed |
+| J7.2 | detection named `php`, for which kiln ships no adapter | `init` wrote it and `doctor` then failed with `no stack named "php"` — a config that cannot work, from the command whose job is to produce one that does |
+
+None of the ten J9 interaction rows failed. The fixes agree with each other; the three
+defects were each inside a single feature, found by asking a question no unit test asks:
+what does the user see next.
 
 ## What this matrix deliberately does not cover
 
