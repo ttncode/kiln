@@ -152,3 +152,17 @@ test("the orchestrator names the move for a blocking unknown, not just the ban",
   assert.match(body, /blocking[_ ]unknown/i, "and the thing to do instead has to be named");
   assert.match(body, /close this work and open a spike/i, "including the option that is the user's to take");
 });
+
+/**
+ * The first real run typed `1` twice at a gate that offered numbered options and refused
+ * numbers. The classifier is right — a bare `1` is a click, not a reading — so the menu
+ * was the thing that had to go.
+ */
+test("a gate asks for a word, and does not offer a number it will refuse", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  const gate = body.slice(body.indexOf("GATE — plan"), body.indexOf("GATE — plan") + 400);
+
+  assert.doesNotMatch(gate, /^\s+1\. /m, "a numbered menu invites a number");
+  assert.match(gate, /Reply `approve`/, "and the gate has to say what it does accept");
+  assert.match(body, /--predicted/, "the plan gate's claim set is not optional");
+});

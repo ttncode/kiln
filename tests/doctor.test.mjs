@@ -157,3 +157,13 @@ test("D81: a map under a multi-repo config says which branch every v1 reader act
   assert.equal(found.status, STATUS.warn);
   assert.match(found.detail, /every reader gets "main"/);
 });
+
+test("doctor says when a work has no owner, because its gate enforces nothing", () => {
+  const root = project();
+  writeState(root, { ...newWork({ id: "42", sessionId: null, base: "aaa" }) });
+  writeState(root, { ...newWork({ id: "99", sessionId: null, base: "bbb" }) });
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "work is owned");
+  assert.equal(row.status, STATUS.fail, "two unowned works cannot be claimed automatically");
+  assert.match(row.detail, /enforces nothing/);
+});

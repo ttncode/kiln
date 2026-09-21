@@ -5,7 +5,7 @@ import { gitOutput } from "../lib/init.mjs";
 import { relative } from "node:path";
 import { resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
-import { claimOwner, displacedFrom, workForSession } from "../lib/guards/context.mjs";
+import { claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
@@ -44,7 +44,7 @@ function rootAndBranches(cwd) {
 function context(payload) {
   const cwd = payload.cwd ?? process.cwd();
   const { root, protectedBranches, stackId } = rootAndBranches(cwd);
-  const state = workForSession(root, payload.session_id);
+  const state = workForSession(root, payload.session_id) ?? claimUnbound(root, payload.session_id);
   const takenOver = state ? null : displacedFrom(root, payload.session_id);
   return { cwd, root, protectedBranches, stackId, state, takenOver };
 }

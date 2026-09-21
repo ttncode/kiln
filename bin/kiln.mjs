@@ -176,9 +176,17 @@ function runGate(argv) {
   return writeGate(root, { id, key, decision, answer, claimed, rest });
 }
 
+/**
+ * Recording a gate is the evidence its stage finished, so the stage moves with it.
+ * Nothing else writes `stage`, which is why the first real run ended at INVESTIGATE
+ * having gone all the way to a merge request — and would have resumed from the start.
+ */
+const STAGE_AFTER = { probe: "IMPLEMENT", spec: "PLAN", plan: "IMPLEMENT", review: "VERIFY", ship: "SHIP" };
+
 function writeGate(root, { id, key, decision, answer, claimed, rest }) {
   const by = rest.includes("--auto") ? "auto" : "user";
-  const recorded = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  const opened = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  const recorded = decision === "approved" ? { ...opened, stage: STAGE_AFTER[key] ?? opened.stage } : opened;
   // Re-approving without --predicted keeps the claim set rather than clearing it, so
   // the count reported is what the work now claims, not what this call passed in.
   const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;

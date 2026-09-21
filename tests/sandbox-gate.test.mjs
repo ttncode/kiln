@@ -227,3 +227,30 @@ test("D67c: kiln does not police a broad add in a session it is not driving", as
   const project = kilnProject({ gates: {} });
   assert.equal(await bash("git add -A", project, "another-session"), ALLOW);
 });
+
+// ------------------------------------------- the first real run shipped with these off
+
+test("a work opened without a session is claimed by the first guarded call", async () => {
+  const project = kilnProject({ gates: {} });
+  writeState(project.root, { ...readState(project.root, "42"), session_id: null });
+
+  assert.equal(await edit(project.source, project, "a-real-session"), BLOCK, "the gate applies once someone owns it");
+  assert.equal(readState(project.root, "42").session_id, "a-real-session", "and the owner is recorded");
+});
+
+test("an unowned work is what turned guard-gate off on the first real run", async () => {
+  const project = kilnProject({ gates: {} });
+  writeState(project.root, { ...readState(project.root, "42"), session_id: null });
+
+  const { claimUnbound } = await import("../lib/guards/context.mjs");
+  assert.equal(claimUnbound(project.root, null), null, "a payload with no session claims nothing");
+});
+
+test("two unowned works are a guess, and a guess about ownership is worse than none", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  writeState(project.root, { ...readState(project.root, "42"), session_id: null });
+  writeState(project.root, { ...newWork({ id: "99", sessionId: null, base: "bbb" }) });
+
+  const { claimUnbound } = await import("../lib/guards/context.mjs");
+  assert.equal(claimUnbound(project.root, "a-session"), null);
+});
