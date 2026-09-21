@@ -65,3 +65,52 @@ test("a single-repo config is unchanged by the derivation", () => {
   const config = { repo: { kind: "single" }, vcs: { ...DEFAULTS.vcs, protected: ["main"], integration_branch: "main" } };
   assert.deepEqual(protectedBranchesFor(config), ["main"]);
 });
+
+/**
+ * Detection had two honest answers and found a dishonest one in between. Reading only the
+ * root said "unknown" for a checkout with four composer.json files. Reading the modules and
+ * taking the first hit said "node" for a CodeIgniter application that also builds assets —
+ * worse, because "unknown" makes a user look and a wrong name makes them nod.
+ */
+test("a checkout that looks like two stacks says so instead of picking one", () => {
+  const root = withSubmodules([["AdminPage", "AdminPage"], ["FrontEnd", "FrontEnd"]]);
+  for (const path of ["AdminPage", "FrontEnd"]) {
+    writeFile(join(root, path, "package.json"), JSON.stringify({ name: path, scripts: { test: "jest" } }));
+  }
+
+  const stack = detectStack(root);
+  assert.deepEqual([stack.id, ...stack.alternatives].sort(), ["node", "php-ci3"], "both are offered; an exact tie has no right winner");
+
+  const question = proposeConfig(root).questions.find((row) => row.key === "stack.id");
+  assert.ok(question, "an ambiguity the user cannot see is one they cannot correct");
+  assert.equal(question.options.length, 2);
+});
+
+test("the stack seen in the most modules wins, not the one checked first", () => {
+  const root = withSubmodules([["a", "a"], ["b", "b"], ["c", "c"]]);
+  writeFile(join(root, "a", "package.json"), JSON.stringify({ name: "a", scripts: { test: "jest" } }));
+
+  const stack = detectStack(root);
+  assert.equal(stack.id, "php-ci3", "three composer.json against one package.json");
+  assert.deepEqual(stack.alternatives, ["node"]);
+});
+
+test("an unambiguous project carries no alternatives and no extra question", () => {
+  const root = withSubmodules([["AdminPage", "AdminPage"]]);
+  assert.deepEqual(detectStack(root).alternatives, []);
+  assert.equal(proposeConfig(root).questions.find((row) => row.key === "stack.id"), undefined);
+});
+
+/**
+ * CodeIgniter 3 predates composer and is normally vendored into the tree. A real project
+ * turned out to have an empty `require`, and reading only the manifest called it plain
+ * `php` — so the verify steps a CI3 adapter carries would never have been offered.
+ */
+test("a vendored framework is detected from its own files, not only from the manifest", () => {
+  const root = initRepo(tempRoot("kiln-ci3-"));
+  writeFile(join(root, "composer.json"), JSON.stringify({ require: {} }));
+  assert.equal(detectStack(root).id, "php", "nothing says CodeIgniter yet");
+
+  writeFile(join(root, "system", "core", "CodeIgniter.php"), "<?php\n");
+  assert.equal(detectStack(root).id, "php-ci3");
+});

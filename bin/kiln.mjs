@@ -121,6 +121,14 @@ function stackOrNull(id) {
   }
 }
 
+/** An ambiguity the user cannot see is one they cannot correct. */
+function reportDetection(stack) {
+  out(`stack: ${stack.id}${stack.evidence ? ` (${stack.evidence})` : ""}`);
+  if (stack.alternatives?.length > 0) {
+    out(`  this checkout also looks like: ${stack.alternatives.join(", ")} — set stack.id if that is the one to verify`);
+  }
+}
+
 function reportInit(result) {
   for (const path of result.kept) out(`  kept    ${path}`);
   for (const path of result.written) out(`  wrote   ${path}`);
@@ -149,7 +157,7 @@ function runInit(argv) {
     out(JSON.stringify({ config, questions, detected }, null, 2));
     return 0;
   }
-  out(`stack: ${detected.stack.id}${detected.stack.evidence ? ` (${detected.stack.evidence})` : ""}`);
+  reportDetection(detected.stack);
   out(`integration branch: ${integrationBranch(detected)}`);
   out(`${planInit(root).missing.length} file(s) to write`);
   const final = applyOverrides(config, argv);
