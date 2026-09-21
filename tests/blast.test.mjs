@@ -247,3 +247,34 @@ test("the truncation notice is not mistakable for a row", () => {
   assert.match(notice, /more of 25 files/);
   assert.ok(!notice.includes("\t"), "a tab would let a path parser read the notice as a file");
 });
+
+/**
+ * The first real run was a superproject whose every source file lived in a submodule.
+ * Root status prints one line for the whole submodule, so reconciliation reported
+ * `actual 0` and then "nothing changed in this range" over a tree with edits in it.
+ */
+test("reconciliation sees files changed inside a submodule", () => {
+  const sub = tempRoot("kiln-blast-sub-");
+  initRepo(sub);
+  writeFile(join(sub, "controllers", "Account.php"), "<?php\n");
+  commitAll(sub, "sub first");
+
+  const root = tempRoot("kiln-blast-super-");
+  initRepo(root);
+  writeFile(join(root, "README.md"), "super\n");
+  commitAll(root, "super first");
+  git(root, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "AdminPage"]);
+  commitAll(root, "add submodule");
+  const base = git(root, ["rev-parse", "HEAD"]);
+
+  writeFile(join(root, "AdminPage", "controllers", "Account.php"), "<?php // edited\n");
+  assert.deepEqual(actualChanged(root, base), ["AdminPage/controllers/Account.php"]);
+
+  commitAll(join(root, "AdminPage"), "edit inside the submodule");
+  commitAll(root, "bump the gitlink");
+  assert.deepEqual(
+    actualChanged(root, base),
+    ["AdminPage/controllers/Account.php"],
+    "a committed submodule change is one gitlink at the superproject level",
+  );
+});

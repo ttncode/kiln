@@ -5,7 +5,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { applyInit, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
-import { actualChanged, grepBlastRadius, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
+import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
@@ -358,10 +358,11 @@ function runRatchet(argv) {
     return 1;
   }
   // `git diff` shows tracked modifications only, and a spike's output is usually new
-  // files. Reporting "clean" over an untracked probe is the one thing this must not do.
-  const pending = gitOutput(root, ["status", "--short"]) ?? "";
+  // files. Reporting "clean" over an untracked probe is the one thing this must not do —
+  // and a submodule collapses to its own directory name unless statusPaths expands it.
+  const pending = statusPaths(root);
   out(`ratcheting ${state.path} → ${to}. ${ceremonyFor(to).gates.length} gate(s) on the new path.`);
-  out(pending.trim() === "" ? "Working tree is clean." : `Uncommitted work kiln will not touch:\n${pending}`);
+  out(pending.length === 0 ? "Working tree is clean." : `Uncommitted work kiln will not touch:\n${pending.join("\n")}`);
   out("Anything you keep will surface at REVIEW as beyond prediction. That is the reconciliation working.");
   writeState(root, {
     ...state,
