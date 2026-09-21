@@ -209,6 +209,23 @@ Commit an **explicit path list** — never `git add -A`, and never a broad commi
 tree is dirty. Open the PR with your own `gh`/`glab`. The body carries the change summary and
 the verify rows; **no log content goes to the remote**.
 
+Ask what has to be opened before opening anything:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id>
+```
+
+One unit of work can span several repositories — a superproject and its submodules — and
+each one needs its own pull request. The work id is the **topic** they share, which is how
+Gerrit and Android's `repo` link changes across hundreds of repositories, so no new concept
+appears: use the same branch name everywhere, and put the topic in every title.
+
+Say the two things kiln cannot do, in your own words, before the user goes to merge:
+
+- **They do not merge atomically.** A forge without cross-project submit can leave the topic
+  half-merged. Gerrit says this about its own topics; kiln is not better placed to promise.
+- **The order is yours.** Nothing in the repositories says which depends on which.
+
 ## When something breaks
 
 | Shape | What you do |
@@ -244,4 +261,4 @@ Before you say the work is done:
 - [ ] Every gate has a record, and each `answer` is the user's own words.
 - [ ] The full step set ran and every exit code is recorded.
 - [ ] The SHIP commit named its paths.
-- [ ] The PR exists, and it is on a branch, not on the integration branch.
+- [ ] A pull request exists for **every** repository `kiln ship` listed, each on a branch and each carrying the topic.

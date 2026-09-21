@@ -5,6 +5,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { installFloor } from "../lib/floor.mjs";
+import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { PATHS, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
@@ -57,6 +58,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln ratchet <id> <spike|bounded|full>
       Move this work up a rung. Prints the uncommitted diff it found and stops;
       it never touches the working tree.
+
+  kiln ship <id>
+      Group this work's diff by repository and print what has to be opened:
+      one pull request per repository, all carrying the work id as their topic.
 
   kiln report <id>
       Print the run's report, including what auto mode decided on your behalf.
@@ -443,6 +448,14 @@ function runHalt(argv) {
   return 0;
 }
 
+/** Prints; writes nothing. What the run has to open, and what kiln cannot promise about it. */
+function runShip(argv) {
+  const { root, config } = loadConfig(process.cwd());
+  const state = readState(root, argv[0]);
+  out(renderShipPlan(shipPlan(root, { config, state })));
+  return 0;
+}
+
 function runReport(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
@@ -461,6 +474,7 @@ const COMMANDS = {
   ratchet: runRatchet,
   halt: runHalt,
   report: runReport,
+  ship: runShip,
   blast: runBlast,
   scope: runScope,
   verify: runVerify,
