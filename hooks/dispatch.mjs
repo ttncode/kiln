@@ -4,11 +4,11 @@ import { loadConfig } from "../lib/config.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { relative } from "node:path";
 import { resolveTarget } from "../lib/paths.mjs";
-import { destructiveTargets, opensPullRequest, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
+import { destructiveTargets, opensPullRequest, removalTargets, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
-import { sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
+import { isControlFile, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { guardsFor, loadStack } from "../lib/stack.mjs";
 
 const BLOCK = 2;
@@ -116,8 +116,21 @@ function guardSandboxFile(payload, ctx) {
   return path ? checkPath(path, ctx) : ALLOW;
 }
 
+/**
+ * Removal verbs are checked against control files only. Widening them to the whole
+ * sandbox would re-open the shell parsing D34 refuses; a control file is one resolved
+ * path compared by segment, which is what the sandbox already does.
+ */
+function guardRemovedControlFiles(command, ctx) {
+  const hit = removalTargets(command)
+    .map((path) => resolveTarget(path, ctx.cwd))
+    .find((target) => isControlFile(ctx.root, target));
+  return hit ? block(sandboxMessage(ctx.root, { target: hit, reason: "kiln writes its own control files; deleting one is not an edit you get to make" })) : ALLOW;
+}
+
 function guardSandboxBash(payload, ctx) {
   const command = payload.tool_input?.command;
+  if (guardRemovedControlFiles(command, ctx) === BLOCK) return BLOCK;
   const paths = [...destructiveTargets(command), ...writeTargets(command)];
   return paths.map((path) => checkPath(path, ctx)).find((verdict) => verdict === BLOCK) ?? ALLOW;
 }

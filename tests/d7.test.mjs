@@ -205,3 +205,27 @@ test("D7 item 3: a phase with no steps refuses; it does not report green", () =>
   assert.match(run.stderr, /no .* step/);
   assert.doesNotMatch(run.stdout, /green/);
 });
+
+/**
+ * Item 7 is not "config.json is hard to edit" — it is that the agent cannot change the
+ * terms it is judged by. Deleting the file is a stronger edit than writing it, and on a
+ * real run `rm -f .kiln/config.json` was allowed: `rm` reached the sandbox only through
+ * the `rm -rf` pattern, which needs both flags.
+ */
+test("D7 item 7: a control file cannot be removed or emptied through the shell", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  for (const command of [
+    "rm -f .kiln/config.json",
+    "rm .kiln/config.json",
+    "rm -rf .kiln/config.json",
+    "truncate -s 0 .kiln/config.json",
+    "unlink .kiln/work/42/state.json",
+  ]) {
+    assert.equal(await dispatch("pre-bash", payload({ command, root })), 2, `ALLOWED: ${command}`);
+  }
+});
+
+test("removal stays narrow: an ordinary file is still the harness's call", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  assert.equal(await dispatch("pre-bash", payload({ command: "rm -f build/out.log", root })), 0);
+});
