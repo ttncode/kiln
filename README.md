@@ -229,7 +229,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 315, green on every pull request |
+| Tests | 317, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

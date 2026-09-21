@@ -35,9 +35,27 @@ things do matter:
   on another branch. Do not review the absence of the thing under review.
 - **Files beyond prediction** are where an investigation was wrong. Read those first.
 
-### 2. Read the change, then judge it
+### 2. Hand the diff to a reviewer that did not write it
 
-Use [code-reviewer.md](code-reviewer.md) for how to read a diff and what to say about it.
+```
+Task(subagent_type: "general-purpose", prompt: <the template in code-reviewer.md, filled in>)
+```
+
+[code-reviewer.md](code-reviewer.md) is that subagent's prompt, not a checklist for you.
+Reading it yourself and reviewing your own diff is the one thing this stage cannot buy —
+*"same author, same blind spots"* is the sentence at the top of this file, and on the first
+real full-path run the implementer reviewed itself because this step said "use" where it
+meant "dispatch".
+
+A subagent is safe here and it was measured, not assumed: `PreToolUse` hooks fire inside
+one and block there, and its `session_id` is the parent's — so `guard-gate` still matches
+this work and the reviewer cannot edit past a gate either (§1.6 findings 7 and 8).
+
+The template tells the reviewer not to dispatch further. That instruction is for the
+reviewer; it is not this step declining to dispatch.
+
+Then judge what comes back yourself — the findings are yours to grade and yours to put in
+`review.md`.
 
 Two rules kiln adds:
 

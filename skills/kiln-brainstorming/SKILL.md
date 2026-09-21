@@ -87,6 +87,21 @@ When in doubt between two paths, take the heavier one. The ratchet is
 one-way: hidden complexity discovered mid-task upgrades the path —
 stop, say so, and step up. Nothing downgrades mid-task.
 
+## The written spec gets a reader who did not write it
+
+On the full path, before the spec gate:
+
+```
+Task(subagent_type: "general-purpose", prompt: <the template in spec-document-reviewer-prompt.md, filled in>)
+```
+
+[spec-document-reviewer-prompt.md](spec-document-reviewer-prompt.md) is that prompt. It came
+with this skill and nothing referenced it, so no spec was ever read by anyone but its author
+— and the spec is what the plan, the implementation and the review all stand on.
+
+Bring what comes back to the gate with the spec. A gate that hides a reviewer's objection is
+asking for an approval of something the user was not shown.
+
 ## Anti-Pattern: "Too Simple To Need Approval"
 
 Every path ends with your human partner approving the required design
