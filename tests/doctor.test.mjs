@@ -94,7 +94,13 @@ test("doctor exits non-zero on a failure, so a wrapper can gate on it", () => {
   assert.match(run.stdout, /would stop a run/);
 });
 
-test("D7 item 1: doctor fails when the branch the repo ships from is unprotected", () => {
+/**
+ * `init` run from a feature branch once protected that branch and left the branch the
+ * project ships from open to a push. The warning that caught it is gone because the hole
+ * is: a branch kiln would open a pull request against is added to the protected set,
+ * whatever the file says.
+ */
+test("D7 item 1: the branch a project ships from is protected whether or not it is listed", () => {
   const root = tempRoot("kiln-doctor-branch-");
   initRepo(root);
   writeFile(join(root, "a.txt"), "a");
@@ -105,8 +111,8 @@ test("D7 item 1: doctor fails when the branch the repo ships from is unprotected
   writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
 
   const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "protected branches");
-  assert.equal(row.status, STATUS.fail);
-  assert.match(row.detail, /ships from "main"/);
+  assert.equal(row.status, STATUS.ok);
+  assert.match(row.detail, /main/, "integration_branch is main, so main is protected");
 });
 
 test("D88: doctor --write repairs the one thing it can repair without guessing", () => {
@@ -144,18 +150,30 @@ test("D81: a per-module map outside a multi-repo config is named, not resolved s
   assert.match(found.detail, /repo\.kind "multi"/);
 });
 
-test("D81: a map under a multi-repo config says which branch every v1 reader actually gets", () => {
+test("D81: a per-module map is reported per module, because something reads it now", () => {
   const root = project();
   writeConfig(root, {
     ...DEFAULTS,
-    repo: { kind: "multi", root: null },
+    repo: { kind: "multi", root: null, modules: { admin: "AdminPage" } },
     vcs: { ...DEFAULTS.vcs, integration_branch: { admin: "v3-master" } },
   });
+  const rows = runChecks(root, { config: loadConfig(root).config, migrated: false });
+
+  const branch = rows.find((row) => row.title === "integration branch");
+  assert.equal(branch.status, STATUS.ok);
+  assert.match(branch.detail, /admin → v3-master/);
+
+  const guarded = rows.find((row) => row.title === "protected branches");
+  assert.match(guarded.detail, /v3-master/, "a branch a module ships from is a branch kiln must not push to");
+});
+
+test("a map with no multi kind still fails, because then nothing resolves it", () => {
+  const root = project();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: { admin: "v3-master" } } });
   const found = runChecks(root, { config: loadConfig(root).config, migrated: false })
     .find((row) => row.title === "integration branch");
 
-  assert.equal(found.status, STATUS.warn);
-  assert.match(found.detail, /every reader gets "main"/);
+  assert.equal(found.status, STATUS.fail);
 });
 
 test("doctor says when a work has no owner, because its gate enforces nothing", () => {
@@ -185,7 +203,7 @@ test("doctor trusts the declared shipping branch, not a detection fallback", () 
   assert.equal(row.status, STATUS.ok, "origin/HEAD is unset here, and the branch you stand on is not the answer");
 });
 
-test("doctor still fails when the declared shipping branch is unprotected", () => {
+test("a declared shipping branch joins the protected set rather than producing a finding", () => {
   const root = tempRoot("kiln-doctor-undeclared-");
   initRepo(root);
   writeConfig(root, {
@@ -196,8 +214,9 @@ test("doctor still fails when the declared shipping branch is unprotected", () =
   writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
 
   const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "protected branches");
-  assert.equal(row.status, STATUS.fail);
-  assert.match(row.detail, /ships from "release"/);
+  assert.equal(row.status, STATUS.ok);
+  assert.match(row.detail, /release/);
+  assert.match(row.detail, /main/);
 });
 
 test("a remote default that disagrees with the declaration is a warning, not a failure", () => {

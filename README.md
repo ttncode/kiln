@@ -184,9 +184,11 @@ One file, `.kiln/config.json`, and exactly one environment variable (`KILN_ROOT`
 
 - `init` writes the `steps` it can actually satisfy — a `typecheck` step appears when you have
   a `tsconfig.json`, a `lint` step when you have a lint script.
-- Under a multi-module workspace, `integration_branch` also accepts a per-module map. **No v1
-  command resolves it per module** — every reader takes the scalar, and `kiln doctor` says so
-  rather than letting a map look like it is in force.
+- Submodules are read from `.gitmodules`, so `repo.modules` is detected rather than typed,
+  and the stack is detected from a module when the superproject has no manifest of its own.
+- Under a multi-module workspace, `integration_branch` also accepts a per-module map, and
+  **every module's shipping branch is protected whether or not you list it** — a branch kiln
+  would open a pull request against is one it must not push to.
 - A step whose `${cmd.x}` is unset **refuses to run** rather than skipping quietly, and
   `kiln doctor` says so before you hit it.
 
@@ -223,7 +225,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 288, green on every pull request |
+| Tests | 295, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

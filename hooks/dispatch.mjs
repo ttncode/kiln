@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { loadConfig } from "../lib/config.mjs";
+import { protectedBranchesFor } from "../lib/modules.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { relative } from "node:path";
 import { resolveTarget } from "../lib/paths.mjs";
@@ -37,7 +38,7 @@ function block(message) {
 function rootAndBranches(cwd) {
   try {
     const { root, config } = loadConfig(cwd);
-    return { root, protectedBranches: config.vcs.protected, stackId: config.stack.id };
+    return { root, protectedBranches: protectedBranchesFor(config), stackId: config.stack.id };
   } catch {
     return { root: cwd, protectedBranches: ["main", "master"], stackId: null };
   }
