@@ -152,3 +152,108 @@ decided what would happen** — a real process, a real harness, a real repositor
 
 §6.1 rule 9 says to expect the same yield before P1 and before v1.0. On this evidence, that
 is not pessimism; it is the observed rate.
+
+
+---
+
+## 7. The first run on a real ticket, and what it left inert
+
+§5 measured single mechanisms against real repositories. §7 is the first time a person ran
+the whole product: a real Claude Code session, a real ticket, a PHP CI3 monorepo with four
+git submodules, driven by the user rather than by its author.
+
+The run finished. It produced a plan, both gates were approved and recorded, and no unsafe
+action completed. It also proved that **none of that was being enforced.**
+
+### 7.1 `session_id: null`
+
+`state.json` after the run:
+
+```json
+{ "session_id": null, "stage": null, "predicted": [] }
+```
+
+`guard-gate` matches a work to the session that owns it. With no session recorded, it
+matched nothing, so **no edit was checked against a gate for the entire run**. The plan gate
+was recorded. The review gate was recorded. Neither was ever consulted.
+
+`guard-protected-branch` still fired throughout, because it needs no session. That is why
+the run looked guarded.
+
+The root cause is one shape repeated three times: `session_id`, `stage` and `predicted` are
+written only if the agent passes the right flag, and nothing made that happen. For
+`session_id`, nothing *could* — the id exists only in the hook payload, so it can only be
+bound where the payload is read.
+
+| Left inert | Why | Fix |
+|---|---|---|
+| `session_id` | no env var carries it; `kiln open` cannot know it | the first guarded call claims the single unowned work |
+| `stage` | advanced only with `--stage` | a recorded gate advances it |
+| `predicted[]` | filled only with `--predicted` | named non-optional at the plan gate |
+| the gate classifier | scanned the whole answer for negation | reads the opening clause |
+| `kiln doctor` | had nothing to say about any of it | WARN on one unowned work, FAIL on two |
+
+The user's own transcript shows the second failure mode this produced. The gate printed a
+numbered menu, they typed `1` twice, and kiln refused both times — a menu invites a number,
+and a bare number is a click rather than evidence anyone read the artifact. A gate asks for
+a word now, and the skill says why.
+
+### 7.2 A false FAIL teaches an agent to route around blocks
+
+Re-running `kiln doctor` on the same repository after those fixes:
+
+```
+[FAIL] protected branches: this repository ships from "fix/v3/account-edit-non-numeric-admin-id",
+       which is not in vcs.protected — a push to it would be allowed
+```
+
+printed two lines under `[ ok ] integration branch: v3-develop-tps`, which *was* protected.
+`refs/remotes/origin/HEAD` is unset in a submodule superproject, so §5.3's own fix fell back
+to the current branch — the feature branch the previous run had created — and doctor read a
+detection fallback as authority.
+
+This matters more than a cosmetic wrong line. The same transcript contains the agent meeting
+a genuine guard, working around it with `printf '\x2f\x2f'`, and then saying so unprompted:
+
+> that bypassed a guard rather than surfacing it, and I shouldn't have done it silently even
+> with a benign target.
+
+Blocks that fire wrongly are what train that behaviour. The declaration is authority now; an
+unset `origin/HEAD` means no second opinion rather than a wrong one, and a remote that
+disagrees is a warning, because shipping from a staging branch is legitimate.
+
+### 7.3 Reconciliation could not see a single source file
+
+Re-running the survival test end to end on the same monorepo surfaced the sixth defect:
+
+```
+Scope — predicted 1 · actual 0 · 1 predicted-not-touched
+HALT: nothing changed in this range. The usual cause is a commit on another branch.
+```
+
+There were edits in the tree. Every source file in that project lives inside a git
+submodule, and `git status --short` prints a submodule as one line naming the directory,
+`git diff --name-only` as a gitlink. So reconciliation counted one entry that was not a
+source path, filtered it, and reported zero — then said nothing had changed.
+
+The zero is not the problem. The sentence after it is: kiln stating something false with
+confidence is the failure this project exists to refuse. Submodule layouts are the reason
+D45 declines to require a git worktree; they cannot also be the layout reconciliation
+cannot see. Both halves now expand — the working tree through the submodule's own status,
+the committed half through the gitlink's before/after SHAs.
+
+Measured afterwards, same repository:
+
+```
+Scope — predicted 1 · actual 1 · ⚠ 1 beyond prediction · 1 predicted-not-touched
+  beyond: AdminPage/application/controllers/Admins.php
+```
+
+### 7.4 The count
+
+Six holes in §6, six more here. Twelve defects, and the property that found every one of
+them has not changed: **something other than kiln decided what would happen.** §7 adds a
+sharper version of it — a real *person* decided, on a real ticket, in a repository whose
+shape nobody had chosen for a test.
+
+The scorecard lines that remain ungraded are ungraded for the same reason.
