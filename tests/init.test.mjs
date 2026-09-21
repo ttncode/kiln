@@ -33,14 +33,20 @@ test("a typecheck step appears only when a tsconfig does", () => {
   assert.equal(detectStack(root).cmd.typecheck, "tsc --noEmit");
 });
 
-test("CodeIgniter is told apart from plain PHP by what it requires", () => {
+/**
+ * Only a stack kiln can load may be named. Plain PHP detected as `php`, `init` wrote it,
+ * and `kiln doctor` failed with `no stack named "php"` — a config that cannot work,
+ * produced by the command whose job is to produce one that does.
+ */
+test("CodeIgniter is told apart from plain PHP, and only the one with an adapter is named", () => {
   const ci3 = tempRoot();
   writeFile(join(ci3, "composer.json"), JSON.stringify({ require: { "codeigniter/framework": "3.1" } }));
   assert.equal(detectStack(ci3).id, "php-ci3");
 
   const php = tempRoot();
   writeFile(join(php, "composer.json"), JSON.stringify({ require: { "monolog/monolog": "3.0" } }));
-  assert.equal(detectStack(php).id, "php");
+  assert.equal(detectStack(php).id, "unknown", "kiln ships no php.json, so it does not name one");
+  assert.deepEqual(detectStack(php).alternatives, [], "and does not offer it as a choice either");
 });
 
 test("an unrecognised project still yields a usable stack rather than an error", () => {

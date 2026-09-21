@@ -109,7 +109,7 @@ test("an unambiguous project carries no alternatives and no extra question", () 
 test("a vendored framework is detected from its own files, not only from the manifest", () => {
   const root = initRepo(tempRoot("kiln-ci3-"));
   writeFile(join(root, "composer.json"), JSON.stringify({ require: {} }));
-  assert.equal(detectStack(root).id, "php", "nothing says CodeIgniter yet");
+  assert.equal(detectStack(root).id, "unknown", "composer alone names no stack kiln can load");
 
   writeFile(join(root, "system", "core", "CodeIgniter.php"), "<?php\n");
   assert.equal(detectStack(root).id, "php-ci3");

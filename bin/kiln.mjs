@@ -280,7 +280,10 @@ function writeGate(root, { id, key, decision, answer, claimed, rest }) {
   const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;
   writeState(root, next);
   out(JSON.stringify({ recorded: true, gate: key, claimed: next.predicted.length, ...next.gates[key] }, null, 2));
-  return 0;
+  // A rejection is evidence and is kept, but it is not a gate that opened. Exit 0 made it
+  // indistinguishable from an approval to anything reading the status — and since every
+  // menu now ends in "Stop here", this is the common way a user says no.
+  return decision === DECISION.approved ? 0 : 2;
 }
 
 /**
@@ -600,8 +603,11 @@ function runShip(argv) {
 function verifiedLine(state) {
   const ran = (state.verify ?? []).filter((entry) => !entry.skipped);
   if (ran.length === 0) return "Verified: never — no step has run for this work.";
-  const green = state.last_verified && state.last_verified !== state.base;
-  return `Verified: ${ran.length} step(s) ran${green ? ` · green at ${state.last_verified.slice(0, 9)}` : " · not green"}.`;
+  // Greenness is in the entries. Inferring it from `last_verified !== base` said "not
+  // green" after a run that was green, because the two are equal until something is
+  // committed — and verifying before committing is the ordinary case.
+  const green = ran.every((entry) => entry.exit === 0);
+  return `Verified: ${ran.length} step(s) ran${green ? ` · green at ${String(state.last_verified).slice(0, 9)}` : " · not green"}.`;
 }
 
 function runReport(argv) {
