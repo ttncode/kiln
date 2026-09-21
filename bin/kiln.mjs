@@ -8,7 +8,7 @@ import { installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
-import { PATHS, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
+import { PATHS, autoEligible, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
@@ -222,11 +222,29 @@ function flag(argv, name) {
  * No verb sets a gate. This one reads an answer, measures the artifact, classifies
  * what was said, and records only that — the shape task-done uses (D65, D71).
  */
+/**
+ * `--auto` used to mean "record approved, no questions asked", and the rule saying when
+ * that is allowed lived in `autoEligible` with no caller outside the tests. A flag that
+ * approves on request is not auto mode; it is a way past the gate. So the rule is asked
+ * here, where the record is written, and the caller cannot skip it.
+ */
+function autoRefusal(root, { id, config }) {
+  const state = readState(root, id);
+  if (state.status === WORK_STATUS.halted) return `this work is halted — auto mode does not rule past a halt`;
+  const verdict = autoEligible(state.path, config);
+  return verdict.eligible ? null : verdict.reason;
+}
+
+const AUTO_ANSWER = "ruled by auto mode, not by the user";
+
 function runGate(argv) {
   const [id, key, ...rest] = argv;
-  const { root } = loadConfig(process.cwd());
-  const answer = flag(rest, "--answer") ?? "";
-  const decision = rest.includes("--auto") ? DECISION.approved : classifyAnswer(answer);
+  const { root, config } = loadConfig(process.cwd());
+  const auto = rest.includes("--auto");
+  const refusal = auto ? autoRefusal(root, { id, config }) : null;
+  if (refusal) return refuseAuto(key, refusal);
+  const answer = auto ? AUTO_ANSWER : flag(rest, "--answer") ?? "";
+  const decision = auto ? DECISION.approved : classifyAnswer(answer);
 
   if (decision === DECISION.notAYes) {
     out(JSON.stringify({ recorded: false, ...reAskFor(key) }, null, 2));
@@ -239,6 +257,11 @@ function runGate(argv) {
     return 2;
   }
   return writeGate(root, { id, key, decision, answer, claimed, rest });
+}
+
+function refuseAuto(key, refusal) {
+  process.stderr.write(`kiln refused an auto ruling on the ${key} gate: ${refusal}.\nAsk the user.\n`);
+  return 2;
 }
 
 /**
@@ -426,7 +449,7 @@ function adoptExisting(root, { id, sessionId }) {
 /** Records the base it observed rather than being told one. */
 function runOpen(argv) {
   const [id, ...rest] = argv;
-  const { root } = loadConfig(process.cwd());
+  const { root, config } = loadConfig(process.cwd());
   if (existsSync(statePath(root, id))) return adoptExisting(root, { id, sessionId: flag(rest, "--session") });
   const base = gitOutput(root, ["rev-parse", "HEAD"]);
   if (!base) {
@@ -440,7 +463,21 @@ function runOpen(argv) {
   }
   const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path, dirtyAtOpen: actualChanged(root, base) });
   out(writeState(root, state));
+  out(autoLine(path, config));
   return 0;
+}
+
+/**
+ * The path is chosen here, and whether kiln will rule a gate on the user's behalf follows
+ * from it. Said at `open` because that is the moment the answer becomes knowable, and
+ * because a run that decides for someone without telling them first is the failure the
+ * gates exist to prevent.
+ */
+function autoLine(path, config) {
+  const verdict = autoEligible(path, config);
+  return verdict.eligible
+    ? `auto mode is ON for ${path}: kiln will rule its gates and say so in \`kiln report\`.`
+    : `auto mode is off for ${path} (${verdict.reason}) — every gate stops for you.`;
 }
 
 /**
