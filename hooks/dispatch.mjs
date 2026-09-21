@@ -9,6 +9,7 @@ import { claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { isControlFile, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
+import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
 import { guardsFor, loadStack } from "../lib/stack.mjs";
 
 const BLOCK = 2;
@@ -115,8 +116,12 @@ function claimVerdict(target, ctx) {
   return owner ? `claimed by work ${owner}, which is still active` : null;
 }
 
+/** Every write funnels through here — an Edit, a redirect, a `tee` — so the rule is stated once. */
 function checkPath(path, ctx) {
   const target = resolveTarget(path, ctx.cwd);
+  if (isVerificationFile(target)) {
+    return block(sandboxMessage(ctx.root, { target, reason: "this file is part of what enforces the run; the run does not get to edit it" }));
+  }
   const verdict = sandboxVerdict(ctx.root, { target, activeId: ctx.state?.id });
   const reason = verdict.blocked ? verdict.reason : claimVerdict(target, ctx);
   return reason ? block(sandboxMessage(ctx.root, { target, reason })) : ALLOW;
@@ -135,8 +140,13 @@ function guardSandboxFile(payload, ctx) {
 function guardRemovedControlFiles(command, ctx) {
   const hit = removalTargets(command)
     .map((path) => resolveTarget(path, ctx.cwd))
-    .find((target) => isControlFile(ctx.root, target));
-  return hit ? block(sandboxMessage(ctx.root, { target: hit, reason: "kiln writes its own control files; deleting one is not an edit you get to make" })) : ALLOW;
+    .find((target) => isControlFile(ctx.root, target) || isVerificationFile(target));
+  return hit ? block(sandboxMessage(ctx.root, { target: hit, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
+}
+
+function guardVerification(payload) {
+  const attempt = disarmAttempt(payload.tool_input?.command);
+  return attempt ? block(disarmMessage(attempt)) : ALLOW;
 }
 
 function guardSandboxBash(payload, ctx) {
@@ -171,7 +181,7 @@ function guardGateBash(payload, ctx) {
 }
 
 const CHAINS = {
-  "pre-bash": [guardProtectedBranch, guardSandboxBash, guardGateBash],
+  "pre-bash": [guardVerification, guardProtectedBranch, guardSandboxBash, guardGateBash],
   "pre-edit": [guardSandboxFile, guardGateFile],
   "post-edit": [],
 };
