@@ -4,7 +4,7 @@ import { loadConfig } from "../lib/config.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { relative } from "node:path";
 import { resolveTarget } from "../lib/paths.mjs";
-import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
+import { destructiveTargets, opensPullRequest, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { claimOwner, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
@@ -134,6 +134,9 @@ function guardGateFile(payload, ctx) {
 
 function guardGateBash(payload, ctx) {
   const command = payload.tool_input?.command;
+  if (ctx.state && stagesEverything(command)) {
+    return block(gateMessage("a broad `git add`", "this run stages its own files by name, never the whole tree"));
+  }
   if (opensPullRequest(command)) {
     const verdict = shipVerdict(ctx.root, ctx.state);
     if (verdict.blocked) return block(gateMessage("opening a pull request", verdict.reason));

@@ -208,3 +208,22 @@ test("the sed file operand is still seen, so the gate still applies to it", asyn
   const project = kilnProject({ gates: {} });
   assert.equal(await bash("sed -i '$a\\// note' src/app.ts", project), BLOCK);
 });
+
+// ---------------------------------------------------------------- D67c, the SHIP commit
+
+test("D67c: a broad git add is blocked while a run is active", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  for (const command of ["git add -A", "git add --all", "git add ."]) {
+    assert.equal(await bash(command, project), BLOCK, command);
+  }
+});
+
+test("D67c: staging named paths is what the law asks for, and passes", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  assert.equal(await bash("git add src/app.ts tests/app.test.ts", project), ALLOW);
+});
+
+test("D67c: kiln does not police a broad add in a session it is not driving", async () => {
+  const project = kilnProject({ gates: {} });
+  assert.equal(await bash("git add -A", project, "another-session"), ALLOW);
+});
