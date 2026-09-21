@@ -166,3 +166,15 @@ test("a gate asks for a word, and does not offer a number it will refuse", () =>
   assert.match(gate, /Reply `approve`/, "and the gate has to say what it does accept");
   assert.match(body, /--predicted/, "the plan gate's claim set is not optional");
 });
+
+/**
+ * The skill told the agent to let the user override the classification and never said
+ * how: `open --path` exists in the CLI and appeared nowhere in the skill, so a spoken
+ * `full` could only reach state through `kiln ratchet` — after opening on a path the
+ * user did not choose, and at the cost of the gate records the ratchet clears.
+ */
+test("the orchestrator names the flag that carries a path override", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /open <id> --path/, "the override has to have a route into state");
+  assert.match(body, /defaults to `bounded`/, "the default is a choice the agent makes silently otherwise");
+});

@@ -6,7 +6,7 @@ import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
-import { canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
+import { PATHS, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
@@ -377,13 +377,12 @@ function runOpen(argv) {
     process.stderr.write("no commit to start from. Make one first — a run needs a base.\n");
     return 1;
   }
-  const state = newWork({
-    id,
-    sessionId: flag(rest, "--session") ?? null,
-    base,
-    path: flag(rest, "--path") ?? "bounded",
-    dirtyAtOpen: actualChanged(root, base),
-  });
+  const path = flag(rest, "--path") ?? "bounded";
+  if (!PATHS.includes(path)) {
+    process.stderr.write(`no ceremony path named "${path}". One of: ${PATHS.join(", ")}.\n`);
+    return 1;
+  }
+  const state = newWork({ id, sessionId: flag(rest, "--session") ?? null, base, path, dirtyAtOpen: actualChanged(root, base) });
   out(writeState(root, state));
   return 0;
 }

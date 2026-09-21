@@ -193,3 +193,15 @@ test("D12: a downward ratchet is refused at the command, not just in the library
   assert.equal(run.status, 1);
   assert.match(run.stderr, /only goes up/);
 });
+
+test("open refuses a ceremony path that does not exist", () => {
+  const root = initRepo(tempRoot("kiln-open-path-"));
+  writeConfig(root, DEFAULTS);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "open", "w1", "--path", "heavy"], { cwd: root, encoding: "utf8" });
+
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /no ceremony path named "heavy"/);
+});

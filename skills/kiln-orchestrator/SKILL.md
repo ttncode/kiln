@@ -90,6 +90,21 @@ End by saying the classification out loud, and that it can be overridden:
 
 > This looks **bounded** — one clear change, two gates. Say `full` if you want the heavier path.
 
+### 2b. Open the work on the path that was chosen
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" open <id> --path <spike|bounded|full>
+```
+
+`--path` defaults to `bounded`, so **leaving it out is a silent vote for bounded** — and
+a user who asked for `full` in their very first sentence then has to ratchet out of a
+path they never chose. Read the argument for a path word before classifying: `full`,
+`bounded` or `spike` said anywhere in it is the user's decision, and it stands whatever
+you would have classified. Say which one you are using and why.
+
+There is no downward ratchet, so this is the only cheap moment. `kiln ratchet` is the
+move afterwards, and it clears the gate records by design.
+
 ### 3. Emit the todo list, and only here
 
 One todo per stage, **gates as their own items**, so the list shows at a glance whether kiln
