@@ -24,6 +24,13 @@ record that survives your own forgetting.
 **Narration:** between tool calls, narrate at most one short line — the
 ledger and the tool results carry the record.
 
+**No summaries between tasks.** No table of completed tasks, no "Tasks 1-3 are
+green" recap, no "Task 4 is next and is the largest". A summary is a closing
+gesture and the turn ends on it: measured on a five-hour run, both unnecessary
+stops came directly after a table, and both ended on a sentence promising to
+continue. The promise did not survive the table. The ledger already holds what
+a table would say, and `kiln report` renders it on request.
+
 **Continuous execution:** Do not pause to check in with your human partner
 between tasks. They chose inline execution to spend less, not to answer
 "should I continue?" after every task. Execute all tasks from the plan
@@ -68,7 +75,7 @@ digraph process {
         "Plan wrong? Rule and record. Code wrong? kiln-debugging" [shape=box];
         "Commit as the plan's commit steps say" [shape=box];
         "Completion contract met?" [shape=diamond];
-        "kiln verify --phase fast: record every exit code" [shape=box];
+        "kiln verify --phase fast --task N/total: record it, read the next-move line" [shape=box];
     }
 
     "Setup: read plan + spec, pre-flight scan" [shape=box];
@@ -84,8 +91,8 @@ digraph process {
     "Step output matches plan's Expected?" -> "Commit as the plan's commit steps say" [label="yes, last step"];
     "Commit as the plan's commit steps say" -> "Completion contract met?";
     "Completion contract met?" -> "Work the steps in order: TDD, run every verification, read every output" [label="no - finish the task"];
-    "Completion contract met?" -> "kiln verify --phase fast: record every exit code" [label="yes"];
-    "kiln verify --phase fast: record every exit code" -> "More tasks remain?";
+    "Completion contract met?" -> "kiln verify --phase fast --task N/total: record it, read the next-move line" [label="yes"];
+    "kiln verify --phase fast --task N/total: record it, read the next-move line" -> "More tasks remain?";
     "More tasks remain?" -> "Read the task from the plan" [label="yes"];
     "More tasks remain?" -> "kiln scope <id>: read the reconciliation line" [label="no"];
     "kiln scope <id>: read the reconciliation line" -> "Hand over to kiln's REVIEW stage";
@@ -201,7 +208,7 @@ Finish it.
 Run
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" verify <id> --phase fast
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" verify <id> --phase fast --task <N>/<total>
 ```
 
 It runs the
@@ -210,8 +217,11 @@ if they pass — appends the completion line to the ledger:
 
 `Task <N>: complete (commits <base7>..<head7>, tests: <command> → <result>)`
 
-A failing run records nothing; the task is not complete. When it records,
-mark the todo complete and take the next task.
+A failing run records nothing; the task is not complete.
+
+`--task <N>/<total>` is not decoration. kiln records the position and its last
+line tells you what to do next. **Read that line and do it in the same turn.**
+It is the instruction; this document is five hours behind it.
 
 ## Handing over to REVIEW
 
@@ -266,7 +276,7 @@ Task 1: Hook installation script
 [Step 4: run it — PASS 1/1. Matches Expected.]
 [Step 5: commit — d4e5f6a]
 [Contract: tests ran, output read, no deviations]
-[kiln verify 42 --phase fast → pass unit exit 0 — recorded in state.verify[]]
+[kiln verify 42 --phase fast --task 3/8 → pass unit exit 0 — recorded; "Task 4 is next — do not stop"]
 
 Task 2: Recovery modes
 
@@ -276,7 +286,7 @@ Task 2: Recovery modes
 [Ruling: the plan's consumer name is a typo against Task 1 Produces; use installHook
  — carry_over: Task 2: Ruling: install_hook → installHook — cost if wrong: one rename]
 [Steps 2-5 as planned; commit b7c8d9e]
-[kiln verify 42 --phase fast → pass unit exit 0]
+[kiln verify 42 --phase fast --task 4/8 → pass unit exit 0]
 
 ...
 
@@ -305,7 +315,7 @@ discovered while implementing Task 2 and is named above.
 
 Before handing over to REVIEW:
 
-- [ ] Every task has a green `kiln verify --phase fast` record **in the current range**.
+- [ ] Every task has a green `kiln verify --phase fast --task <N>/<total>` record **in the current range**.
 - [ ] Every `Expected:` line was compared against real output you read.
 - [ ] Every deviation has a `Ruling:` in `carry_over[]`, with what it costs if wrong.
 - [ ] `kiln scope <id>` ran and its line is in your handover.

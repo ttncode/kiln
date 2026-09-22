@@ -8,6 +8,8 @@ import {
   canRatchet,
   ceremonyFor,
   gateKeysFor,
+  nextMove,
+  taskPosition,
   ratchetRefusal,
   renderAutoRuled,
 } from "../lib/ceremony.mjs";
@@ -453,4 +455,27 @@ test("a work that already lists its owner as displaced is repaired by re-opening
   assert.match(again.stdout, /is already yours. Nothing changed/, "it is not a claim, and not a takeover");
   assert.deepEqual(readState(root, "w1").displaced, ["sess-B"], "the owner stops being listed as displaced");
   assert.equal(readState(root, "w1").session_id, "sess-A");
+});
+
+/**
+ * Measured on a five-hour run: the agent stopped twice between tasks while the skill said
+ * "Execute all tasks from the plan without stopping", and when asked why, answered "the
+ * skill says run continuously and I've been pausing anyway". Both stops came right after a
+ * summary table, on a sentence promising to continue.
+ *
+ * Superpowers carries the same rule on a subagent per task; BMAD writes story status from
+ * the build rather than from the agent, and its #387 and #496 show what prose alone does.
+ * So the line rides on the call the contract already makes mandatory after every task.
+ */
+test("the position is read from the caller and the next move is printed, not narrated", () => {
+  assert.deepEqual(taskPosition("3/8"), { task: 3, of: 8 });
+  assert.deepEqual(taskPosition(" 3 / 8 "), { task: 3, of: 8 });
+  assert.equal(taskPosition("9/8"), null, "a task beyond the total is not a position");
+  assert.equal(taskPosition("0/8"), null);
+  assert.equal(taskPosition("three of eight"), null);
+  assert.equal(taskPosition(undefined), null, "the flag is optional");
+
+  assert.match(nextMove({ task: 3, of: 8 }), /Task 4 is next — do not stop, and do not summarise\./);
+  assert.match(nextMove({ task: 8, of: 8 }), /Every task is done; next is the review gate\./);
+  assert.equal(nextMove(null), null);
 });

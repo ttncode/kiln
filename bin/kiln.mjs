@@ -8,7 +8,7 @@ import { installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
-import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
+import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
@@ -488,12 +488,10 @@ function runVerify(argv) {
   const { root, config } = loadConfig(process.cwd());
   const phase = flag(rest, "--phase") ?? "full";
   const state = readState(root, id);
+  const step = taskPosition(flag(rest, "--task"));
   const head = gitOutput(root, ["rev-parse", "HEAD"]) ?? state.base;
   const planned = planSteps(effectiveSteps(loadStack(config.stack.id), config), { phase, effects: effectsInPlay(rest) });
-  if (planned.length === 0) {
-    process.stderr.write(`${noStepsMessage(config, phase)}\n`);
-    return 1;
-  }
+  if (planned.length === 0) return refuseEmptyPhase(config, { phase, step });
 
   const result = runPhase(planned, {
     cwd: root,
@@ -501,7 +499,14 @@ function runVerify(argv) {
     tmpDir: join(root, ".kiln", "tmp", id, "steps"),
     range: `${state.base}..${head}`,
   });
-  return recordRun({ root, state, phase, head, result });
+  return recordRun({ root, state: { ...state, step }, phase, head, result });
+}
+
+/** The refusal still says what comes next: a phase kiln cannot run is not a reason to stop. */
+function refuseEmptyPhase(config, { phase, step }) {
+  process.stderr.write(`${noStepsMessage(config, phase)}\n`);
+  if (step) process.stderr.write(`${nextMove(step)}\n`);
+  return 1;
 }
 
 /**
@@ -575,6 +580,9 @@ function recordRun({ root, state, phase, head, result }) {
   }
   if (!result.failed) {
     out(phase === "full" ? "green" : "fast pass — not green; the project's suite defines that");
+    // The turn after a task ends where the agent last read an instruction. Prose in a skill
+    // loaded five hours ago is not that place; the output of the call it just made is.
+    if (state.step) out(nextMove(state.step));
     return 0;
   }
   process.stderr.write(`${result.failed.output}\n`);
