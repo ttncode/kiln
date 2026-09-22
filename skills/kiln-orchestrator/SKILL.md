@@ -149,11 +149,18 @@ unable to run any command at all. `open` writes that file; nothing else does.
 argument for a path word first: `full`, `bounded` or `spike` said anywhere in it is the
 user's decision, and it stands whatever you would have classified.
 
+Say the change type too. `--type` takes Conventional Commits' own vocabulary — `feat`,
+`fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `build`, `ci`, `style`, `revert` — and
+it becomes the branch's namespace, so `fix/20260922-account-edit-returns-500` sits with the
+project's own branches rather than beside `main`. The request usually says which: *"returns
+a 500 instead of a 404"* is a `fix`, *"remove this filter"* is a `refactor` or a `chore`.
+Default `chore`, which is the standard's catch-all and says the least.
+
 `kiln resolve` reads the leading modifiers for you and returns them — `path`, and `auto`
-when the request begins with `--auto`. Pass both on:
+when the request begins with `--auto`. Pass those on too:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" open <id> --path full --auto
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" open <id> --path full --type fix --auto
 ```
 
 `--auto` is the user asking kiln to rule this run's gates. It is a **human instruction in

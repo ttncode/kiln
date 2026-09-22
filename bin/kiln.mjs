@@ -8,7 +8,7 @@ import { installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
-import { PATHS, autoEligible, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
+import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
@@ -36,7 +36,7 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Decide what <arg> means - a URL, a work in progress, a ticket ref, or a
       description - and print the decision as JSON. Writes nothing.
 
-  kiln open <id> [--session <session-id>] [--path bounded] [--auto]
+  kiln open <id> [--session <session-id>] [--path bounded] [--type fix] [--auto]
       Create the work directory and record the commit it starts from.
 
   kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
@@ -614,6 +614,8 @@ function openRefusal(root, { id, rest }) {
   if (taken) return taken;
   const path = flag(rest, "--path") ?? "bounded";
   if (!PATHS.includes(path)) return `no ceremony path named "${path}". One of: ${PATHS.join(", ")}.`;
+  const type = flag(rest, "--type") ?? DEFAULT_TYPE;
+  if (!TYPES.includes(type)) return `"${type}" is not a change type. One of: ${TYPES.join(", ")}.`;
   return gitOutput(root, ["rev-parse", "HEAD"]) ? null : "no commit to start from. Make one first — a run needs a base.";
 }
 
@@ -629,6 +631,7 @@ function runOpen(argv) {
     sessionId: flag(rest, "--session") ?? null,
     base: gitOutput(root, ["rev-parse", "HEAD"]),
     path: flag(rest, "--path") ?? "bounded",
+    type: flag(rest, "--type") ?? DEFAULT_TYPE,
     auto: rest.includes("--auto"),
     dirtyAtOpen: actualChanged(root, gitOutput(root, ["rev-parse", "HEAD"])),
   });
