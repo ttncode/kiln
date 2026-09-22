@@ -39,6 +39,42 @@ test("B25: the ceiling is asserted, not claimed closed", async () => {
   assert.deepEqual(writeTargets("bash <<'EOF'\ncode\nEOF"), [], "heredocs are uncovered, by decision");
 });
 
+/**
+ * Measured on a real run: a read-only `SELECT ... HAVING COUNT(*) > 1` was refused as a
+ * source edit, because the scan read `> 1` as a redirect into a file named `1`. The agent
+ * did not route around it, so the fact it was checking stayed unverified and went into the
+ * spec as an unknown.
+ */
+test("a > inside quotes is the tool's argument, not a redirect", async () => {
+  const query = 'docker exec db mysql -e "SELECT id, COUNT(*) FROM administrator_maps GROUP BY id HAVING COUNT(*) > 1"';
+  assert.deepEqual(writeTargets(query), [], "the shell passes this as one argument");
+  assert.deepEqual(writeTargets('psql -c "SELECT * FROM t WHERE n > 5"'), []);
+  assert.deepEqual(writeTargets('awk "{ if ($1 > 2) print }" f.txt'), []);
+  assert.deepEqual(writeTargets("grep -E 'a>b' file"), []);
+  assert.deepEqual(writeTargets('echo "a > b" > real.txt'), ["real.txt"], "the quoted one is data, the bare one is the redirect");
+});
+
+/**
+ * Splitting on `;` before reading quotes made a real write invisible: the `;` inside
+ * `drop_column('users','email');` ended the segment, and the redirect that followed opened
+ * with an unterminated quote. A separator inside quotes is data, like every other character.
+ */
+test("a separator inside quotes does not end the command", async () => {
+  const ddl = "$this->dbforge->drop_column('users','email');";
+  assert.deepEqual(writeTargets(`echo "${ddl}" > app/migrations/001_drop.php`), ["app/migrations/001_drop.php"]);
+  assert.deepEqual(writeTargets('echo "a && b" > out.txt'), ["out.txt"]);
+  assert.deepEqual(writeTargets("echo one > a.txt; echo two > b.txt"), ["a.txt", "b.txt"], "a bare separator still splits");
+});
+
+/** The old scan required whitespace before the operator, so these two were never seen. */
+test("a redirect with no space before it is still a redirect", async () => {
+  assert.deepEqual(writeTargets("cat a>src/a.ts"), ["src/a.ts"]);
+  assert.deepEqual(writeTargets("node x.mjs 2> src/err.log"), ["src/err.log"]);
+  assert.deepEqual(writeTargets('echo hi > "out file.txt"'), ["out file.txt"], "a quoted path still resolves");
+  assert.deepEqual(writeTargets("make test > t.log 2>&1"), ["t.log"], "a file descriptor dup names no file");
+});
+
+
 test("D34: only rm -rf and git clean -xfd count as destructive", async () => {
   assert.deepEqual(destructiveTargets("rm -rf /home/you/data"), ["/home/you/data"]);
   assert.deepEqual(destructiveTargets("rm -fr build"), ["build"]);
