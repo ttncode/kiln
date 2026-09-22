@@ -1,11 +1,12 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
 import { branchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { slugOfId } from "../lib/resolve.mjs";
 import { newWork } from "../lib/state.mjs";
-import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
+import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
 
@@ -66,13 +67,18 @@ test("a single-repository work says none of that", () => {
  * `branch_pattern` has been in the schema since the first version and nothing rendered it.
  * A placeholder the work cannot fill is named — the same law D60.1 applies to `${cmd.x}`.
  */
+/**
+ * `${type}` is fillable now, so the unfillable one is `${slug}`: a ticket-ref id has no
+ * descriptive tail to take, and inventing one is what produced a ninety-character branch
+ * name the first time.
+ */
 test("a branch pattern the work cannot fill says so instead of shipping the placeholder", () => {
-  const state = newWork({ id: "w-1", base: "abc", path: "bounded" });
-  assert.equal(branchName({ vcs: { branch_pattern: "${id}" } }, state), "w-1");
+  const state = newWork({ id: "PROJ-1919", base: "abc", path: "bounded", type: "fix" });
+  assert.equal(branchName({ vcs: { branch_pattern: "${type}/${id}" } }, state), "fix/PROJ-1919");
 
-  const partial = branchName({ vcs: { branch_pattern: "${type}/${id}" } }, state);
-  assert.deepEqual(partial.unfilled, ["type"]);
-  assert.match(renderShipPlan({ topic: "w-1", branch: partial, modules: [] }), /still contains \$\{type\}/);
+  const partial = branchName({ vcs: { branch_pattern: "${type}/${slug}" } }, state);
+  assert.deepEqual(partial.unfilled, ["slug"]);
+  assert.match(renderShipPlan({ topic: "PROJ-1919", branch: partial, modules: [] }), /still contains \$\{slug\}/);
 });
 
 /**
@@ -85,9 +91,9 @@ test("the slug is the id's descriptive tail, not the id again", () => {
   assert.equal(slugOfId("admin-page-20260921-invalid-id-returns-404"), "invalid-id-returns-404");
   assert.equal(slugOfId("PROJ-1919"), null, "a ticket ref has no slug to take");
 
-  const state = { id: "20260921-invalid-id-returns-404" };
-  assert.equal(branchName({ vcs: { branch_pattern: DEFAULTS.vcs.branch_pattern } }, state), state.id);
-  assert.match(branchName({ vcs: { branch_pattern: "${type}/${slug}" } }, state).rendered, /\$\{type\}\/invalid-id-returns-404/);
+  const state = newWork({ id: "20260921-invalid-id-returns-404", base: "a", type: "fix" });
+  assert.equal(branchName({ vcs: { branch_pattern: "${id}" } }, state), state.id);
+  assert.equal(branchName({ vcs: { branch_pattern: "${type}/${slug}" } }, state), "fix/invalid-id-returns-404");
 });
 
 test("a pattern that asks for the id and the slug is told it repeats itself", () => {
@@ -128,4 +134,35 @@ test("a file the plan claimed ships even if it was dirty at open", () => {
     predicted: [{ path: "AdminPage.php" }],
   };
   assert.deepEqual(shipPlan(root, { config, state }).modules[0].files, ["AdminPage.php"], "the plan gate took responsibility for it");
+});
+
+/**
+ * `${type}` was in the default pattern and could not be filled, so #59 removed it along
+ * with the doubling it was next to — and took the namespace with it. Three real runs then
+ * put branches like `20260922-route-…` beside `main` and `develop`, in a repository whose
+ * own convention is `feature/v3/#1352`.
+ *
+ * Conventional Commits already owns this vocabulary; kiln does not invent one.
+ */
+test("a branch carries its change type as a namespace", () => {
+  const pattern = { vcs: { branch_pattern: DEFAULTS.vcs.branch_pattern } };
+  const work = (type) => newWork({ id: "20260922-account-edit-returns-500", base: "a", type });
+
+  assert.equal(branchName(pattern, work("fix")), "fix/20260922-account-edit-returns-500");
+  assert.equal(branchName(pattern, work(undefined)), "chore/20260922-account-edit-returns-500", "the standard's catch-all says the least");
+  assert.equal(DEFAULTS.vcs.branch_pattern, "${type}/${id}");
+});
+
+test("a type kiln does not know is refused at open, not discovered at ship", () => {
+  const root = initRepo(tempRoot("kiln-type-"));
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  writeConfig(root, DEFAULTS);
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "open", "w1", "--type", "hotfix"], { cwd: root, encoding: "utf8" });
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /"hotfix" is not a change type/);
+  assert.match(run.stderr, /feat, fix, chore/);
 });

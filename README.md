@@ -231,7 +231,8 @@ enforced or re-aim it, never loosen it.
 
 ```jsonc
 {
-  "vcs":   { "provider": "github", "protected": ["main"], "integration_branch": "main" },
+  "vcs":   { "provider": "github", "protected": ["main"], "integration_branch": "main",
+             "branch_pattern": "${type}/${id}" },   // fix/20260922-export-button-does-nothing
   "stack": { "id": "node",
              "cmd":   { "test": "npm test" },
              "steps": [{ "id": "unit", "run": "${cmd.test}" }] },
@@ -288,7 +289,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 396, green on every pull request |
+| Tests | 398, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
