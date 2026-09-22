@@ -578,6 +578,13 @@ function runScope(argv) {
  * `displaced`, and its very next source edit was refused. Measured, and it happened twice
  * in one real run because the skill re-opens a work to change its path.
  */
+function adoptionLine(id, { before, now }) {
+  if (before === now) return `work ${id} is already yours. Nothing changed.`;
+  return before
+    ? `took over work ${id} from session ${before}. That session's next source edit will be blocked.`
+    : `claimed work ${id}, which had no session. Nothing was taken from anyone.`;
+}
+
 function adoptExisting(root, { id, sessionId }) {
   const before = readState(root, id);
   if (!sessionId) {
@@ -587,9 +594,7 @@ function adoptExisting(root, { id, sessionId }) {
     return 0;
   }
   writeState(root, adoptSession(before, sessionId));
-  out(before.session_id && before.session_id !== sessionId
-    ? `took over work ${id} from session ${before.session_id}. That session's next source edit will be blocked.`
-    : `claimed work ${id}, which had no session. Nothing was taken from anyone.`);
+  out(adoptionLine(id, { before: before.session_id, now: sessionId }));
   return 0;
 }
 
