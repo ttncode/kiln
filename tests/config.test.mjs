@@ -225,6 +225,41 @@ test("a value takes the shape already at its key", () => {
   assert.equal(draft.vcs.integration_branch, "v3-develop", "a string stays a string");
 });
 
+/**
+ * Measured: an agent set a two-step list with `--set stack.steps=[{...},{...}]` and kiln
+ * split it on the commas inside the JSON, writing six string fragments into a real
+ * project's .kiln/config.json. Repairing it took `node -e` — a direct write to the file
+ * D48 exists to keep out of the agent's reach.
+ */
+test("a value written as JSON is stored as JSON", () => {
+  const draft = { stack: { steps: [{ id: "unit", run: "${cmd.test}" }] } };
+  setPath(draft, 'stack.steps=[{"id":"unit-fast","phase":"fast","run":"make fast"},{"id":"unit","phase":"full","run":"make test"}]');
+
+  assert.deepEqual(draft.stack.steps, [
+    { id: "unit-fast", phase: "fast", run: "make fast" },
+    { id: "unit", phase: "full", run: "make test" },
+  ]);
+});
+
+/** Falling back to the comma split is exactly how the corrupt file was written. */
+test("JSON that does not parse is refused, not shredded", () => {
+  const draft = { stack: { steps: [] } };
+  assert.throws(
+    () => setPath(draft, 'stack.steps=[{"id":"unit-fast",]'),
+    /read it as JSON, and it does not parse/,
+  );
+  assert.deepEqual(draft.stack.steps, [], "nothing was written");
+});
+
+test("only a structure declares itself with a bracket", () => {
+  const draft = { vcs: { branch_pattern: "${id}" }, stack: { cmd: { test: "npm test" } } };
+  setPath(draft, "vcs.branch_pattern=feature/v3/${id}");
+  assert.equal(draft.vcs.branch_pattern, "feature/v3/${id}", "a brace inside the value is not a JSON opening");
+
+  setPath(draft, "stack.cmd.test=make test NO_DUMP=1");
+  assert.equal(draft.stack.cmd.test, "make test NO_DUMP=1");
+});
+
 test("one protected branch protects that branch", () => {
   const root = configured({ vcs: { protected: ["main"], integration_branch: "main", provider: "github", branch_pattern: "${id}" } });
   assert.equal(cli(root, ["config", "set", "vcs.protected=v3-master,main"]).status, 0);
