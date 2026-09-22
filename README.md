@@ -318,7 +318,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 461, green on every pull request |
+| Tests | 462, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
@@ -345,6 +345,7 @@ kiln was designed before it was written, and the design is in the repository.
 | [`journey-matrix.md`](docs/design/2026-09-22-journey-matrix.md) | kiln as a user meets it — 56 rows, and the ten where two separate fixes could disagree |
 | [`cross-project-acceptance.md`](docs/design/2026-09-22-cross-project-acceptance.md) | the same matrix against nine checkouts nobody here designed |
 | [`real-repository-matrix.md`](docs/design/2026-09-23-real-repository-matrix.md) | the rules router across ten checkouts — six real projects and four layouts — and the two defects that found |
+| [`upstream-read.md`](docs/design/2026-09-23-upstream-read.md) | the release-checklist step the fork costs: what upstream did since the fork point, and the bug of theirs kiln was still carrying |
 
 Start with the architecture file. Every decision carries why it was made, so you can disagree
 with the reasoning rather than only the result.

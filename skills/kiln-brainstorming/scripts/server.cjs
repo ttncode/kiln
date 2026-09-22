@@ -242,8 +242,17 @@ function isFullDocument(html) {
   return trimmed.startsWith('<!doctype') || trimmed.startsWith('<html');
 }
 
+// split/join, not replace: a string replacement treats $&, $`, $' and $1 as
+// substitutions, so a screen containing NT$' swallowed the rest of the template and
+// emitted a stray closing tag. Upstream superpowers #2362 is this bug; the branding
+// substitution two functions up already used the safe idiom.
 function wrapInFrame(content) {
-  return renderBranding(frameTemplate).replace('<!-- CONTENT -->', content);
+  return renderBranding(frameTemplate).split('<!-- CONTENT -->').join(content);
+}
+
+function injectHelper(html, injection) {
+  if (!html.includes('</body>')) return html + injection;
+  return html.split('</body>').join(injection + '\n</body>');
 }
 
 function getNewestScreen() {
@@ -391,11 +400,7 @@ function handleRequest(req, res) {
       ? (raw => isFullDocument(raw) ? raw : wrapInFrame(raw))(fs.readFileSync(screenFile, 'utf-8'))
       : waitingPage();
 
-    if (html.includes('</body>')) {
-      html = html.replace('</body>', helperInjection + '\n</body>');
-    } else {
-      html += helperInjection;
-    }
+    html = injectHelper(html, helperInjection);
 
     res.writeHead(200, securityHeaders({ 'Content-Type': 'text/html; charset=utf-8' }));
     res.end(html);
@@ -696,6 +701,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  wrapInFrame,
+  injectHelper,
   computeAcceptKey,
   encodeFrame,
   decodeFrame,
