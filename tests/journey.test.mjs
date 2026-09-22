@@ -469,7 +469,7 @@ test("J9.9 an auto-ruled gate records words, not a click", () => {
 
 test("J9.10 the floor and the guard protect the same branches", () => {
   const root = nodeProject({ name: "j910" });
-  ok(root, ["init", "--set", "vcs.protected=main", "--set", "stack.cmd.test=true"]);
+  ok(root, ["config", "set", "vcs.protected=main"]);
   ok(root, ["doctor", "--write"]);
 
   const remote = tempRoot("kiln-j910-remote-");

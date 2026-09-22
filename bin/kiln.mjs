@@ -19,6 +19,7 @@ import { resolveArgument } from "../lib/resolve.mjs";
 import { STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
+import { protectedBranchesFor } from "../lib/modules.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
 
@@ -26,6 +27,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Detect the stack and write .kiln/. Overwrites nothing.
       --propose  print the proposed config and its questions; write nothing.
       --set      override one dotted key, e.g. --set stack.cmd.test="npm test".
+
+  kiln config set <key>=<value> [<key>=<value> ...]
+      Change a value after init. A change may tighten what is enforced or
+      re-aim it, never loosen it.
 
   kiln resolve [<arg>]
       Decide what <arg> means - a URL, a work in progress, a ticket ref, or a
@@ -77,6 +82,23 @@ function out(text) {
   process.stdout.write(text.endsWith("\n") ? text : `${text}\n`);
 }
 
+/**
+ * A value takes the shape already at its key, because the schema is what declares the
+ * shape and a flag only supplies the contents.
+ *
+ * Splitting on a comma instead meant one branch was not a list: `--set
+ * vcs.protected=v3-master` stored the string, `protectedBranchesFor` spread it into
+ * ["v","3","-","m",…], and a push to v3-master was ALLOWED — D7 item 1, through the
+ * documented flag. Booleans went the same way, which is why `--set auto.bounded=true`
+ * stored "true" and could never have switched auto on.
+ */
+function shapedLike(current, raw) {
+  if (Array.isArray(current)) return raw.split(",").map((part) => part.trim()).filter(Boolean);
+  if (typeof current === "boolean") return raw === "true";
+  if (typeof current === "number") return Number(raw);
+  return raw.includes(",") ? raw.split(",").map((part) => part.trim()) : raw;
+}
+
 /** Config is a file the agent may not write (D48), so answers arrive as arguments. */
 export function setPath(target, assignment) {
   const separator = assignment.indexOf("=");
@@ -90,7 +112,7 @@ export function setPath(target, assignment) {
     if (typeof node[key] !== "object" || node[key] === null) node[key] = {};
     node = node[key];
   }
-  node[leaf] = raw.includes(",") ? raw.split(",").map((part) => part.trim()) : raw;
+  node[leaf] = shapedLike(node[leaf], raw);
   return target;
 }
 
@@ -122,6 +144,12 @@ function stackOrNull(id) {
 }
 
 /** An ambiguity the user cannot see is one they cannot correct. */
+/** `--set` on a project init will not overwrite was read and dropped, silently. */
+function refuseLateSet() {
+  process.stderr.write("this project already has a .kiln/config.json, and init overwrites nothing — so --set would be read and dropped.\nUse `kiln config set <key>=<value>` to change a value.\n");
+  return 1;
+}
+
 function reportDetection(stack) {
   out(`stack: ${stack.id}${stack.evidence ? ` (${stack.evidence})` : ""}`);
   if (stack.alternatives?.length > 0) {
@@ -133,6 +161,9 @@ function reportDetection(stack) {
  * A question kiln prepared and nobody answered became a value nobody chose, silently. It is
  * named here so a person running the CLI directly sees what was decided for them, and so an
  * agent that skipped `--propose` still leaves the user something to correct.
+ *
+ * Only on a first init. Run again on a configured project, it described a **proposal** —
+ * defaults kiln would have used — while the file on disk held something else entirely.
  */
 function reportUnasked(questions, argv) {
   const answered = new Set(argv.filter((_, index) => argv[index - 1] === "--set").map((pair) => pair.split("=")[0]));
@@ -173,6 +204,9 @@ function runInit(argv) {
     out(USAGE);
     return 0;
   }
+  const configured = existsSync(configPath(root));
+  if (configured && argv.includes("--set")) return refuseLateSet();
+
   const { config, questions, detected } = proposeConfig(root);
   if (argv.includes("--propose")) {
     out(JSON.stringify({ config, questions, detected }, null, 2));
@@ -181,11 +215,66 @@ function runInit(argv) {
   reportDetection(detected.stack);
   out(`integration branch: ${integrationBranch(detected)}`);
   out(`${planInit(root).missing.length} file(s) to write`);
+  return writeInit(root, { config, questions, argv, configured });
+}
+
+function writeInit(root, { config, questions, argv, configured }) {
   const final = applyOverrides(config, argv);
   reportInit(applyInit(root, final));
   for (const path of installFloor(root)) out(`  wrote   ${path}`);
-  reportUnasked(questions, argv);
+  if (!configured) reportUnasked(questions, argv);
   return warnUnsatisfied(final);
+}
+
+/**
+ * D48 keeps `.kiln/config.json` out of the agent's reach, because it holds the terms the
+ * run is judged by. Which left no way to change a value after `init`: the guard refuses the
+ * edit, `init` overwrites nothing, and there was no verb — so a user who said "the
+ * integration branch is v3-master" was told to edit JSON by hand. That happened three times.
+ *
+ * The resolution is #68's, applied to a durable change instead of a per-run one: the
+ * authorization is in the user's own words, and what matters is the **direction**. A change
+ * may tighten enforcement or re-aim it. It may never loosen it, and it may never hand the
+ * gates to auto mode — which is the one thing the harness itself refuses by name, as
+ * `[Self-Modification]`.
+ *
+ * `kiln config set <key>=<value>` is the shape `git config`, `npm config set` and
+ * `gh config set` already taught everyone.
+ */
+const LOOSENS = "vcs.protected";
+
+function configRefusal({ before, after, keys }) {
+  if (keys.some((key) => key.startsWith("auto."))) {
+    return "auto mode rules gates on your behalf, so it stays your own edit — add `--auto` to a request instead, or set it in the file yourself.";
+  }
+  const lost = protectedBranchesFor(before).filter((branch) => !protectedBranchesFor(after).includes(branch));
+  return lost.length > 0
+    ? `this would stop protecting ${lost.join(", ")}. A config change may tighten what is enforced or re-aim it, never loosen it — edit ${LOOSENS} yourself if you mean to.`
+    : null;
+}
+
+function runConfig(argv) {
+  const [verb, ...assignments] = argv;
+  const { root, config } = loadConfig(process.cwd());
+  if (verb !== "set" || assignments.length === 0) {
+    process.stderr.write("usage: kiln config set <key>=<value> [<key>=<value> ...]\n");
+    return 1;
+  }
+  const next = assignments.reduce((draft, assignment) => setPath(draft, assignment), JSON.parse(JSON.stringify(config)));
+  const keys = assignments.map((pair) => pair.split("=")[0]);
+  const refusal = configRefusal({ before: config, after: next, keys });
+  if (refusal) {
+    process.stderr.write(`kiln refused that config change: ${refusal}\n`);
+    return 2;
+  }
+  writeFileSync(configPath(root), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  for (const key of keys) out(`  ${key}: ${JSON.stringify(valueAt(config, key))} → ${JSON.stringify(valueAt(next, key))}`);
+  out("Run `kiln doctor` to check it.");
+  return 0;
+}
+
+function valueAt(config, key) {
+  return key.split(".").reduce((node, part) => (node === undefined || node === null ? undefined : node[part]), config);
 }
 
 function runResolve(argv) {
@@ -634,6 +723,7 @@ function runReport(argv) {
 const COMMANDS = {
   init: runInit,
   open: runOpen,
+  config: runConfig,
   resolve: runResolve,
   list: runList,
   gate: runGate,
