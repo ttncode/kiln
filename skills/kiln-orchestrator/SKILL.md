@@ -14,6 +14,12 @@ what is still open.
 - Lead with the finding, then the evidence. Never the other way round.
 - A file path, a count or an exit code goes in a line of its own or a table cell.
 - Quote a tool's own error verbatim; never summarise one.
+- **Never describe what a command checks or does. Run it and print what it said.** Offering
+  `kiln doctor` as a next step, one run wrote *"checks containers, make test reachable,
+  GitLab token"* — it checks none of those. Nobody asked for that list; the gap where an
+  authoritative one should have been got filled with a guess, and a guess about what a
+  safety tool verifies is worse than no answer. If the user wants to know what a command
+  does, run it, or show them `kiln <verb>` with no arguments.
 - No preamble. The user knows which stage they are in because you told them at the top.
 
 ## Overview
