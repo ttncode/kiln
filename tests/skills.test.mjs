@@ -239,3 +239,25 @@ test("the orchestrator is told to run a command rather than describe it", () => 
   assert.match(body, /Never describe what a command checks or does/);
   assert.match(body, /Run it and print what it said/);
 });
+
+/**
+ * kiln ships seven skills. Measured across three real runs on a real project, exactly one
+ * ever loaded — this one — while the other six sat unread and their stages were improvised
+ * inside it. A skill nothing invokes is the same shape as a config field nothing reads,
+ * except it is two thousand lines of it.
+ */
+test("the orchestrator invokes every skill kiln ships", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  for (const name of skillNames().filter((skill) => skill !== "kiln-orchestrator")) {
+    assert.match(body, new RegExp(`\`${name}\``), `${name} ships and the orchestrator never names it`);
+  }
+});
+
+test("each stage names the skill that does it, rather than restating it", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /Use the `kiln-writing-plans` skill/);
+  assert.match(body, /use the `kiln-brainstorming` skill/);
+  assert.match(body, /Use the `kiln-implement` skill/);
+  assert.match(body, /use the `kiln-review` skill/);
+  assert.match(body, /Do not restate its contents here/, "a skill invoked and then paraphrased is a skill not used");
+});
