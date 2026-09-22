@@ -7,7 +7,7 @@ import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
-import { actualChanged, grepBlastRadius, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
+import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, ratchetRefusal, renderAutoRuled } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
@@ -600,6 +600,11 @@ function runBlast(argv) {
 function runScope(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
+  const anchor = anchorVerdict(root, state.last_verified);
+  if (!anchor.ok) {
+    process.stderr.write(`${offBranchMessage(state.id, { base: state.last_verified, reason: anchor.reason })}\n`);
+    return 1;
+  }
   const result = reconcile({
     predicted: state.predicted,
     actual: actualChanged(root, state.last_verified),
@@ -638,8 +643,9 @@ function adoptionLine(id, { before, now }) {
     : `claimed work ${id}, which had no session. Nothing was taken from anyone.`;
 }
 
-function adoptExisting(root, { id, sessionId }) {
+function adoptExisting(root, { id, sessionId, base }) {
   const before = readState(root, id);
+  if (base) return reanchor(root, { state: before, base });
   if (!sessionId) {
     out(before.session_id
       ? `work ${id} already exists and is driven by session ${before.session_id}. Nothing changed.`
@@ -648,6 +654,30 @@ function adoptExisting(root, { id, sessionId }) {
   }
   writeState(root, adoptSession(before, sessionId));
   out(adoptionLine(id, { before: before.session_id, now: sessionId }));
+  return 0;
+}
+
+/**
+ * Re-anchoring shrinks what every count afterwards measures, which is why it is typed by a
+ * person and written into `carry_over` where `kiln report` shows it. A work whose base the
+ * branch never grew from reports a number belonging to someone else's ticket; a work whose
+ * base was quietly moved forward reports a number belonging to nobody. The second is worse,
+ * so the move is on the record.
+ */
+function reanchor(root, { state, base }) {
+  const commit = gitOutput(root, ["rev-parse", `${base}^{commit}`]);
+  if (!commit) {
+    process.stderr.write(`"${base}" does not name a commit in this checkout.\n`);
+    return 1;
+  }
+  const moved = {
+    ...state,
+    base: commit,
+    last_verified: commit,
+    carry_over: [...state.carry_over, { from_pass: state.pass, kind: "reanchor", text: `${String(state.base).slice(0, 9)} → ${commit.slice(0, 9)}` }],
+  };
+  out(writeState(root, moved));
+  out(`base moved to ${commit.slice(0, 9)}. Every scope and ship count from here measures from there, and \`kiln report\` says so.`);
   return 0;
 }
 
@@ -696,20 +726,27 @@ function runOpen(argv) {
   const { root, config } = loadConfig(process.cwd());
   const refusal = openRefusal(root, { id, rest });
   if (refusal) return refuseOpen(refusal);
-  if (existsSync(statePath(root, id))) return adoptExisting(root, { id, sessionId: flag(rest, "--session") });
+  if (existsSync(statePath(root, id))) {
+    return adoptExisting(root, { id, sessionId: flag(rest, "--session"), base: flag(rest, "--base") });
+  }
 
-  const state = newWork({
-    id,
-    sessionId: flag(rest, "--session") ?? null,
-    base: gitOutput(root, ["rev-parse", "HEAD"]),
-    path: flag(rest, "--path") ?? "bounded",
-    type: flag(rest, "--type") ?? DEFAULT_TYPE,
-    auto: rest.includes("--auto"),
-    dirtyAtOpen: actualChanged(root, gitOutput(root, ["rev-parse", "HEAD"])),
-  });
+  const state = newWork(openedAt(root, { id, rest }));
   out(writeState(root, state));
   out(autoLine(state.path, { config, state }));
   return 0;
+}
+
+function openedAt(root, { id, rest }) {
+  const head = gitOutput(root, ["rev-parse", "HEAD"]);
+  return {
+    id,
+    sessionId: flag(rest, "--session") ?? null,
+    base: head,
+    path: flag(rest, "--path") ?? "bounded",
+    type: flag(rest, "--type") ?? DEFAULT_TYPE,
+    auto: rest.includes("--auto"),
+    dirtyAtOpen: actualChanged(root, head),
+  };
 }
 
 /**
