@@ -7,7 +7,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatch } from "../hooks/dispatch.mjs";
 import { gitOutput } from "../lib/init.mjs";
@@ -378,4 +378,31 @@ test("D7 item 5: a work id is one path segment, not a path", () => {
   assert.equal(existsSync(join(root, ".kiln", "escaped")), false, "nor outside .kiln/work/");
 
   assert.equal(open(mintId({ text: "the export button does nothing", now: new Date("2026-09-22") })).status, 0, "what kiln mints, kiln accepts");
+});
+
+/**
+ * The id check from the test above threw on a directory an older kiln had happily created,
+ * and that killed `kiln list`, `kiln doctor`, and — through `activeWorks` — every guarded
+ * call in the session. Which is exactly the deadlock #63 closed, walked back in through the
+ * door its own fix opened.
+ *
+ * Only *addressing* a work checks its id. Finding one that cannot be addressed is a report.
+ */
+test("a directory kiln cannot address is reported, not a reason to stop", async () => {
+  const { root } = kilnProject({ gates: { plan: "approved" } });
+  mkdirSync(join(root, ".kiln", "work", "#1586"), { recursive: true });
+  writeFileSync(join(root, ".kiln", "work", "#1586", "state.json"), JSON.stringify({ id: "#1586", status: "in_progress" }), "utf8");
+
+  assert.equal(await dispatch("pre-bash", payload({ command: "npm test", root })), ALLOW, "one bad directory does not stop the session");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const list = spawnSync(process.execPath, [bin, "list"], { cwd: root, encoding: "utf8" });
+  assert.equal(list.status, 0, list.stderr);
+  assert.match(list.stdout, /#1586\s+invalid/);
+
+  const doctor = spawnSync(process.execPath, [bin, "doctor"], { cwd: root, encoding: "utf8" });
+  const line = doctor.stdout.split("\n").find((row) => row.includes("cannot be a work id"));
+  assert.ok(line, doctor.stdout);
+  assert.match(line, /\[warn\]/, "a warning, not a stop");
+  assert.match(line, /rename or delete it/);
 });
