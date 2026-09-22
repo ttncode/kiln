@@ -10,6 +10,7 @@ import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSessio
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
+import { interpreterMessage, interpreterReach } from "../lib/guards/interpreter.mjs";
 import { isControlFile, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
 import { guardsFor, loadStack } from "../lib/stack.mjs";
@@ -152,6 +153,16 @@ function guardRemovedControlFiles(command, ctx) {
   return hit ? block(sandboxMessage(ctx.root, { target: hit, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
 }
 
+/**
+ * An inline program is a door the write-target scan cannot see through, and #95 widened it:
+ * a `>` inside quotes is now data, so `sh -c "echo x > path"` no longer trips the redirect
+ * scan by accident. The door is named here rather than left to luck.
+ */
+function guardInterpreter(payload) {
+  const reach = interpreterReach(payload.tool_input?.command);
+  return reach ? block(interpreterMessage(reach)) : ALLOW;
+}
+
 function guardVerification(payload) {
   const attempt = disarmAttempt(payload.tool_input?.command);
   return attempt ? block(disarmMessage(attempt)) : ALLOW;
@@ -189,7 +200,7 @@ function guardGateBash(payload, ctx) {
 }
 
 const CHAINS = {
-  "pre-bash": [guardVerification, guardProtectedBranch, guardSandboxBash, guardGateBash],
+  "pre-bash": [guardInterpreter, guardVerification, guardProtectedBranch, guardSandboxBash, guardGateBash],
   "pre-edit": [guardSandboxFile, guardGateFile],
   "post-edit": [],
 };

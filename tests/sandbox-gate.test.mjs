@@ -75,6 +75,31 @@ test("a redirect with no space before it is still a redirect", async () => {
 });
 
 
+/**
+ * Measured: an agent repaired a config kiln had corrupted with `node -e "... require('fs')
+ * ... .kiln/config.json ..."`, and it was allowed. D48 is not "config.json is hard to edit"
+ * — it is that the agent cannot change the terms it is judged by.
+ *
+ * #95 made this door wider by making it honest: a `>` inside quotes is data, so
+ * `sh -c "echo x > path"` no longer trips the redirect scan by accident.
+ *
+ * The program is not read. What is read is whether it names a file the enforcement is made
+ * of, because "kiln cannot see what this does" and "this may touch what judges the run"
+ * cannot both hold.
+ */
+test("an inline program may not name the files that enforce the run", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const config = join(project.root, ".kiln", "config.json");
+
+  assert.equal(await bash(`node -e "require('fs').writeFileSync('${config}','{}')"`, project), BLOCK);
+  assert.equal(await bash(`python3 -c "open('.kiln/config.json','w')"`, project), BLOCK);
+  assert.equal(await bash('sh -c "echo x > .git/hooks/pre-push"', project), BLOCK, "the door #95 opened, named");
+  assert.equal(await bash(`node -e "console.log(require('./.kiln/work/w1/state.json'))"`, project), BLOCK);
+
+  assert.equal(await bash('node -e "console.log(1+1)"', project), ALLOW, "an interpreter is not itself the offence");
+  assert.equal(await bash("npm run build", project), ALLOW);
+});
+
 test("D34: only rm -rf and git clean -xfd count as destructive", async () => {
   assert.deepEqual(destructiveTargets("rm -rf /home/you/data"), ["/home/you/data"]);
   assert.deepEqual(destructiveTargets("rm -fr build"), ["build"]);
