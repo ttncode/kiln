@@ -299,6 +299,8 @@ test("D7 item 7: a control file cannot be removed or emptied through the shell",
     "rm -rf .kiln/config.json",
     "truncate -s 0 .kiln/config.json",
     "unlink .kiln/work/42/state.json",
+    `node -e "require('fs').writeFileSync('.kiln/config.json','{}')"`,
+    `python3 -c "open('.kiln/config.json','w').write('{}')"`,
   ]) {
     assert.equal(await dispatch("pre-bash", payload({ command, root })), 2, `ALLOWED: ${command}`);
   }
