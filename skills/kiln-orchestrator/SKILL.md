@@ -91,6 +91,24 @@ Only ask what `questions` actually contains. `stack.id` appears only when the ch
 like several stacks; `vcs.integration_branch` only when nothing in the repository names a
 default branch. Detection answers the rest.
 
+## The skills that do the stages
+
+You drive the run. **Each stage is done by its own skill, and you invoke it** — none of them
+is loaded by being installed. Measured across three real runs: only this skill ever loaded,
+and the other six sat unread while their stages were improvised here.
+
+| Stage | Skill | When |
+|---|---|---|
+| design, before a spec | `kiln-brainstorming` | `full`, before the spec gate. On `bounded` the design is two sentences in chat and this is skipped |
+| PLAN | `kiln-writing-plans` | every path that has a plan gate |
+| IMPLEMENT | `kiln-implement` | after the plan gate |
+| writing any test | `kiln-tdd` | inside IMPLEMENT, before implementation code |
+| a bug, a failing test, anything unexpected | `kiln-debugging` | the moment it happens, before proposing a fix |
+| REVIEW | `kiln-review` | after IMPLEMENT, on `bounded` and `full` |
+
+Invoke the skill, then follow it. Do not restate its contents here or paraphrase what it
+would have said — that is the same rule as never describing a command you could run.
+
 ## Process
 
 ### 1. Resolve the argument before interpreting it
@@ -148,6 +166,10 @@ because there is nothing yet to launder past a gate. Once a gate exists, it only
 
 ### 2b. INVESTIGATE
 
+On `full`, the design comes before the spec: **use the `kiln-brainstorming` skill** and let
+it ask its questions. On `bounded` and `spike` the design is a short exchange in chat, and
+brainstorming is skipped — say which of the two you are doing.
+
 Read the code the work touches. Write `.kiln/work/<id>/brief.md`: what is asked, what you
 found, what is still unknown.
 
@@ -191,6 +213,9 @@ is working or waiting on the user. Emitted *after* classification, so it matches
 chosen. Subagent stages create no todos — the list would nest into noise.
 
 ### 4. PLAN
+
+**Use the `kiln-writing-plans` skill.** It decides what a plan has to contain; the two
+things below are what kiln adds to it.
 
 Write `.kiln/work/<id>/plan.md`. It carries a **Review Focus** section: up to five inputs or
 failure modes the brief implies but no step exercises, most likely first. Then render the
@@ -304,6 +329,12 @@ file, the gate is the thing to go back to.
 | `next_pass` | confirm with the user first. Every gate must be given again — approvals belong to the pass that earned them |
 
 ### 7. IMPLEMENT, then 8. REVIEW and VERIFY
+
+**Use the `kiln-implement` skill** for the task-by-task execution, **`kiln-tdd`** before
+writing any implementation code, and **`kiln-debugging`** the moment something fails or
+surprises you — a symptom fix without a root cause is the thing that skill exists to stop.
+For the review, **use the `kiln-review` skill**: it dispatches a reviewer that did not write
+the diff, which is the one thing this stage buys.
 
 Write the code. Run the `fast` steps. A `fast` pass is **never reported as green**: it ran
 only what the change touched, and the project's suite is what defines green.
