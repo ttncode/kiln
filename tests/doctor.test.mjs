@@ -1,6 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS, loadConfig } from "../lib/config.mjs";
 import { STATUS, runChecks, worstStatus } from "../lib/doctor.mjs";
@@ -54,7 +55,7 @@ test("D20: an unrouted rule is named, because unrouted is dead weight", () => {
 
 test("D20: a routed rule passes", () => {
   const root = project();
-  writeFile(join(root, ".kiln", "rules", "index.md"), "| `src/**` | routed.md |\n");
+  writeFile(join(root, ".kiln", "rules", "index.md"), "| Trigger | Rule file |\n|---|---|\n| `src/**` | routed.md |\n");
   writeFile(join(root, ".kiln", "rules", "routed.md"), "# routed\n");
   assert.equal(row(root, "rules routing")[0].status, STATUS.ok);
 });
@@ -281,4 +282,74 @@ test("doctor says whether kiln will rule a gate for you", () => {
   assert.equal(row.status, STATUS.warn);
   assert.match(row.detail, /ON for bounded/);
   assert.match(row.detail, /kiln report/, "the finding names where to see what it decided");
+});
+
+/* --- the rules router: every row that cannot resolve is named --- */
+
+function router(rows, files = {}) {
+  const root = project();
+  writeFile(join(root, ".kiln", "rules", "index.md"), "| Trigger | Rule file |\n|---|---|\n" + rows.map((r) => `| ${r} |\n`).join(""));
+  for (const [name, body] of Object.entries(files)) writeFile(join(root, ".kiln", "rules", name), body);
+  initRepo(root);
+  writeFile(join(root, "src", "app.js"), "1\n");
+  commitAll(root, "first");
+  return root;
+}
+
+const routing = (root) => row(root, "rules routing");
+
+/**
+ * The failure this check exists to prevent is Cursor's: a malformed rule is skipped with
+ * no warning and no log, so the rule is filed, it is routed, and the agent behaves as
+ * though it had never been written. There is no symptom to debug.
+ */
+test("E07: a row filling one column of two routes nothing, and says so", () => {
+  const [finding] = routing(router(["src/** |"]));
+  assert.equal(finding.status, STATUS.fail);
+  assert.match(finding.detail, /one of the two columns/);
+  assert.match(finding.detail, /src\/\*\*/, "the row is named, or there is nothing to fix");
+});
+
+test("E08: a rule routed but not on disk is a failure, not an empty read", () => {
+  const [finding] = routing(router(["src/** | ghost.md"]));
+  assert.equal(finding.status, STATUS.fail);
+  assert.match(finding.detail, /ghost\.md/);
+});
+
+test("E11: a rule file naming a path outside .kiln/rules/ is refused", () => {
+  const [finding] = routing(router(["src/** | ../../../etc/passwd"]));
+  assert.equal(finding.status, STATUS.fail);
+  assert.match(finding.detail, /not a file in \.kiln\/rules\//);
+});
+
+test("a table with rows but no separator is not a table, and nothing in it routes", () => {
+  const root = project();
+  writeFile(join(root, ".kiln", "rules", "index.md"), "| src/** | a.md |\n");
+  const [finding] = routing(root);
+  assert.equal(finding.status, STATUS.fail);
+  assert.match(finding.detail, /separator/);
+});
+
+/**
+ * The other half of "unrouted is dead weight". The file is routed, the row is well-formed,
+ * and the trigger still reaches no file in this project — so the rule is never applied and
+ * nothing anywhere would have said so.
+ */
+test("E09: a trigger matching no file in the project is a dead route", () => {
+  const [finding] = routing(router(["app/legacy/** | legacy.md"], { "legacy.md": "Old." }));
+  assert.equal(finding.status, STATUS.warn);
+  assert.match(finding.detail, /matches no file here/);
+});
+
+test("a live route resolves clean", () => {
+  const findings = routing(router(["src/** | js.md"], { "js.md": "No console.log." }));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].status, STATUS.ok);
+  assert.match(findings[0].detail, /1 route\(s\), all resolved/);
+});
+
+test("E10: a rule file with a BOM and CRLF is read, and neither is rewritten", () => {
+  const root = router(["src/** | js.md"], { "js.md": "﻿No console.log.\r\nSecond line.\r\n" });
+  assert.equal(routing(root)[0].status, STATUS.ok);
+  assert.match(readFileSync(join(root, ".kiln", "rules", "js.md"), "utf8"), /\r\n/, "doctor reads; it does not normalise");
 });
