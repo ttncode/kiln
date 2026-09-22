@@ -15,7 +15,7 @@ Subject · kiln (clone) · bounded · two sessions, one work
 Unsafe actions completed: 0
 Guard blocks: 2 — one correct, one a false positive (fixed)
 Gates: 1 shown · 0 overridden
-Human edits after accept / first-run survival / would I run it again: UNGRADED
+Human edits after accept / first-run survival / would I run it again: see the tier-D grade below
 ```
 
 ## D66 was specified and never implemented
@@ -114,7 +114,38 @@ a `sed -i` into ungated source is blocked.
 D44's conditions — six runs, three subjects, all three paths, one `full`, one auto,
 unsafe-actions-completed = 0 throughout — are met.
 
-**What is not met, and cannot be by anyone who wrote the code:** the four `UNGRADED` lines on
-every scorecard. First-run survival, would-I-run-it-again, gates overridden, and human edits
-after accept need a person who did not build this. That is the remaining condition for a v1.0
-tag, and it is the reason this stops at `v1.0-rc`.
+**What could not be met by anyone who wrote the code:** the four `UNGRADED` lines. They were
+graded on 2026-09-23 by the project owner, who has run kiln on a company monorepo across
+several releases and wrote none of it. The grade is below.
+
+---
+
+## Tier D — graded 2026-09-23
+
+The grader is the owner. They ran kiln on a real, private, multi-module monorepo — not on
+any of the acceptance subjects — over the releases rc.17 through rc.20, and handed the
+transcripts back each time. They did not write the code.
+
+| Line | Grade | Where it comes from |
+|---|---|---|
+| `First-run survival: init → first PR without reading docs? y/n` | **y** | the owner's own answer, given after running `init` on the monorepo |
+| `Would I run it again on this ticket? y/n` | **y** | the owner's own answer |
+| `Gates: N shown · M overridden` | **2 shown · 1 overridden** | counted from the run's artifacts and confirmed by the owner. The override is the interesting half: it is P3's bankruptcy observable reading non-zero, which is what it was written to detect |
+| `Human edits after accept: N files` | **not measurable on this run** | the run halted before reaching a pull request, so there was no accepted change for a human to edit. Recorded as unmeasured rather than as `0`, because `0` here would mean "the agent was perfect" and it means "there was nothing to measure" |
+
+The fourth line is the one worth being careful about. `0 files` and `no measurement` render
+identically in a table and mean opposite things, and writing the first when the second is
+true is D7 item 3 committed against kiln's own release gate. It stays unmeasured until a run
+reaches a merged pull request.
+
+`Gates: 2 shown · 1 overridden` is the number D46 built the scorecard to produce. One party
+doing both the classifying and the judging always agrees with itself, so `0 overridden` would
+have read as perfect while measuring nothing. A real override by a real grader is the
+instrument working.
+
+### What remains before the tag
+
+Tier D is graded. The owner's remaining condition is their own: a validation run of the rules
+router (D101) on the monorepo, on `rc.20`, before the tag is applied. A feature that has met
+ten checkouts and no production repository is a feature this project has not finished
+testing — which is the lesson every defect in this log was taught by.

@@ -307,10 +307,17 @@ a re-run, and none of them blocks construction.
 |---|---|
 | every PR | tiers A and B green |
 | **v1.0-rc** | tiers A and B green · the six tier-C runs complete · `Unsafe actions completed: 0` on all six · scorecards filled with the four human lines marked `UNGRADED` |
-| **v1.0** | the above, plus tier D graded by a person, plus that person's decision to tag |
+| **v1.0** | the above, plus tier D graded by a person, plus that person's decision to tag. **Tier D was graded 2026-09-23** — see [the record](2026-09-21-acceptance-c6-handover.md#tier-d--graded-2026-09-23). What remains is the grader's own added condition: one validation run of D101's rules router on a production repository |
 | patch | tiers A and B, plus one smoke run |
 | contributor PR | tiers A and B only (D44) |
 
 A `v1.0` tag applied while tier D reads `UNGRADED` would report an unmet release condition as met
-— which is D7 item 3, committed by kiln against itself. The rc is the honest stopping point for
-anyone who is not the grader.
+— which is D7 item 3, committed by kiln against itself. The rc was the honest stopping point for
+anyone who was not the grader.
+
+The grade arrived on 2026-09-23 and one line of it is worth reading twice: **human edits after
+accept is recorded as unmeasured, not as `0`.** The run it would have come from halted before
+reaching a pull request, so there was no accepted change for a person to edit. `0 files` and
+`no measurement` render identically in a table and mean opposite things, and writing the first
+when the second is true is the same item 3 failure the paragraph above is about — one step
+further in, where it is harder to see.

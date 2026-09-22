@@ -66,15 +66,22 @@ test("the README's test count matches the suite", () => {
  * The claim drifted the other way once already: the opening said "has not yet been through
  * the six acceptance runs" while the status table two screens down said "6 of 6". Both
  * halves are pinned here, against the records rather than against each other.
+ *
+ * The tier-D half moved on 2026-09-23. It used to assert `UNGRADED`, on the reasoning that a
+ * graded scorecard would make the rc wording stale — which was right until the grade arrived
+ * and left the rc wording standing on a condition that had been met. What actually holds the
+ * tag is now the thing this asserts: the grade is recorded, and the README says what is
+ * genuinely outstanding rather than something already done.
  */
 test("the README does not claim a release bar it has not met", () => {
   const latest = readFileSync(join(ROOT, "docs", "design", "2026-09-21-acceptance-c6-handover.md"), "utf8");
-  assert.match(latest, /UNGRADED/, "a graded scorecard would make the rc wording the stale one");
+  assert.match(latest, /Tier D — graded/, "the rc wording has to stand on a real condition");
+  assert.doesNotMatch(latest, /^Human edits after accept.*UNGRADED/m);
 
   assert.match(README, /Status: `v1\.0\.0-rc`/);
   assert.match(README, /6 of 6/, "the runs that are done have to be visible");
   assert.doesNotMatch(README, /has not yet\s+been through the six/);
-  assert.match(README, /only a person/, "the outstanding half has to stay visible");
+  assert.match(README, /validation run/, "the outstanding half has to stay visible, and be the true one");
 });
 
 /**
