@@ -437,3 +437,20 @@ test("resume refuses what it cannot answer", () => {
   assert.equal(silent.status, 1);
   assert.match(silent.stderr, /a halt is a question/, "the same argument --reason won");
 });
+
+/**
+ * #87 filtered the claiming session out of `displaced`, and an early return skipped the
+ * filter when the session already owned the work — which is the only session that would
+ * ever try to repair such a record. Found by applying the fix to the real one it was
+ * written for, where it changed nothing.
+ */
+test("a work that already lists its owner as displaced is repaired by re-opening it", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "w1", "--session", "sess-A"]);
+  writeState(root, { ...readState(root, "w1"), displaced: ["sess-B", "sess-A"] });
+
+  const again = kiln(root, ["open", "w1", "--session", "sess-A"]);
+  assert.match(again.stdout, /is already yours. Nothing changed/, "it is not a claim, and not a takeover");
+  assert.deepEqual(readState(root, "w1").displaced, ["sess-B"], "the owner stops being listed as displaced");
+  assert.equal(readState(root, "w1").session_id, "sess-A");
+});
