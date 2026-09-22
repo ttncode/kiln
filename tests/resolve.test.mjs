@@ -73,6 +73,21 @@ test("B12 / D79: a reserved word resolves ahead of every other branch", () => {
   }
 });
 
+/**
+ * B12 asks for more than the classification: `/kiln dna` at tier 0 must *report that DNA is
+ * v1.2*. Without the message the orchestrator read `reserved` as "run that command" and ran
+ * `kiln dna`, which does not exist — a usage error in place of the answer.
+ */
+test("B12: a word held for a later version says so, and names what exists instead", () => {
+  const { message } = resolveArgument({ arg: "dna", root: tempRoot() });
+  assert.match(message, /v1\.2/, "it names the version the user is waiting for");
+  assert.match(message, /kiln blast/, "and the tier-0 command that works today");
+
+  for (const word of ["init", "doctor"]) {
+    assert.equal(resolveArgument({ arg: word, root: tempRoot() }).message, null, `${word} is a command, not a reservation`);
+  }
+});
+
 test("B14: a work directory cannot shadow a reserved word", () => {
   const root = tempRoot();
   writeState(root, newWork({ id: "dna", sessionId: "s", base: "aaa" }));
