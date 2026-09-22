@@ -16,8 +16,9 @@ it is **wrong**.
 
 **Status: `v1.0.0-rc`.** Everything below runs, every promise it makes has a test, and the six
 real-world acceptance runs its own release bar requires are done — `unsafe actions completed: 0`
-on every one. What holds the v1.0 tag back is the four scorecard lines only a person who did
-not build it can grade — see [Status](#status).
+on every one. The four scorecard lines only a person who did not build it can grade are
+[graded](docs/design/2026-09-21-acceptance-c6-handover.md). What holds the v1.0 tag back is one
+validation run of the newest feature on a production repository — see [Status](#status).
 
 ## Table of Contents
 
@@ -329,12 +330,19 @@ no stack declares as a guard fails the build.
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
 | Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md), plus the [journey matrix](docs/design/2026-09-22-journey-matrix.md) run against [nine real checkouts](docs/design/2026-09-22-cross-project-acceptance.md) — Node, PHP, Python, C, a pnpm workspace, husky, submodules, and a project shipping from `8.2`; plus [ten more](docs/design/2026-09-23-real-repository-matrix.md) for the rules router — six real projects and four layouts |
-| **Not done** | the four scorecard lines only a person can grade — see [the last record](docs/design/2026-09-21-acceptance-c6-handover.md) |
+| Tier D | **graded** 2026-09-23 by the project owner, who wrote none of it: first-run survival **y** · would I run it again **y** · gates **2 shown · 1 overridden** · human edits after accept **unmeasured**, because that run never reached a PR and `0` would have meant something else |
+| **Not done** | one validation run of the [rules router](#project-rules) on a production repository. Ten checkouts is not a user |
 
-The machine-checkable half of the promise is done; the human-graded half is not, and no
-amount of test-writing closes it. The
-[verification plan](docs/design/2026-09-20-verification-plan.md) says exactly which four
-questions only a person can answer, and why.
+`0 files` and `no measurement` render identically in a table and mean opposite things. The
+fourth line stays unmeasured until a run reaches a merged pull request, rather than being
+written as a zero that would read as *the agent was perfect*.
+
+`2 shown · 1 overridden` is the number the scorecard was built to produce. One party doing
+both the classifying and the judging always agrees with itself, so `0 overridden` would have
+read as perfect while measuring nothing. A real override by a real grader is the instrument
+working. The
+[verification plan](docs/design/2026-09-20-verification-plan.md) says why only a person can
+answer these four.
 
 ## Design documents
 
