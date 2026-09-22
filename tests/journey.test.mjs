@@ -51,9 +51,14 @@ test("J1.3 init a second time overwrites nothing", () => {
   assert.equal(readFileSync(join(root, ".kiln", "config.json"), "utf8"), before);
 });
 
-test("J1.4 doctor calls a fresh project Ready", () => {
-  const run = ok(nodeProject({ name: "j14" }), ["doctor"]);
-  assert.match(run.stdout, /Ready\./);
+test("J1.4 doctor calls a project init set up Ready, with nothing warned about", () => {
+  const root = initRepo(tempRoot("kiln-j14-"));
+  writeFile(join(root, "package.json"), JSON.stringify({ name: "app", scripts: { test: "true" } }));
+  commitAll(root, "first");
+  ok(root, ["init"]);
+
+  const run = ok(root, ["doctor"]);
+  assert.match(run.stdout, /^Ready\.$/m, "what init writes, doctor accepts without a warning");
   assert.doesNotMatch(run.stdout, /FAIL/);
 });
 

@@ -255,11 +255,11 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 375, green on every pull request |
+| Tests | 379, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
-| Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md) — all three paths, both modes, two sessions, `unsafe actions completed: 0` on every one |
+| Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md), plus the [journey matrix](docs/design/2026-09-22-journey-matrix.md) run against [nine real checkouts](docs/design/2026-09-22-cross-project-acceptance.md) — Node, PHP, Python, C, a pnpm workspace, husky, submodules, and a project shipping from `8.2` |
 | **Not done** | the four scorecard lines only a person can grade — see [the last record](docs/design/2026-09-21-acceptance-c6-handover.md) |
 
 The machine-checkable half of the promise is done; the human-graded half is not, and no
@@ -278,6 +278,8 @@ kiln was designed before it was written, and the design is in the repository.
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
 | [`live-harness-evidence.md`](docs/design/2026-09-21-live-harness-evidence.md) | what a real Claude Code session measured, including three holes every green test had missed |
+| [`journey-matrix.md`](docs/design/2026-09-22-journey-matrix.md) | kiln as a user meets it — 56 rows, and the ten where two separate fixes could disagree |
+| [`cross-project-acceptance.md`](docs/design/2026-09-22-cross-project-acceptance.md) | the same matrix against nine checkouts nobody here designed |
 
 Start with the architecture file. Every decision carries why it was made, so you can disagree
 with the reasoning rather than only the result.

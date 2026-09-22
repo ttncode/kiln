@@ -313,6 +313,18 @@ function applyRepairs({ root, config }) {
  * Exits non-zero on a failure so a wrapper can gate on it. A warning is a thing to know,
  * not a thing to stop for.
  */
+/**
+ * "Ready." over a warning is right for most warnings — a rule budget, a map nobody reads.
+ * It was wrong for one: a missing push floor means D7 item 1 has lost a whole layer, and on
+ * a husky project that was the state of every run while the last line said Ready.
+ */
+function summaryFor(worst, results) {
+  if (worst === STATUS.fail) return "Something here would stop a run. Fix the FAIL lines.";
+  const warnings = results.filter((row) => row.status === STATUS.warn);
+  if (warnings.length === 0) return "Ready.";
+  return `Ready, with ${warnings.length} warning(s): ${warnings.map((row) => row.title).join(", ")}.`;
+}
+
 function runDoctor(argv) {
   const loaded = loadConfig(process.cwd());
   if (argv.includes("--write")) return applyRepairs(loaded);
@@ -320,7 +332,7 @@ function runDoctor(argv) {
   for (const row of results) out(`  [${MARK[row.status]}] ${row.title}: ${row.detail}`);
 
   const worst = worstStatus(results);
-  out(worst === STATUS.fail ? "\nSomething here would stop a run. Fix the FAIL lines." : "\nReady.");
+  out(`\n${summaryFor(worst, results)}`);
   return worst === STATUS.fail ? 1 : 0;
 }
 
