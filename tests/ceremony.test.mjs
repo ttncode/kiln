@@ -402,3 +402,38 @@ test("a work never lists its own owner as displaced", () => {
   assert.equal(state.session_id, "sess-A");
   assert.deepEqual(state.displaced, ["sess-B"], "taking it back removes you from the list");
 });
+
+/**
+ * `kiln halt` said "Source edits are blocked until this is resumed" and nothing could
+ * resume it: `resolve` presents a halt, it does not clear one, and only a ship opened the
+ * next pass. A work whose blocking unknown the user had answered stayed blocked for good —
+ * the third message this session to name a remedy that did not exist.
+ */
+test("a halt ends when the question is answered", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "w1", "--session", "s1"]);
+  const halted = kiln(root, ["halt", "w1", "--reason", "outside readers still need the legacy table"]);
+  assert.match(halted.stdout, /kiln resume w1 --answer/, "the remedy names itself");
+
+  const resumed = kiln(root, ["resume", "w1", "--answer", "Those readers are in scope."]);
+  assert.equal(resumed.status, 0, resumed.stderr);
+  assert.equal(readState(root, "w1").status, "in_progress");
+
+  const carried = readState(root, "w1").carry_over;
+  assert.deepEqual(carried.map((row) => row.kind), ["halt", "resume"], "the answer sits beside the question");
+  assert.equal(carried.at(-1).text, "Those readers are in scope.");
+});
+
+test("resume refuses what it cannot answer", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "w1", "--session", "s1"]);
+
+  const running = kiln(root, ["resume", "w1", "--answer", "x"]);
+  assert.equal(running.status, 1);
+  assert.match(running.stderr, /is in_progress, not halted/);
+
+  kiln(root, ["halt", "w1", "--reason", "a question"]);
+  const silent = kiln(root, ["resume", "w1"]);
+  assert.equal(silent.status, 1);
+  assert.match(silent.stderr, /a halt is a question/, "the same argument --reason won");
+});

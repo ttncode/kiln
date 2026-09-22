@@ -60,6 +60,9 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln halt <id> --reason "<why>"
       Stop this work and record why. Source edits block until it is resumed.
 
+  kiln resume <id> --answer "<what you decided>"
+      End a halt. The answer is recorded beside the question it answers.
+
   kiln ratchet <id> <spike|bounded|full>
       Move this work up a rung. Prints the uncommitted diff it found and stops;
       it never touches the working tree.
@@ -717,7 +720,41 @@ function runHalt(argv) {
     status: WORK_STATUS.halted,
     carry_over: [...state.carry_over, { from_pass: state.pass, kind: flag(rest, "--kind") ?? "halt", text: reason }],
   });
-  out(`halted ${id}: ${reason}\nSource edits are blocked until this is resumed.`);
+  out(`halted ${id}: ${reason}\nSource edits are blocked until \`kiln resume ${id} --answer "<what you decided>"\`.`);
+  return 0;
+}
+
+/**
+ * A halt is a question, and a question needs an answer to end. `kiln halt` said "blocked
+ * until this is resumed" and nothing could resume it: `resolve` presents a halt, it does
+ * not clear one, and only a ship opened the next pass. So a work whose blocking unknown the
+ * user had answered stayed blocked for good — the third time this session a message named a
+ * remedy that did not exist.
+ *
+ * The answer is recorded beside the halt it answers, because a halt resolved without a
+ * written reason is a stop nobody can audit, which is the same argument `--reason` won.
+ */
+function resumeRefusal(id, { answer, state }) {
+  if (!answer) return 'a halt is a question. Say what was decided: --answer "<what you decided>".';
+  return state.status === WORK_STATUS.halted ? null : `work ${id} is ${state.status}, not halted. Nothing to resume.`;
+}
+
+function runResume(argv) {
+  const [id, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  const answer = flag(rest, "--answer") ?? "";
+  const state = answer ? readState(root, id) : null;
+  const refusal = resumeRefusal(id, { answer, state });
+  if (refusal) {
+    process.stderr.write(`${refusal}\n`);
+    return 1;
+  }
+  writeState(root, {
+    ...state,
+    status: WORK_STATUS.inProgress,
+    carry_over: [...state.carry_over, { from_pass: state.pass, kind: "resume", text: answer }],
+  });
+  out(`resumed ${id} at ${state.stage}: ${answer}`);
   return 0;
 }
 
@@ -763,6 +800,7 @@ const COMMANDS = {
   gate: runGate,
   ratchet: runRatchet,
   halt: runHalt,
+  resume: runResume,
   report: runReport,
   ship: runShip,
   blast: runBlast,
