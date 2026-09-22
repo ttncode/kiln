@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { matchingRules, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { newWork, openNextPass, recordRules } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, tempRoot, writeFile } from "./helpers/fixture.mjs";
@@ -180,4 +180,65 @@ test("E13: a work id with no state is refused by the same error every other verb
 test("E19: a new pass clears what the previous pass was handed", () => {
   const shipped = recordRules(newWork({ id: "w1", sessionId: "s", base: "aaa" }), { stage: "plan", files: ["a.md"] });
   assert.deepEqual(openNextPass(shipped, "bbb").rules, [], "an approval belongs to the pass that earned it, and so does a rule reading");
+});
+
+/* --- as a person meets it --- */
+
+/**
+ * E23. The whole feature in one run: a fresh project, one rule written and routed by hand,
+ * and the rule reaching both stages. Everything before this tested a part.
+ */
+test("E23: a rule written after init reaches PLAN and REVIEW of the next run", () => {
+  const root = nodeProject({ name: "e23" });
+  ok(root, ["init"]);
+  writeFile(join(root, ".kiln", "rules", "js.md"), "Never log a token.\n");
+  writeFile(join(root, ".kiln", "rules", "index.md"), `${HEADER}| src/** | js.md |\n`);
+
+  assert.equal(ok(root, ["doctor"]).stdout.includes("1 route(s), all resolved"), true, "doctor sees the route before any run does");
+
+  ok(root, ["open", "w1", "--session", "s"]);
+  const before = JSON.parse(readFileSync(join(root, ".kiln", "work", "w1", "state.json"), "utf8"));
+  writeFileSync(join(root, ".kiln", "work", "w1", "state.json"), JSON.stringify({ ...before, predicted: ["src/app.js"] }));
+
+  assert.match(ok(root, ["rules", "w1", "--stage", "plan"]).stdout, /Never log a token\./);
+  writeFile(join(root, "src", "app.js"), "export const a = 2;\n");
+  commitAll(root, "the change");
+  assert.match(ok(root, ["rules", "w1", "--stage", "review"]).stdout, /Never log a token\./);
+  assert.deepEqual(state(root, "w1").rules.map((row) => row.stage), ["plan", "review"]);
+});
+
+test("E24: a rule added part-way through a run is picked up by the next call", () => {
+  const root = opened([], {});
+  const before = JSON.parse(readFileSync(join(root, ".kiln", "work", "w1", "state.json"), "utf8"));
+  writeFileSync(join(root, ".kiln", "work", "w1", "state.json"), JSON.stringify({ ...before, predicted: ["src/app.js"] }));
+  assert.match(ok(root, ["rules", "w1"]).stdout, /No rule is routed/);
+
+  routed(root, ["src/** | late.md"], { "late.md": "Arrived late." });
+  assert.match(ok(root, ["rules", "w1"]).stdout, /Arrived late\./);
+});
+
+test("E25: a route typed wrong is caught by doctor, not discovered by its silence in a run", () => {
+  const root = routed(nodeProject({ name: "e25" }), ["src/** | jss.md"], { "js.md": "R." });
+  const run = kiln(root, ["doctor"]);
+  assert.equal(run.status, 1, "a router that cannot resolve is a FAIL, so a wrapper can gate on it");
+  assert.match(run.stdout, /jss\.md/);
+  assert.match(run.stdout, /js\.md/, "and the orphan on the other side of the typo");
+});
+
+test("E26: a project whose rules directory was deleted still runs, and doctor says it is gone", () => {
+  const root = opened([], {});
+  rmSync(join(root, ".kiln", "rules"), { recursive: true });
+  const before = JSON.parse(readFileSync(join(root, ".kiln", "work", "w1", "state.json"), "utf8"));
+  writeFileSync(join(root, ".kiln", "work", "w1", "state.json"), JSON.stringify({ ...before, predicted: ["src/app.js"] }));
+
+  assert.match(ok(root, ["rules", "w1"]).stdout, /No rule is routed/);
+  assert.equal(kiln(root, ["doctor"]).status, 0, "no rules at all is a project without rules, not a broken one");
+});
+
+test("the template init writes routes nothing and resolves clean", () => {
+  const root = nodeProject({ name: "template" });
+  rmSync(join(root, ".kiln", "rules"), { recursive: true, force: true });
+  ok(root, ["init"]);
+  assert.deepEqual(readRoutes(root).map((row) => row.state), ["empty"], "the placeholder row is not a route and not an error");
+  assert.match(ok(root, ["doctor"]).stdout, /0 route\(s\), all resolved/);
 });

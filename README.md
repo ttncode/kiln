@@ -28,6 +28,7 @@ not build it can grade — see [Status](#status).
 - [The three paths](#the-three-paths)
 - [Auto mode](#auto-mode)
 - [What it blocks](#what-it-blocks)
+- [Project rules](#project-rules)
 - [Configuration](#configuration)
 - [Adding a stack](#adding-a-stack)
 - [What it refuses to do](#what-it-refuses-to-do)
@@ -67,7 +68,7 @@ resolves. The short form without the namespace works only where nothing else cla
 
 `init` reads your project, proposes a config, and asks at most three questions — each with a
 default, so answering none of them still leaves you working. It writes `.kiln/config.json`,
-an empty rules router, and one `.gitignore` line. It never overwrites a file you already have.
+an empty [rules router](#project-rules), and one `.gitignore` line. It never overwrites a file you already have.
 
 **No token. No Docker. No Python. No CI.** Any of those appearing in `init` is a bug.
 
@@ -223,6 +224,34 @@ Three limits are stated rather than papered over, and each has a test asserting 
 - **A hook that exceeds its timeout allows the tool.** Measured. So nothing in the list above
   depends on a timeout.
 
+## Project rules
+
+Things this project has already decided, routed to the files they are about. `init` writes
+an empty router at `.kiln/rules/index.md`; you fill in the table.
+
+```markdown
+| Trigger — a path glob | Rule file |
+|---|---|
+| src/auth/**           | auth.md   |
+| **/*.sql              | schema.md |
+```
+
+kiln reads it twice in every run — at **PLAN** against the files the plan predicts, and at
+**REVIEW** against the files the diff actually touched. The second one is the point: a rule
+reaching a file the plan never named is exactly where a run goes wrong, and a router that
+only sees what is already in the conversation cannot get there.
+
+Three properties, each chosen against a way this fails elsewhere:
+
+| | |
+|---|---|
+| **A trigger is a glob, never a topic** | "Applies when the topic comes up" is matched by the model reading a description. Nothing can tell you afterwards whether it was applied, and it is where the reports of silently-ignored rules come from |
+| **A row that does not resolve is named** | A half-filled row, a rule file that is not there, a glob matching nothing in the project — `kiln doctor` fails on each, by its own text. A rule skipped in silence has no symptom to debug |
+| **What was handed over is recorded** | `state.rules[]` holds the rules each stage was given, and the run may not write a rule while it is being judged by one. *This rule applied* is a fact, not a hope |
+
+`rules.budget_lines` caps the total, because a rulebook everything matches is a rulebook
+nothing follows. `kiln doctor` reports the number every time.
+
 ## Configuration
 
 One file, `.kiln/config.json`, and exactly one environment variable (`KILN_ROOT`).
@@ -289,7 +318,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 453, green on every pull request |
+| Tests | 458, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
