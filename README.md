@@ -23,6 +23,7 @@ not build it can grade — see [Status](#status).
 
 - [Why blocking is different](#why-blocking-is-different)
 - [Install](#install)
+- [Usage](#usage)
 - [Your first run](#your-first-run)
 - [The three paths](#the-three-paths)
 - [Auto mode](#auto-mode)
@@ -69,6 +70,28 @@ default, so answering none of them still leaves you working. It writes `.kiln/co
 an empty rules router, and one `.gitignore` line. It never overwrites a file you already have.
 
 **No token. No Docker. No Python. No CI.** Any of those appearing in `init` is a bug.
+
+## Usage
+
+```
+/kiln:kiln init                      set this project up
+/kiln:kiln "<what you want done>"    one unit of work, to a reviewed pull request
+/kiln:kiln <url|ticket-ref|work-id>  the same, from a link, a ticket, or work in progress
+/kiln:kiln                           list work in progress
+/kiln:kiln doctor                    check this setup
+```
+
+Say a path or `--auto` at the **start** of the request to choose how it runs:
+
+```
+/kiln:kiln spike can we drop the legacy importer
+/kiln:kiln full rebuild the importer
+/kiln:kiln --auto the export button does nothing
+```
+
+Anything the orchestrator calls underneath — `open`, `gate`, `scope`, `verify`, `ship`,
+`report`, `config set`, `halt`, `ratchet`, `blast`, `list` — is `kiln <verb>`; run `kiln`
+with no arguments for the list.
 
 ## Your first run
 
@@ -148,36 +171,22 @@ destroy, and carrying it forward silently would launder pre-plan code past a gat
 
 ## Auto mode
 
-Off by default: every gate stops for you. Turning it on hands those gates to kiln, and the
-pull request becomes the place you look.
-
-**For one run** — put `--auto` at the **start** of the request:
+Off by default — every gate stops for you.
 
 ```
-/kiln:kiln --auto the export button on the reports page does nothing
-/kiln:kiln --auto full rebuild the importer
+/kiln:kiln --auto the export button does nothing   # this run only; --auto goes first
+/kiln:kiln init --set auto.bounded=true            # every bounded run
+/kiln:kiln init --set auto.full=true               # every full run
 ```
-
-**As the standing default** — at first `init`, or by editing `.kiln/config.json` yourself:
-
-```
-/kiln:kiln init --set auto.bounded=true          # and auto.full for the full path
-```
-
-`kiln config set auto.bounded=true` is **refused on purpose**. Auto decides on your behalf,
-so switching it on stays an act of yours — it is the one config key an agent may not set,
-which is the same line your harness draws when it refuses a tool editing its own permissions.
-
-What it will never do, whatever you type:
 
 | | |
 |---|---|
-| a `spike` | never eligible — its output is a question, not a change |
-| a halted work | never ruled past |
-| hide what it did | `kiln report <id>` lists every gate it decided, and says so |
+| Already set up? | edit `auto` in `.kiln/config.json` — `kiln config set` refuses this key |
+| Is it on? | `kiln doctor`, and `kiln open` prints it |
+| What did it decide? | `kiln report <id>` |
+| Never auto | a `spike`, and a halted work |
 
-`--auto` in a request beats `auto.*` in the file, for that run only. `kiln open` prints which
-way it is set before anything is decided, and `kiln doctor` reports it.
+`--auto` in a request wins over `auto.*` in the file, for that run.
 
 ## What it blocks
 
@@ -279,7 +288,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 390, green on every pull request |
+| Tests | 391, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

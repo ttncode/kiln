@@ -128,7 +128,20 @@ test("auto mode is findable, and says both ways to turn it on", () => {
   const section = README.slice(README.indexOf("## Auto mode"), README.indexOf("## What it blocks"));
   assert.match(section, /--auto/, "the per-run lever");
   assert.match(section, /init --set auto\.bounded=true/, "and the standing one");
-  assert.match(section, /refused on purpose/, "including the way that is deliberately not offered");
+  assert.match(section, /config set` refuses this key/, "including the way that is deliberately not offered");
   assert.match(section, /spike/, "and what it will never do");
   assert.match(section, /kiln report/, "and where to see what it decided");
+});
+
+/** A command a reader cannot find is a command they do not have. */
+test("the commands a user types are listed in one place", () => {
+  assert.match(README, /^## Usage$/m);
+  assert.match(README, /\[Usage\]\(#usage\)/);
+
+  const section = README.slice(README.indexOf("## Usage"), README.indexOf("## Your first run"));
+  for (const command of ["init", '"<what you want done>"', "doctor"]) {
+    assert.ok(section.includes(command), `Usage never shows ${command}`);
+  }
+  assert.match(section, /--auto/, "the modifiers are part of how it is typed");
+  assert.match(section, /kiln <verb>/, "and the verbs underneath are pointed at, not listed twice");
 });
