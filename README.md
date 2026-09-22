@@ -25,6 +25,7 @@ not build it can grade — see [Status](#status).
 - [Install](#install)
 - [Your first run](#your-first-run)
 - [The three paths](#the-three-paths)
+- [Auto mode](#auto-mode)
 - [What it blocks](#what-it-blocks)
 - [Configuration](#configuration)
 - [Adding a stack](#adding-a-stack)
@@ -145,6 +146,39 @@ The ratchet only goes **up**. Ratcheting out of a spike halts, prints the uncomm
 found, and touches none of it: deleting your probe would destroy data you did not ask kiln to
 destroy, and carrying it forward silently would launder pre-plan code past a gate.
 
+## Auto mode
+
+Off by default: every gate stops for you. Turning it on hands those gates to kiln, and the
+pull request becomes the place you look.
+
+**For one run** — put `--auto` at the **start** of the request:
+
+```
+/kiln:kiln --auto the export button on the reports page does nothing
+/kiln:kiln --auto full rebuild the importer
+```
+
+**As the standing default** — at first `init`, or by editing `.kiln/config.json` yourself:
+
+```
+/kiln:kiln init --set auto.bounded=true          # and auto.full for the full path
+```
+
+`kiln config set auto.bounded=true` is **refused on purpose**. Auto decides on your behalf,
+so switching it on stays an act of yours — it is the one config key an agent may not set,
+which is the same line your harness draws when it refuses a tool editing its own permissions.
+
+What it will never do, whatever you type:
+
+| | |
+|---|---|
+| a `spike` | never eligible — its output is a question, not a change |
+| a halted work | never ruled past |
+| hide what it did | `kiln report <id>` lists every gate it decided, and says so |
+
+`--auto` in a request beats `auto.*` in the file, for that run only. `kiln open` prints which
+way it is set before anything is decided, and `kiln doctor` reports it.
+
 ## What it blocks
 
 Seven promises, seven tests. [`tests/d7.test.mjs`](tests/d7.test.mjs) is the whole list in one
@@ -206,19 +240,7 @@ enforced or re-aim it, never loosen it.
   would open a pull request against is one it must not push to.
 - A step whose `${cmd.x}` is unset **refuses to run** rather than skipping quietly, and
   `kiln doctor` says so before you hit it.
-- `auto` lets kiln rule a path's gates itself. Two levers, and the run's own beats the
-  standing one:
-
-  ```
-  /kiln:kiln --auto the export button does nothing    # this run only
-  "auto": { "bounded": true }                         # every bounded run
-  ```
-
-  Off by default. A spike is never eligible, a halted work is never ruled past, and
-  `--auto` satisfies `full`'s opt-in because typing it is the deliberate act that opt-in
-  was asking for. `kiln open` says which way it is set, `kiln doctor` reports it, and
-  `kiln report <id>` lists every gate it decided — a ruling nobody can see is worse than a
-  question nobody was asked.
+- `auto` lets kiln rule a path's gates itself — see [Auto mode](#auto-mode).
 
 ## Adding a stack
 
@@ -257,7 +279,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 389, green on every pull request |
+| Tests | 390, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

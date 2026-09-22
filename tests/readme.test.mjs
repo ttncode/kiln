@@ -114,3 +114,21 @@ test("the documented invocation is the one that resolves", () => {
     assert.equal(bare.length, 0, `${file} tells the reader to type /kiln, which may not resolve`);
   }
 });
+
+/**
+ * Auto mode was documented as the fifth bullet in the Configuration list, nine lines long
+ * among one-liners, with no heading and no table-of-contents entry. A reader asking how to
+ * turn it on had to read a section about the config file to find half an answer: the other
+ * half, `--auto`, is typed in a request and never appears in that file.
+ */
+test("auto mode is findable, and says both ways to turn it on", () => {
+  assert.match(README, /^## Auto mode$/m);
+  assert.match(README, /\[Auto mode\]\(#auto-mode\)/, "and it is in the table of contents");
+
+  const section = README.slice(README.indexOf("## Auto mode"), README.indexOf("## What it blocks"));
+  assert.match(section, /--auto/, "the per-run lever");
+  assert.match(section, /init --set auto\.bounded=true/, "and the standing one");
+  assert.match(section, /refused on purpose/, "including the way that is deliberately not offered");
+  assert.match(section, /spike/, "and what it will never do");
+  assert.match(section, /kiln report/, "and where to see what it decided");
+});
