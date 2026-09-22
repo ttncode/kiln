@@ -7,12 +7,13 @@ import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
-import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
+import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
+import { STAGES, rulesReport } from "../lib/rules.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
-import { recordFullVerified, recordVerify } from "../lib/state.mjs";
+import { recordFullVerified, recordRules, recordVerify } from "../lib/state.mjs";
 import { join } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
@@ -53,6 +54,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
 
   kiln blast <term> [<term> ...]
       Tier-0 blast radius: which files mention these terms.
+
+  kiln rules <id> [--stage plan|review]
+      Print the project rules routed to the files this stage names, and record
+      which ones the run was handed.
 
   kiln scope <id>
       Reconcile what the plan predicted against what the diff actually touched.
@@ -628,6 +633,39 @@ function runScope(argv) {
 }
 
 /**
+ * The stage decides which files the rules are matched against, and the two are genuinely
+ * different questions. At `plan` they meet the change preview, so a rule shapes the plan
+ * instead of being remembered after it. At `review` they meet the diff that actually
+ * happened — which is how a rule reaches a file the plan never predicted, the case a router
+ * that only sees what is already in context cannot cover.
+ */
+function stagePaths(root, { state, stage }) {
+  if (stage === "plan") return pathsOf(state.predicted);
+  const anchor = anchorVerdict(root, state.last_verified);
+  if (anchor.ok) return actualChanged(root, state.last_verified);
+  process.stderr.write(`${offBranchMessage(state.id, { base: state.last_verified, reason: anchor.reason })}\n`);
+  return null;
+}
+
+function runRules(argv) {
+  const [id, ...rest] = argv;
+  const stage = flag(rest, "--stage") ?? "plan";
+  if (!STAGES.includes(stage)) {
+    process.stderr.write(`"${stage}" is not a stage kiln routes rules for. Use one of: ${STAGES.join(", ")}.\n`);
+    return 1;
+  }
+  const { root } = loadConfig(process.cwd());
+  const state = readState(root, id);
+  const paths = stagePaths(root, { state, stage });
+  if (paths === null) return 1;
+
+  const report = rulesReport({ root, stage, id: state.id, paths });
+  out(report.text);
+  writeState(root, recordRules(state, { stage, files: report.files }));
+  return 0;
+}
+
+/**
  * Opening a work that already exists is a handover, not a mistake: this session takes
  * over, and says so. The session it replaced is recorded, so its next guarded write is
  * blocked rather than allowed by a guard that could not tell it had been replaced.
@@ -907,6 +945,7 @@ const COMMANDS = {
   report: runReport,
   ship: runShip,
   blast: runBlast,
+  rules: runRules,
   scope: runScope,
   verify: runVerify,
   doctor: runDoctor,
