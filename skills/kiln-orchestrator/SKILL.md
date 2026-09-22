@@ -135,7 +135,7 @@ Act on `kind`, and on nothing else:
 | `kind` | Do |
 |---|---|
 | `list` | run `kiln list`, print it, stop |
-| `reserved` | run that command, stop |
+| `reserved` | a `message` means the word is held for a later version — print it verbatim and stop. No `message` means it is a command: run it, stop |
 | `url` | fetch it with your own tools, then treat the text as a description |
 | `ticket` | fetch the ref with `gh`/`glab`/MCP, then treat the text as a description |
 | `work` | resume — see step 6 |
