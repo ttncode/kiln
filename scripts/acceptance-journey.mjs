@@ -14,7 +14,7 @@
  * repository instead.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -122,6 +122,60 @@ function afterEditRows(repo, id) {
     { id: "J5.1 auto off", ok: kiln(repo, ["gate", id, "review", "--auto"]).status === 2, detail: "auto is off, so it refuses and says ask the user" },
     { id: "J6.3 skip", ok: skipRefuses(repo, id), detail: "a phase where every step is skipped refuses" },
     redRow(repo, id),
+    ...rulesRows(repo, id),
+  ];
+}
+
+function routerIndex(trigger, file) {
+  return `| Trigger | Rule file |\n|---|---|\n| ${trigger} |${file ? ` ${file} |` : ""}\n`;
+}
+
+function doctorLine(repo, title) {
+  const found = kiln(repo, ["doctor"]).stdout.split("\n").find((line) => line.includes(title));
+  return (found ?? "").trim();
+}
+
+/**
+ * The router, on a checkout somebody else laid out. The trigger is written against a file
+ * this project actually has, so a match here is a match on real paths — a fixture can
+ * always be built to match itself.
+ */
+function rulesRows(repo, id) {
+  const source = sourceFile(repo);
+  const dir = join(repo, ".kiln", "rules");
+  writeFileSync(join(dir, "house.md"), "Never commit a secret.\n", "utf8");
+  writeFileSync(join(dir, "index.md"), routerIndex(source, "house.md"), "utf8");
+
+  const out = [
+    { id: "R1 resolved", ok: doctorLine(repo, "rules routing").includes("all resolved"), detail: doctorLine(repo, "rules routing") },
+    { id: "R2 plan", ok: kiln(repo, ["rules", id, "--stage", "plan"]).stdout.includes("Never commit a secret."), detail: `${source} routed to house.md, matched against the plan` },
+    { id: "R3 review", ok: kiln(repo, ["rules", id, "--stage", "review"]).stdout.includes("Never commit a secret."), detail: "and against the diff the run actually produced" },
+    { id: "R4 recorded", ok: rulesRecorded(repo, id), detail: "state.rules names both stages, so the reading is a fact rather than a hope" },
+    { id: "R5 guarded", ok: edit(repo, ".kiln/rules/house.md") === 2, detail: "a run may not rewrite the rule it is judged by" },
+    ...routerFaults(repo, source),
+  ];
+  writeFileSync(join(dir, "index.md"), routerIndex(source, "house.md"), "utf8");
+  return out;
+}
+
+function rulesRecorded(repo, id) {
+  const path = join(repo, ".kiln", "work", id, "state.json");
+  const stages = (JSON.parse(readFileSync(path, "utf8")).rules ?? []).map((row) => row.stage);
+  return stages.includes("plan") && stages.includes("review");
+}
+
+/** The failure Cursor ships silently: a row that cannot resolve, skipped with no symptom. */
+function routerFaults(repo, source) {
+  const index = join(repo, ".kiln", "rules", "index.md");
+  writeFileSync(index, routerIndex(source, ""), "utf8");
+  const half = kiln(repo, ["doctor"]);
+
+  writeFileSync(index, routerIndex("no/such/path/**", "house.md"), "utf8");
+  const dead = doctorLine(repo, "rules routing");
+
+  return [
+    { id: "R6 half row", ok: half.status === 1 && half.stdout.includes("one of the two columns"), detail: "a row filling one column of two is a FAIL, not a silent skip" },
+    { id: "R7 dead route", ok: dead.includes("matches no file here"), detail: dead },
   ];
 }
 
@@ -170,12 +224,49 @@ function redRow(repo, id) {
   };
 }
 
-function guardRows(repo) {
+/**
+ * Whether this checkout stands on a protected branch is a property of the layout, not an
+ * assumption. A linked worktree is on a branch of its own by definition — express checked
+ * out at `wt-branch` while `vcs.protected` says `master` — and asserting a block there was
+ * asserting that kiln blocks a legitimate push.
+ *
+ * So the expectation follows the config, and the branch is then protected and the same
+ * push tried again: both directions are checked on every layout, which is the only way a
+ * false block and a missing block are told apart.
+ */
+function branchStanding(repo) {
+  const config = JSON.parse(readFileSync(join(repo, ".kiln", "config.json"), "utf8"));
   const branch = git(repo, ["symbolic-ref", "--short", "HEAD"]).stdout.trim();
-  const blocked = [
+  return { branch, protectedHere: config.vcs.protected.includes(branch) };
+}
+
+function protectCurrentBranch(repo) {
+  const { branch, protectedHere } = branchStanding(repo);
+  if (protectedHere) return () => {};
+  const config = JSON.parse(readFileSync(join(repo, ".kiln", "config.json"), "utf8"));
+  const path = join(repo, ".kiln", "config.json");
+  const before = readFileSync(path, "utf8");
+  const vcs = { ...config.vcs, protected: [...config.vcs.protected, branch] };
+  writeFileSync(path, JSON.stringify({ ...config, vcs }, null, 2), "utf8");
+  return () => writeFileSync(path, before, "utf8");
+}
+
+function pushRows(repo) {
+  const { branch, protectedHere } = branchStanding(repo);
+  const want = protectedHere ? 2 : 0;
+  return [
     ["J8.1 HEAD", "git push origin HEAD"],
     ["J8.1 named", `git push origin ${branch}`],
     ["J8.1 force", "git push --force origin +HEAD"],
+  ].map(([id, command]) => ({
+    id,
+    ok: bash(repo, command) === want,
+    detail: protectedHere ? command : `${command} — allowed: ${branch} is not protected here`,
+  }));
+}
+
+function guardRows(repo) {
+  const always = [
     ["J8.2 rm", "rm -rf /tmp/not-my-repo"],
     ["J8.7 config", "rm -f .kiln/config.json"],
     ["J8.7 hook", "rm -f .git/hooks/pre-push"],
@@ -183,7 +274,15 @@ function guardRows(repo) {
     ["J8.7 hooksPath", "git config core.hooksPath /dev/null"],
   ].map(([id, command]) => ({ id, ok: bash(repo, command) === 2, detail: command }));
 
-  return [...blocked, { id: "J8 narrow", ok: bash(repo, "rm -f build/out.log") === 0, detail: "an ordinary file is still the harness's call" }];
+  return [...pushRows(repo), ...always, onceProtected(repo), { id: "J8 narrow", ok: bash(repo, "rm -f build/out.log") === 0, detail: "an ordinary file is still the harness's call" }];
+}
+
+/** The other direction: protect the branch this checkout is on, and the same push must stop. */
+function onceProtected(repo) {
+  const restore = protectCurrentBranch(repo);
+  const verdict = bash(repo, "git push origin HEAD");
+  restore();
+  return { id: "J8.1 both ways", ok: verdict === 2, detail: "protecting the branch this checkout stands on blocks the same push" };
 }
 
 /**
@@ -198,7 +297,9 @@ function floorRow(repo) {
   const remote = mkdtempSync(join(tmpdir(), "kiln-acc-remote-"));
   git(remote, ["init", "-q", "--bare"]);
   git(repo, ["remote", "add", "origin", remote]);
+  const restore = protectCurrentBranch(repo);
   const push = git(repo, ["push", "origin", "HEAD"]);
+  restore();
   rmSync(remote, { recursive: true, force: true });
 
   const refused = push.status !== 0 && /is a protected branch/.test(push.stderr);
@@ -207,9 +308,21 @@ function floorRow(repo) {
     : { id: "J8.8 real push", ok: refused, detail: (push.stderr.split("\n").find((line) => line.includes("protected")) ?? push.stderr.split("\n")[0] ?? "").trim() }];
 }
 
-/** A file that exists in every one of these projects, whatever language it is written in. */
+/**
+ * A regular file at the root, a README first. Four spellings was a guess, and express ships
+ * `Readme.md`, so the harness crashed reading a file that was not there.
+ *
+ * Not a symlink, either: zod's `README.md` points into `packages/`, and kiln refuses to
+ * follow one (D52). A row asserting that the gate authorises this edit would have been
+ * asserting that kiln does the unsafe thing.
+ */
 function sourceFile(repo) {
-  return ["README.md", "readme.md", "README.rst", "README"].find((name) => existsSync(join(repo, name))) ?? "README.md";
+  const entries = readdirSync(repo).filter((name) => !name.startsWith("."));
+  const regular = (name) => lstatSync(join(repo, name)).isFile();
+  return entries.filter((name) => /^readme/i.test(name)).find(regular)
+    ?? entries.filter((name) => /\.(md|txt|rst)$/i.test(name)).find(regular)
+    ?? entries.find(regular)
+    ?? "README.md";
 }
 
 const say = (line) => process.stdout.write(`${line}\n`);
