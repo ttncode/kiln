@@ -176,7 +176,24 @@ function reportUnasked(questions, argv) {
 function reportInit(result) {
   for (const path of result.kept) out(`  kept    ${path}`);
   for (const path of result.written) out(`  wrote   ${path}`);
-  out(result.written.length > 0 ? "\nRun `kiln doctor` to check it." : "\nAlready set up. Run `kiln doctor --write` to repair paths.");
+}
+
+/**
+ * Last, after everything that was written and everything that was decided. It used to sit
+ * inside `reportInit`, which printed it before the floor and before the questions kiln had
+ * answered on the user's behalf — a closing line in the middle closes nothing.
+ *
+ * And it names the entry point, because `/kiln:kiln "<sentence>"` is not guessable from a
+ * command called `init`. That is the one line `git init` and `cargo new` do not need and a
+ * scaffolder does. `--auto` is deliberately absent: `kiln open` already names it at the
+ * moment it means something, and the first ten minutes should not teach the way past a gate
+ * before the user has met one.
+ */
+function reportNext(wrote) {
+  const start = '/kiln:kiln "<what you want done>"';
+  out(wrote
+    ? `\nNext: ${start}   ·   kiln doctor to check this setup`
+    : `\nAlready set up. ${start} to start, or kiln doctor to check it.`);
 }
 
 /**
@@ -220,10 +237,13 @@ function runInit(argv) {
 
 function writeInit(root, { config, questions, argv, configured }) {
   const final = applyOverrides(config, argv);
-  reportInit(applyInit(root, final));
+  const result = applyInit(root, final);
+  reportInit(result);
   for (const path of installFloor(root)) out(`  wrote   ${path}`);
   if (!configured) reportUnasked(questions, argv);
-  return warnUnsatisfied(final);
+  const code = warnUnsatisfied(final);
+  reportNext(result.written.length > 0);
+  return code;
 }
 
 /**
