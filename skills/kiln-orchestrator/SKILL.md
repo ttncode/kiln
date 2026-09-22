@@ -53,9 +53,18 @@ cheap again because investigating it was tiring. What you have found is a **bloc
 unknown**, and it has its own move:
 
 1. Name the unknown, and say what each answer would change.
-2. Halt. Record it in `carry_over[]` as `{kind: "blocking_unknown", text}`.
+2. Halt: `kiln halt <id> --reason "<the unknown>"`. Source edits stop until it is answered.
 3. Offer the user two futures, not a path change: **answer it and continue here**, or
    **close this work and open a spike** whose deliverable is that answer.
+
+When they answer it, end the halt with their words:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" resume <id> --answer "<what they decided>"
+```
+
+The answer is recorded beside the question it answers, so a run that stopped and started
+again says why in its own record rather than only in a transcript.
 
 Option 3 is the user's to take, not yours — closing a work and opening another is a
 decision about their time, and `spike` is the only path whose output is allowed to be a
