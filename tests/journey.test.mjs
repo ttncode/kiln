@@ -226,6 +226,35 @@ test("J6.1/J6.2 the exit code is the verdict, whatever the output says", () => {
   assert.match(red.stderr, /All tests passed/, "the tool's own output is shown, never parsed");
 });
 
+/**
+ * The implement contract says execute every task without stopping, and on a five-hour run
+ * the agent stopped twice anyway — both times right after a summary table, both times on a
+ * sentence promising to continue. Asked why: "the skill says run continuously and I've been
+ * pausing anyway."
+ *
+ * The call after every task is the one place the agent is certainly reading. So the position
+ * is recorded by kiln and the next move is printed there, rather than added to a document
+ * loaded hours earlier.
+ */
+test("the per-task check records the position and says what comes next", () => {
+  const project = nodeProject({
+    name: "jnext",
+    cmd: { test: "true", test_fast: "true" },
+    steps: [{ id: "unit-fast", phase: "fast", run: "${cmd.test_fast}" }, { id: "unit", run: "${cmd.test}" }],
+  });
+  ok(project, ["open", "w1", "--session", SESSION]);
+
+  const mid = ok(project, ["verify", "w1", "--phase", "fast", "--task", "3/8"]);
+  assert.match(mid.stdout, /Task 4 is next — do not stop, and do not summarise/);
+  assert.deepEqual(state(project, "w1").step, { task: 3, of: 8 }, "written by kiln, not narrated by the agent");
+
+  const last = ok(project, ["verify", "w1", "--phase", "fast", "--task", "8/8"]);
+  assert.match(last.stdout, /Every task is done; next is the review gate/);
+
+  const unpositioned = ok(project, ["verify", "w1", "--phase", "fast"]);
+  assert.doesNotMatch(unpositioned.stdout, /next/, "no position claimed, none invented");
+});
+
 test("J6.3/J6.4/J6.5 a phase that verified nothing refuses, and doctor said so first", () => {
   const skipped = nodeProject({ name: "j63", steps: [{ id: "unit", run: "${cmd.test}", requires: ["migrate"] }] });
   ok(skipped, ["open", "w1", "--session", SESSION]);
