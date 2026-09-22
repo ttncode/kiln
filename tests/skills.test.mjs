@@ -261,3 +261,28 @@ test("each stage names the skill that does it, rather than restating it", () => 
   assert.match(body, /use the `kiln-review` skill/);
   assert.match(body, /Do not restate its contents here/, "a skill invoked and then paraphrased is a skill not used");
 });
+
+/**
+ * D69's release checklist step, run for the first time: read upstream's issues since the
+ * fork commit. Upstream main has not moved since v6.4.1, so there is nothing to merge —
+ * but superpowers #2362 describes a bug in the visual companion kiln forked, and kiln's
+ * copy had it.
+ *
+ * `String.prototype.replace` with a string replacement treats `$&`, `` $` ``, `$'` and
+ * `$1` as substitutions. A screen containing a currency amount written `NT$'` swallowed the
+ * rest of the template and emitted a stray closing tag. Measured before the fix:
+ *
+ *   '<main><!-- CONTENT --></main>'.replace(marker, "<p>NT$' 1,200</p>")
+ *   → '<main><p>Total: NT</main> 1,200</p></main>'
+ */
+test("a dollar sign in a screen is content, not a replacement pattern", async () => {
+  const server = await import("../skills/kiln-brainstorming/scripts/server.cjs");
+  const { wrapInFrame, injectHelper } = server.default ?? server;
+
+  for (const hazard of ["NT$' 1,200", "$& and $1", "cost: $`x`"]) {
+    assert.ok(wrapInFrame(`<p>${hazard}</p>`).includes(hazard), `wrapInFrame mangled ${hazard}`);
+    assert.ok(injectHelper("<body>x</body>", `<script>${hazard}</script>`).includes(hazard), `injectHelper mangled ${hazard}`);
+  }
+
+  assert.ok(injectHelper("<p>no body tag</p>", "<script>s</script>").endsWith("<script>s</script>"));
+});
