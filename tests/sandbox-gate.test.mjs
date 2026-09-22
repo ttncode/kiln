@@ -5,7 +5,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { dispatch } from "../hooks/dispatch.mjs";
@@ -17,6 +17,14 @@ after(cleanupFixtures);
 
 const BLOCK = 2;
 const ALLOW = 0;
+
+/** The real dispatcher process, because the message is what the agent reads on stderr. */
+function blockMessage(phase, input) {
+  const dispatcher = new URL("../hooks/dispatch.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [dispatcher, phase], { input: JSON.stringify(input), encoding: "utf8" });
+  assert.equal(run.status, BLOCK, `expected a block, got ${run.status}: ${run.stdout}${run.stderr}`);
+  return run.stderr;
+}
 
 const bash = async (command, project, session) =>
   dispatch("pre-bash", payload({ command, root: project.root, session }));
@@ -381,4 +389,36 @@ test("a session kiln is not driving may write a rule", async () => {
   const project = kilnProject({ gates: { plan: "approved" } });
   const rule = join(project.root, ".kiln", "rules", "auth.md");
   assert.equal(await edit(rule, project, "some-other-session"), ALLOW);
+});
+
+/**
+ * Refusing to follow a symlink is deliberate (D52; agent-skills #295 rates the
+ * arbitrary-file-overwrite primitive High). How it was *reported* was not: the throw
+ * reached the dispatcher's catch-all, and the agent was told "This is a bug in kiln, not in
+ * your change. Run `kiln doctor`" — which is false, and doctor then prints `Ready.`
+ *
+ * Measured on a clone of zod, whose README.md is a symlink into packages/. Editing a README
+ * is an ordinary thing to be asked for, and the agent was told the tool was broken.
+ */
+test("a symlink is refused as a decision, not reported as a bug in kiln", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const real = join(project.root, "src", "real.ts");
+  writeFileSync(real, "export const a = 1;\n");
+  const link = join(project.root, "src", "link.ts");
+  symlinkSync(real, link);
+
+  const message = blockMessage("pre-edit", payload({ file: link, root: project.root }));
+  assert.match(message, /it is a symlink/);
+  assert.match(message, new RegExp(real.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), "the file it points at is the remedy");
+  assert.doesNotMatch(message, /bug in kiln/, "kiln did what it was designed to do");
+  assert.doesNotMatch(message, /kiln doctor/, "doctor says Ready and knows nothing about this path");
+});
+
+test("a symlink pointing at nothing says so, rather than naming a file that is not there", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const link = join(project.root, "src", "dangling.ts");
+  symlinkSync(join(project.root, "src", "gone.ts"), link);
+
+  const message = blockMessage("pre-edit", payload({ file: link, root: project.root }));
+  assert.match(message, /points at something that does not exist/);
 });

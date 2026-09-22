@@ -318,7 +318,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 458, green on every pull request |
+| Tests | 460, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
@@ -343,6 +343,7 @@ kiln was designed before it was written, and the design is in the repository.
 | [`live-harness-evidence.md`](docs/design/2026-09-21-live-harness-evidence.md) | what a real Claude Code session measured, including three holes every green test had missed |
 | [`journey-matrix.md`](docs/design/2026-09-22-journey-matrix.md) | kiln as a user meets it — 56 rows, and the ten where two separate fixes could disagree |
 | [`cross-project-acceptance.md`](docs/design/2026-09-22-cross-project-acceptance.md) | the same matrix against nine checkouts nobody here designed |
+| [`real-repository-matrix.md`](docs/design/2026-09-23-real-repository-matrix.md) | the rules router across ten checkouts — six real projects and four layouts — and the two defects that found |
 
 Start with the architecture file. Every decision carries why it was made, so you can disagree
 with the reasoning rather than only the result.

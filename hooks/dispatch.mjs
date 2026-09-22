@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { loadConfig } from "../lib/config.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { gitOutput } from "../lib/init.mjs";
-import { relative } from "node:path";
-import { resolveTarget } from "../lib/paths.mjs";
+import { isAbsolute, join, relative } from "node:path";
+import { PathError, isSymlink, resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, removalTargets, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
@@ -125,9 +125,41 @@ function claimVerdict(target, ctx) {
   return owner ? `claimed by work ${owner}, which is still active` : null;
 }
 
+/**
+ * A symlink is refused rather than followed — following one is the arbitrary-file-overwrite
+ * primitive agent-skills #295 rates High, and D52 settled it. What was never deliberate is
+ * how the refusal was *reported*: `resolveTarget` throws, the throw reached the catch-all,
+ * and the agent was told "This is a bug in kiln, not in your change. Run `kiln doctor`" —
+ * which is false, and doctor then says `Ready.` A remedy that does not exist is the shape
+ * this project keeps meeting.
+ *
+ * Measured on a clone of zod, whose `README.md` is a symlink into `packages/`. Editing a
+ * README is an ordinary thing to be asked for, and the agent was told the tool was broken.
+ */
+function pathRefusal(path, cwd) {
+  const at = isAbsolute(path) ? path : join(cwd, path);
+  if (!isSymlink(at)) {
+    return `kiln could not resolve ${at}, so it cannot say whether that write lands inside the project. Nothing was written.`;
+  }
+  let points;
+  try {
+    points = `Write to the file it points at: ${realpathSync(at)}`;
+  } catch {
+    points = "It points at something that does not exist, so there is nothing to write to.";
+  }
+  return `kiln blocked a write to ${at}: it is a symlink, and kiln does not follow one — a write through a symlink lands wherever it points, which is how an edit leaves the project.
+${points}`;
+}
+
 /** Every write funnels through here — an Edit, a redirect, a `tee` — so the rule is stated once. */
 function checkPath(path, ctx) {
-  const target = resolveTarget(path, ctx.cwd);
+  let target;
+  try {
+    target = resolveTarget(path, ctx.cwd);
+  } catch (error) {
+    if (!(error instanceof PathError)) throw error;
+    return block(pathRefusal(path, ctx.cwd));
+  }
   if (isVerificationFile(target)) {
     return block(sandboxMessage(ctx.root, { target, reason: "this file is part of what enforces the run; the run does not get to edit it" }));
   }
