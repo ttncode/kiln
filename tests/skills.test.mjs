@@ -227,3 +227,15 @@ test("the orchestrator knows auto mode exists and what a refusal means", () => {
   assert.match(body, /--auto/, "the flag existed and nothing passed it");
   assert.match(body, /A refusal means ask\s+the user/, "a refused ruling is not a reason to record it another way");
 });
+
+/**
+ * Offering `kiln doctor` as a next step, one run wrote that it "checks containers, make test
+ * reachable, GitLab token". It checks none of those. Nobody asked for the list — the gap
+ * where an authoritative one should have been got filled with a guess, and a guess about
+ * what a safety tool verifies is worse than no answer.
+ */
+test("the orchestrator is told to run a command rather than describe it", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /Never describe what a command checks or does/);
+  assert.match(body, /Run it and print what it said/);
+});
