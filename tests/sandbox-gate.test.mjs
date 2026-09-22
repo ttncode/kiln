@@ -352,3 +352,33 @@ test("a work directory belongs to the work that owns it, and to nobody with none
     "having no work open is not permission to invent one",
   );
 });
+
+/**
+ * D48 is not "config.json is hard to edit" but "the agent cannot change the terms it is
+ * judged by". A project rule became such a term the moment a stage started reading one:
+ * an agent that finds a rule inconvenient must not be able to answer it by rewriting the
+ * rule, because `state.rules[]` would still claim the run was handed the old text.
+ */
+test("E22: a run may not write the project rules it is judged by", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const rule = join(project.root, ".kiln", "rules", "auth.md");
+
+  assert.equal(await edit(rule, project), BLOCK, "Edit");
+  assert.equal(await bash(`echo x > ${rule}`, project), BLOCK, "a redirect");
+  assert.equal(await bash(`rm -f ${rule}`, project), BLOCK, "deleting a rule is a stronger edit than writing one");
+  assert.equal(await bash(`mv /tmp/x ${rule}`, project), BLOCK, "moving one over it");
+  assert.equal(await bash(`node -e "require('fs').unlinkSync('.kiln/rules/auth.md')"`, project), BLOCK, "the path the sandbox cannot see");
+
+  assert.equal(await edit(project.source, project), ALLOW, "source is still the run's to write");
+});
+
+/**
+ * Outside a run nothing is being judged, and a person asking their agent to help write a
+ * rule is doing exactly what the router is for. Blocking that would make the feature
+ * unusable to set up.
+ */
+test("a session kiln is not driving may write a rule", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  const rule = join(project.root, ".kiln", "rules", "auth.md");
+  assert.equal(await edit(rule, project, "some-other-session"), ALLOW);
+});

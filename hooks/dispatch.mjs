@@ -11,7 +11,7 @@ import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { interpreterMessage, interpreterReach } from "../lib/guards/interpreter.mjs";
-import { isControlFile, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
+import { isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
 import { guardsFor, loadStack } from "../lib/stack.mjs";
 
@@ -149,7 +149,7 @@ function guardSandboxFile(payload, ctx) {
 function guardRemovedControlFiles(command, ctx) {
   const hit = removalTargets(command)
     .map((path) => resolveTarget(path, ctx.cwd))
-    .find((target) => isControlFile(ctx.root, target) || isVerificationFile(target));
+    .find((target) => isJudged(ctx.root, { target, activeId: ctx.state?.id }) || isVerificationFile(target));
   return hit ? block(sandboxMessage(ctx.root, { target: hit, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
 }
 

@@ -218,6 +218,17 @@ test("D7 item 7 — the agent cannot approve its own gate or disarm its own guar
   assert.equal(await edit(project.artifacts.plan, project), ALLOW, "artifacts precede every gate");
 });
 
+/**
+ * Item 7's words are "the agent cannot change the terms it is judged by", and a project
+ * rule became such a term the moment `kiln rules` started handing one to a stage. An agent
+ * that finds a rule inconvenient must not be able to answer it by rewriting the rule.
+ */
+test("D7 item 7 — a run may not rewrite the project rules it is judged by", async () => {
+  const project = kilnProject({ gates: { plan: "approved" } });
+  assert.equal(await edit(join(project.root, ".kiln", "rules", "auth.md"), project), BLOCK);
+  assert.equal(await edit(join(project.root, ".kiln", "rules", "auth.md"), project, "unrelated"), ALLOW, "outside a run nothing is being judged");
+});
+
 test("D7 item 7 — the control files stay closed in a session kiln does not drive", async () => {
   const project = kilnProject();
   assert.equal(await edit(join(project.root, ".kiln", "config.json"), project, "unrelated"), BLOCK);
