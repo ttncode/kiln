@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import {
   actualChanged,
+  anchorVerdict,
   grepBlastRadius,
   reconcile,
   reconcileVerdict,
@@ -277,4 +278,62 @@ test("reconciliation sees files changed inside a submodule", () => {
     ["AdminPage/controllers/Account.php"],
     "a committed submodule change is one gitlink at the superproject level",
   );
+});
+
+/**
+ * Measured on a real monorepo: a work opened on v3-master, whose branch was then cut from
+ * another ticket's branch, reported `predicted 11 · actual 283`. `base...HEAD` is correct
+ * git — merge-base to HEAD — and the merge-base was far enough back to sweep in the other
+ * ticket's commits. The agent diagnosed it; nobody reading `283` would have.
+ */
+test("a base the branch never grew from is named, not counted from", () => {
+  const { root, base } = project({ "a.txt": "a" });
+  assert.equal(anchorVerdict(root, base).ok, true, "opened here, still here");
+
+  git(root, ["checkout", "-q", "-b", "sibling"]);
+  writeFile(join(root, "b.txt"), "b");
+  commitAll(root, "another ticket");
+  const siblingTip = git(root, ["rev-parse", "HEAD"]);
+
+  git(root, ["checkout", "-q", "main"]);
+  const verdict = anchorVerdict(root, siblingTip);
+  assert.equal(verdict.ok, false, "HEAD does not descend from the sibling tip");
+  assert.match(verdict.reason, /not an ancestor of HEAD/);
+
+  const missing = anchorVerdict(root, "0".repeat(40));
+  assert.equal(missing.ok, false);
+  assert.match(missing.reason, /not a commit in this checkout/);
+  assert.equal(anchorVerdict(root, null).ok, true, "a work with no base yet is not off-branch");
+});
+
+/** Re-anchoring shrinks every count afterwards, so it is typed by a person and recorded. */
+test("scope refuses the count, and open --base moves the anchor onto the record", () => {
+  const { root } = project({ "a.txt": "a" });
+
+  git(root, ["checkout", "-q", "-b", "other"]);
+  writeFile(join(root, "b.txt"), "b");
+  commitAll(root, "another ticket");
+  const otherTip = git(root, ["rev-parse", "HEAD"]);
+
+  git(root, ["checkout", "-q", "main"]);
+  writeConfig(root, DEFAULTS);
+  kiln(root, ["open", "w1"]);
+  writeFile(join(root, "c.txt"), "c");
+  commitAll(root, "my work");
+
+  const opened = readState(root, "w1");
+  writeState(root, { ...opened, base: otherTip, last_verified: otherTip });
+
+  const refused = kiln(root, ["scope", "w1"]);
+  assert.equal(refused.status, 1, refused.stdout);
+  assert.match(refused.stderr, /did not grow from it/);
+  assert.match(refused.stderr, /kiln open w1 --base <commit-ish>/);
+
+  const forkPoint = git(root, ["rev-parse", "HEAD~1"]);
+  assert.equal(kiln(root, ["open", "w1", "--base", forkPoint]).status, 0);
+
+  const moved = readState(root, "w1");
+  assert.equal(moved.base, forkPoint);
+  assert.equal(moved.carry_over.at(-1).kind, "reanchor", "a shrinking move is on the record");
+  assert.equal(kiln(root, ["scope", "w1"]).status, 0, "and the count means its sentence again");
 });
