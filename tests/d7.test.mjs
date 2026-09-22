@@ -7,10 +7,11 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dispatch } from "../hooks/dispatch.mjs";
 import { gitOutput } from "../lib/init.mjs";
+import { mintId } from "../lib/resolve.mjs";
 import { protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
 import { newWork, openNextPass, readState, recordVerify, writeState } from "../lib/state.mjs";
@@ -343,4 +344,38 @@ test("D7 item 3: every step skipped is not a pass", () => {
   const ran = cli("verify", "w1", "--effects", "migrate");
   assert.equal(ran.status, 0, ran.stderr);
   assert.match(ran.stdout, /green/);
+});
+
+/**
+ * Item 5 is "never writes outside its sandbox", and kiln's own CLI did. A work id becomes a
+ * directory name, so it is a path, and nothing checked it as one:
+ *
+ *     kiln open '../../../escaped'   →   <outside the project>/state.json
+ *     kiln open '../escaped'         →   .kiln/escaped/  — where listWork cannot see it
+ *
+ * The likelier one was quieter: an agent minted `#1586` from a ticket and every command
+ * touching that work had to remember to quote it, because `#` starts a shell comment.
+ * `mintId` would have produced `20260922-1586`; nothing made the id kiln *accepts* the same
+ * as the id kiln *mints*.
+ */
+test("D7 item 5: a work id is one path segment, not a path", () => {
+  const root = tempRoot("kiln-d7-id-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  writeConfig(root, { ...DEFAULTS, stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] } });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const open = (id) => spawnSync(process.execPath, [bin, "open", id], { cwd: root, encoding: "utf8" });
+
+  for (const id of ["../../../escaped", "../escaped", "sub/dir", "#1586", "a b", "-rf", ".", ""]) {
+    const run = open(id);
+    assert.notEqual(run.status, 0, `accepted as an id: ${JSON.stringify(id)}`);
+    assert.match(`${run.stdout}${run.stderr}`, /work id|needs an id/);
+  }
+  assert.equal(existsSync(join(root, "..", "escaped")), false, "nothing reached outside the project");
+  assert.equal(existsSync(join(root, ".kiln", "escaped")), false, "nor outside .kiln/work/");
+
+  assert.equal(open(mintId({ text: "the export button does nothing", now: new Date("2026-09-22") })).status, 0, "what kiln mints, kiln accepts");
 });
