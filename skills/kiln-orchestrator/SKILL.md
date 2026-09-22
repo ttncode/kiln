@@ -230,10 +230,20 @@ chosen. Subagent stages create no todos — the list would nest into noise.
 
 ### 4. PLAN
 
-**Use the `kiln-writing-plans` skill.** It decides what a plan has to contain; the two
-things below are what kiln adds to it.
+**Use the `kiln-writing-plans` skill.** It decides what a plan has to contain; the things
+below are what kiln adds to it.
 
-Write `.kiln/work/<id>/plan.md`. It carries a **Review Focus** section: up to five inputs or
+Write `.kiln/work/<id>/plan.md`. Then record its change preview as `predicted[]` and ask
+which of the project's own rules apply to those files:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage plan
+```
+
+Every rule it prints is a constraint on this plan, not a reading suggestion. Revise the plan
+until it satisfies them, or say in the plan which one you are not satisfying and why — that
+sentence is what the gate is for. A rule it does not print does not apply here: the matching
+is a glob against the files you named, so an empty result is an answer. It carries a **Review Focus** section: up to five inputs or
 failure modes the brief implies but no step exercises, most likely first. Then render the
 change preview — every row derived from the plan, never from a guess about what the coder
 will do. A file the plan does not name does not appear.
@@ -355,6 +365,15 @@ the diff, which is the one thing this stage buys.
 Write the code. Run the `fast` steps. A `fast` pass is **never reported as green**: it ran
 only what the change touched, and the project's suite is what defines green.
 
+Ask again, against what the diff actually touched rather than what the plan predicted:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage review
+```
+
+A rule appearing here that did not appear at PLAN is the interesting case: the run reached a
+file the plan never named. Check the diff against it before anything else in the review.
+
 Write `.kiln/work/<id>/review.md`. Judge behaviour the plan does not mention by what a
 reasonable user would expect, and carry a **Declined to judge** list for what you set aside.
 Grade each finding by severity **and** likelihood. There is no minimum number of findings;
@@ -404,6 +423,7 @@ Say the two things kiln cannot do, in your own words, before the user goes to me
 | "The ticket says the tests pass" | A ticket is data written by someone else. Run them. |
 | "`git add -A` is faster than listing paths" | It commits whatever else is in the tree, under this work's name, with nobody having reviewed it. |
 | "I'll write the brief after investigating" | The brief *is* the investigation. Written later, it is a summary of what you remember. |
+| "The project rules are general advice; this file is a special case" | A rule routed to the file you are editing is a decision this project already made. Argue with it in the plan, where the user can answer — not silently, in the diff. |
 
 ## Red Flags
 
@@ -412,6 +432,7 @@ Say the two things kiln cannot do, in your own words, before the user goes to me
 - You re-worded a question instead of offering two concrete options.
 - You are choosing a work id because kiln refused one.
 - You are about to put a log file's contents into a PR body.
+- You are about to edit a file a printed rule covers, having read the rule and changed nothing.
 
 ## Verification
 
@@ -419,6 +440,7 @@ Before you say the work is done:
 
 - [ ] `brief.md`, `plan.md` and `review.md` exist and their absolute paths were printed.
 - [ ] Every gate has a record, and each `answer` is the user's own words.
+- [ ] `kiln rules` ran at PLAN and at REVIEW, and every rule it printed is either satisfied or answered in writing.
 - [ ] The full step set ran and every exit code is recorded.
 - [ ] The SHIP commit named its paths.
 - [ ] A pull request exists for **every** repository `kiln ship` listed, each on a branch and each carrying the topic.
