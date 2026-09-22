@@ -318,11 +318,12 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 460, green on every pull request |
+| Tests | 461, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
+| Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
-| Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md), plus the [journey matrix](docs/design/2026-09-22-journey-matrix.md) run against [nine real checkouts](docs/design/2026-09-22-cross-project-acceptance.md) — Node, PHP, Python, C, a pnpm workspace, husky, submodules, and a project shipping from `8.2` |
+| Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md), plus the [journey matrix](docs/design/2026-09-22-journey-matrix.md) run against [nine real checkouts](docs/design/2026-09-22-cross-project-acceptance.md) — Node, PHP, Python, C, a pnpm workspace, husky, submodules, and a project shipping from `8.2`; plus [ten more](docs/design/2026-09-23-real-repository-matrix.md) for the rules router — six real projects and four layouts |
 | **Not done** | the four scorecard lines only a person can grade — see [the last record](docs/design/2026-09-21-acceptance-c6-handover.md) |
 
 The machine-checkable half of the promise is done; the human-graded half is not, and no
