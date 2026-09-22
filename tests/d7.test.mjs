@@ -252,6 +252,37 @@ test("D7 item 3: a phase with no steps refuses; it does not report green", () =>
   assert.equal(run.status, 1, `verify exited ${run.status}: ${run.stdout}${run.stderr}`);
   assert.match(run.stderr, /no .* step/);
   assert.doesNotMatch(run.stdout, /green/);
+  assert.match(run.stderr, /stack.steps is empty/, "and here it really is empty");
+});
+
+/**
+ * The refusal said `"steps" is empty` for a config holding one step in another phase, and
+ * pointed at `kiln init` "in a project kiln has not configured yet" — on a project init had
+ * configured minutes earlier. A message naming a remedy that does not exist is the shape
+ * this project keeps re-meeting, so the phase it actually has is what it now reports.
+ */
+test("a phase with no steps says which steps there are, and a remedy that works", () => {
+  const root = tempRoot("kiln-emptyphase-");
+  initRepo(root);
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  writeConfig(root, {
+    ...DEFAULTS,
+    stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const cli = (...args) => spawnSync(process.execPath, [bin, ...args], { cwd: root, encoding: "utf8" });
+  cli("open", "w1");
+
+  const run = cli("verify", "w1", "--phase", "fast");
+  assert.equal(run.status, 1);
+  assert.doesNotMatch(run.stderr, /"steps" is empty/, "it is not empty; it holds one full step");
+  assert.match(run.stderr, /stack.steps holds 1, none of them fast/);
+  assert.match(run.stderr, /unit — phase full/);
+  assert.match(run.stderr, /kiln config set stack\.cmd\.test_fast=/, "the verb that changes a written config");
+  assert.doesNotMatch(run.stderr, /kiln init/, "init overwrites nothing, so it is no remedy here");
 });
 
 /**

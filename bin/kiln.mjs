@@ -523,10 +523,37 @@ ${reasons.join("\n")}
 Declare the effect this change produces with --effects, or fix the step's \`requires\` if it is ordering rather than a precondition.`;
 }
 
+/**
+ * The message claimed `"steps" is empty` for a config holding one step in another phase,
+ * and sent the reader to `kiln init` "in a project kiln has not configured yet" — on a
+ * project that was already configured, by init, minutes earlier. Both halves were false,
+ * which is the shape this project keeps re-meeting: a message naming a remedy that does
+ * not exist.
+ *
+ * What is true is the phase, so the phase is what it reports, with the steps that do exist
+ * listed beside it.
+ */
 function noStepsMessage(config, phase) {
+  const steps = config.stack.steps ?? [];
+  const elsewhere = steps.map((step) => `  ${step.id} — phase ${step.phase ?? "full"}`);
+  const inventory = steps.length === 0
+    ? 'stack.steps is empty, so no phase has anything to run.'
+    : `stack.steps holds ${steps.length}, none of them ${phase}:\n${elsewhere.join("\n")}`;
+
   return `kiln will not report a result for a phase with no steps.
-stack "${config.stack.id}" has no ${phase} step in .kiln/config.json — "steps" is empty, so there is nothing to run.
-Set stack.steps, or run \`kiln init --set stack.cmd.test="<command>"\` in a project kiln has not configured yet.`;
+stack "${config.stack.id}" has no ${phase} step in .kiln/config.json.
+${inventory}
+${remedyFor(phase)}`;
+}
+
+/**
+ * Only a remedy that works from here. `kiln config set` is the verb that changes a written
+ * config; `kiln init` is not, and it overwrites nothing.
+ */
+function remedyFor(phase) {
+  return phase === "fast"
+    ? 'Set the command it runs: `kiln config set stack.cmd.test_fast="<command>"` — or verify with --phase full, which is the phase that decides green.'
+    : 'Set the steps: `kiln config set \'stack.steps=[{"id":"unit","run":"${cmd.test}"}]\'`.';
 }
 
 function effectsInPlay(rest) {
