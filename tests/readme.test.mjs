@@ -1,7 +1,11 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { decisionsToFirstPR } from "../scripts/decision-count.mjs";
+import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
+
+after(cleanupFixtures);
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const README = readFileSync(join(ROOT, "README.md"), "utf8");
@@ -144,4 +148,23 @@ test("the commands a user types are listed in one place", () => {
   }
   assert.match(section, /--auto/, "the modifiers are part of how it is typed");
   assert.match(section, /kiln <verb>/, "and the verbs underneath are pointed at, not listed twice");
+});
+
+/**
+ * B06, the machine half of "first-run survival": every point a user must answer between
+ * `init` and their first pull request. The judgment half is a person's and cannot be
+ * automated — but a release that quietly doubles the count should not be able to.
+ */
+test("B06: the decisions before a first PR are counted, and the README says the number", () => {
+  const origin = initRepo(tempRoot("kiln-b06-origin-"));
+  writeFile(join(origin, "package.json"), JSON.stringify({ name: "b06", scripts: { test: "vitest" } }));
+  commitAll(origin, "first");
+  const project = join(tempRoot("kiln-b06-"), "clone");
+  git(process.cwd(), ["clone", "--quiet", origin, project]);
+
+  const [bounded, full] = decisionsToFirstPR(project);
+
+  assert.equal(bounded.path, "bounded");
+  assert.match(README, new RegExp(`\\*\\*${bounded.total}\\*\\* — ${bounded.asked} questions`), `bounded costs ${bounded.total}`);
+  assert.match(README, new RegExp(`${full.total} on \`full\``), `full costs ${full.total}`);
 });
