@@ -102,6 +102,32 @@ function shapedLike(current, raw) {
   return raw.includes(",") ? raw.split(",").map((part) => part.trim()) : raw;
 }
 
+/**
+ * A value the caller wrote as JSON is taken as JSON. Inferring the shape from the value
+ * already there is right for a scalar and wrong for a structure: `--set stack.steps=[{...},
+ * {...}]` was split on its commas into a string array, and kiln wrote a corrupt
+ * .kiln/config.json into a real project. The repair took `node -e`, which is a direct write
+ * to the one file D48 says the agent may not write.
+ *
+ * `git config` settles this by never guessing: --type is declared or no canonicalization
+ * happens, and a multi-valued key is built with --add rather than by splitting a string.
+ *
+ * Opening with `[` or `{` is the declaration here. A value that opens that way and does not
+ * parse is refused, because falling back to the comma split is how the corrupt file was
+ * written in the first place.
+ */
+function structuredValue(raw) {
+  const text = raw.trim();
+  if (!text.startsWith("[") && !text.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(text);
+    if (typeof parsed !== "object" || parsed === null) throw new Error("not a structure");
+    return parsed;
+  } catch (error) {
+    throw new Error(`the value for this key starts with "${text[0]}", so kiln read it as JSON, and it does not parse: ${error.message}`);
+  }
+}
+
 /** Config is a file the agent may not write (D48), so answers arrive as arguments. */
 export function setPath(target, assignment) {
   const separator = assignment.indexOf("=");
@@ -115,7 +141,7 @@ export function setPath(target, assignment) {
     if (typeof node[key] !== "object" || node[key] === null) node[key] = {};
     node = node[key];
   }
-  node[leaf] = shapedLike(node[leaf], raw);
+  node[leaf] = structuredValue(raw) ?? shapedLike(node[leaf], raw);
   return target;
 }
 
