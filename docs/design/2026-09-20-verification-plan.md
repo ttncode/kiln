@@ -68,7 +68,7 @@ The seven D7 tests, plus the static checks. Binary: one failure fails the build.
 | A9 | `hooks/hooks.json` is the wrapped `{"hooks": …}` shape, and the edit matcher names `NotebookEdit` | §1.6 rows 2 and 5 |
 | A10 | no `superpowers:`-prefixed reference survives in a forked skill, and every skill one names is a skill kiln ships | D69 |
 | A11 | budget: aggregate ≤ 6,000 chars · per-description ≤ 500 warns · a description containing `v\d+\.\d+` or a changelog verb is rejected | §2 Superseded |
-| A12 | every file under `rules/` appears in `index.md`'s trigger table | D20 |
+| A12 | every file under `rules/` appears in `index.md`'s trigger table, **every row resolves**, and a routed rule reaches the stage its glob matches | D20, D101 |
 | A13 | lint, 8 of 10 rules; only the visual companion under `vendor/` excluded | D26, D69 |
 | A14 | version-sync across manifests | D17 |
 
@@ -98,7 +98,7 @@ Grouped by what a developer is actually doing. Every row is one `node --test` ca
 | B09 | `/kiln 42` when `work/42/` exists | resolves as the work dir — the more specific branch wins |
 | B10 | `/kiln <url>` | treated as a URL, fetched by the agent's own tools |
 | B11 | bare `/kiln` | lists work in progress |
-| B12 | `/kiln dna` at tier 0 | resolved as a **reserved word**, never as a work id; reports that DNA is v1.2 |
+| B12 | `/kiln dna` at tier 0 | resolved as a **reserved word**, never as a work id; reports that DNA is v1.2 **and names the tier-0 command that works today**. The classification alone was met from the start; the report was not, and the orchestrator ran a command kiln does not ship |
 | B13 | a work id that collides and is not resumable | prints both and **refuses**; never reuses the directory |
 | B14 | attempting a work id named `init`, `doctor` or `dna` | refused |
 | B15 | `fx-multi` with 2 ticket-owning modules, both holding issue `42` | the id carries the module prefix |
@@ -200,6 +200,31 @@ Grouped by what a developer is actually doing. Every row is one `node --test` ca
 | B65 | `doctor --write` with wrong module paths | repairs them |
 | B66 | older `schema_version` | migrated in memory, one line pointing at `doctor --write`, **no tracked file rewritten** |
 | B67 | newer `schema_version` | **refused**, printing both numbers |
+
+### 3.12 The rules router
+
+`tests/rules.test.mjs`, plus the routing rows of `tests/doctor.test.mjs`. The failure this
+set exists to prevent is the one Cursor ships: a rule that is filed, routed, and silently
+never applied, with no symptom to debug.
+
+| # | Scenario | Must be true |
+|---|---|---|
+| B68 | a glob matching a file the stage names | the rule's **text** is printed, with the trigger it came from |
+| B69 | a glob matching nothing | `N rule(s) routed · None of them match` — the count prints, because silence reads the same as having no router |
+| B70 | no routed rule, and no `rules/` directory at all | both answer, and neither is an error |
+| B71 | two triggers naming one rule · two rules matching one file | one rule handed over once · both handed over |
+| B72 | glob vocabulary | `*` stops at a separator, `**` crosses one, a leading `./` is the same path, `src/**/x` matches `src/x` |
+| B73 | a trigger that looks like a regex (`^src/.*$`) | matched as a literal; it matches nothing and does not throw |
+| B74 | the table header, and the shipped template's `_(none yet)_` row | neither is a route, and neither is an error |
+| B75 | `--stage plan` vs `--stage review` | `predicted[]` vs the real diff; a rule reaching a file the plan never named appears only at review |
+| B76 | the same stage called twice | one record, not two. Two stages are two records |
+| B77 | a stage that names no files | says so, rather than reporting that no rule applied |
+| B78 | a row filling one of two columns · a rule file that is not on disk · a rule path outside `.kiln/rules/` · rows with no `\|---\|` separator | each a **FAIL** naming the row — never a silent skip |
+| B79 | a well-formed trigger matching no file git lists | **WARN**: routed, resolvable, and still reaching nothing |
+| B80 | a rule file with a BOM and CRLF | read; neither is rewritten |
+| B81 | an unknown `--stage` · an unknown work id | refused, naming the stages that exist |
+| B82 | a new pass after ship | `rules[]` cleared with `gates` and `predicted[]` |
+| B83 | the run writing a rule — Edit, redirect, `rm`, `mv`, `node -e` | blocked five ways while a work is open; **allowed** in a session kiln is not driving |
 
 ---
 
