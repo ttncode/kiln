@@ -307,3 +307,41 @@ test("a branch nothing names is marked a guess, so init can ask instead of prete
   const asked = proposeConfig(root).questions.map((row) => row.key);
   assert.ok(asked.includes("vcs.integration_branch"));
 });
+
+/**
+ * `Run kiln doctor to check it.` used to print inside `reportInit` — before the floor was
+ * installed and before the questions kiln had answered on the user's behalf. A closing line
+ * in the middle closes nothing, and the block after it read as coming next.
+ *
+ * It also names the entry point now, because `/kiln:kiln "<sentence>"` is not guessable from
+ * a command called `init`. `--auto` is deliberately absent: `kiln open` names it at the
+ * moment it means something, and the first ten minutes should not teach the way past a gate
+ * before the user has met one.
+ */
+test("init's last line is last, and says what to type next", () => {
+  const root = initRepo(tempRoot("kiln-init-next-"));
+  writeFile(join(root, "package.json"), JSON.stringify({ name: "app", scripts: { test: "true" } }));
+  commitAll(root, "first");
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const lines = spawnSync(process.execPath, [bin, "init"], { cwd: root, encoding: "utf8" }).stdout.trim().split("\n");
+
+  assert.match(lines.at(-1), /Next: \/kiln:kiln "<what you want done>"/);
+  assert.match(lines.at(-1), /kiln doctor to check this setup/, "checking is offered, not required");
+  assert.doesNotMatch(lines.join("\n"), /--auto/, "the way past a gate is not advertised before the first gate");
+
+  const wrote = lines.findIndex((line) => line.includes("pre-push"));
+  const decided = lines.findIndex((line) => line.includes("decided these for you"));
+  assert.ok(wrote < lines.length - 1 && decided < lines.length - 1, "everything written and decided comes before the closing line");
+});
+
+test("a second init still says how to start", () => {
+  const root = initRepo(tempRoot("kiln-init-next2-"));
+  writeFile(join(root, "package.json"), JSON.stringify({ name: "app", scripts: { test: "true" } }));
+  commitAll(root, "first");
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  spawnSync(process.execPath, [bin, "init"], { cwd: root, encoding: "utf8" });
+
+  const again = spawnSync(process.execPath, [bin, "init"], { cwd: root, encoding: "utf8" });
+  assert.match(again.stdout.trim().split("\n").at(-1), /Already set up\. \/kiln:kiln/);
+});
