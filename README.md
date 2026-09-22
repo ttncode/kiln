@@ -72,6 +72,11 @@ an empty [rules router](#project-rules), and one `.gitignore` line. It never ove
 
 **No token. No Docker. No Python. No CI.** Any of those appearing in `init` is a bug.
 
+**Updating:** `/plugin update kiln`, then `kiln doctor` in each project. The update replaces
+the plugin and touches nothing in your repository — which also means a project that already
+has the push floor keeps the hook the older version installed. Doctor reports that as `stale`
+and `kiln doctor --write` replaces it; `kiln open` warns once per run until it is done.
+
 ## Usage
 
 ```
@@ -318,7 +323,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 464, green on every pull request |
+| Tests | 466, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
@@ -337,7 +342,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 103 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 104 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
