@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS, loadConfig } from "../lib/config.mjs";
 import { STATUS, runChecks } from "../lib/doctor.mjs";
@@ -121,7 +121,8 @@ test("a hook already in the configured directory is reported, never replaced", (
   assert.equal(readFileSync(join(root, ".husky", "pre-push"), "utf8"), "#!/bin/sh\n# husky owns this\n");
   const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "push floor");
   assert.equal(row.status, STATUS.warn);
-  assert.match(row.detail, /add `node "\$\(git rev-parse --show-toplevel\)\/\.kiln\/hooks\/pre-push\.mjs" "\$@"`/, "the exact line to add");
+  assert.match(row.detail, /--show-superproject-working-tree \|\| git rev-parse --show-toplevel/, "the line a submodule can also use");
+  assert.doesNotMatch(row.detail, /add `exec node "\$\(git rev-parse --show-toplevel\)/, "not the line that broke every submodule push");
 });
 
 test("a hooksPath outside the checkout is named, because kiln cannot install there", () => {
@@ -225,4 +226,66 @@ test("no runner above this checkout allows the push, and says why", () => {
   const run = spawnSync("git", ["push", "origin", "HEAD:refs/heads/main"], { cwd: alone, encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stderr, /no \.kiln\/hooks\/pre-push\.mjs above/);
+});
+
+/**
+ * Measured, and it is the worse half of this pair. In a linked worktree
+ * `--absolute-git-dir` is `.git/worktrees/<name>`, so kiln installed the hook there,
+ * `floorStatus` read it back as `installed`, `doctor` printed `Ready.` — and git reads
+ * `.git/hooks`. A real push to a protected branch succeeded, exit 0.
+ *
+ * D7 item 1 reported as held while absent: the husky bug this function was written to fix,
+ * one directory over. `git rev-parse --git-path hooks` answers commondir and core.hooksPath
+ * in one call, which is why nothing here computes a path.
+ */
+test("a worktree reads hooks from the common dir, so that is where the floor goes", () => {
+  const root = project(["main"]);
+  const tree = join(root, "..", `${root.split("/").pop()}-wt`);
+  git(root, ["add", "-f", ".kiln"]);
+  commitAll(root, "kiln tracked");
+  git(root, ["worktree", "add", "-q", tree, "-b", "wt"]);
+
+  installFloor(tree);
+  const reads = gitOutput(tree, ["rev-parse", "--git-path", "hooks"]);
+  assert.ok(existsSync(join(reads, "pre-push")), "installed where git will actually look");
+
+  const remote = tempRoot("kiln-floor-wt-remote-");
+  git(remote, ["init", "-q", "--bare"]);
+  git(tree, ["remote", "add", "origin", remote]);
+  const push = spawnSync("git", ["push", "origin", "HEAD:refs/heads/main"], { cwd: tree, encoding: "utf8" });
+  assert.equal(push.status, 1, `a protected push from a worktree is refused: ${push.stdout}${push.stderr}`);
+  assert.match(push.stderr, /main is a protected branch/);
+});
+
+/**
+ * The hook's own first line says `Regenerate with kiln doctor --write`, and the installer
+ * skipped anything already present — so a hook from an older kiln stayed forever and nobody
+ * who had installed could receive a fix. A remedy naming a command that does nothing.
+ */
+test("a hook written by an older kiln is replaced, because it says it will be", () => {
+  const root = project(["main"]);
+  installFloor(root);
+  const hook = join(root, ".git", "hooks", "pre-push");
+  writeFile(hook, `${readFileSync(hook, "utf8")}\n# an older kiln wrote this\n`);
+
+  assert.equal(floorStatus(root)[0].state, "stale");
+  const [warned] = runChecks(root, loadConfig(root)).filter((r) => r.title === "push floor");
+  assert.equal(warned.status, STATUS.warn);
+  assert.match(warned.detail, /written by an older kiln/);
+
+  assert.deepEqual(installFloor(root), [hook], "and --write replaces it");
+  assert.equal(readFileSync(hook, "utf8"), hookBody());
+  assert.equal(floorStatus(root)[0].state, "installed");
+});
+
+/** A hook that is present and a hook that can run are different facts. */
+test("an installed hook with no runner above it is not called installed", () => {
+  const root = project(["main"]);
+  installFloor(root);
+  rmSync(runnerPath(root));
+  assert.equal(floorStatus(root)[0].state, "no-runner");
+
+  const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "push floor");
+  assert.equal(row.status, STATUS.warn);
+  assert.match(row.detail, /it checks nothing/);
 });
