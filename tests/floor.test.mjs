@@ -5,7 +5,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS, loadConfig } from "../lib/config.mjs";
 import { STATUS, runChecks } from "../lib/doctor.mjs";
-import { floorStatus, installFloor, runnerPath } from "../lib/floor.mjs";
+import { floorStatus, hookBody, installFloor, runnerPath } from "../lib/floor.mjs";
+import { gitOutput } from "../lib/init.mjs";
 import { refusal } from "../lib/floor/pre-push.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
@@ -151,4 +152,77 @@ test("doctor's closing line does not read as fine when something is warned about
   const run = spawnSync(process.execPath, [bin, "doctor"], { cwd: root, encoding: "utf8" });
   assert.equal(run.status, 0, `a warning is still not a reason to stop: ${run.stdout}`);
   assert.match(run.stdout, /Ready, with 1 warning\(s\): push floor\./);
+});
+
+function submoduleProject() {
+  const sub = initRepo(tempRoot("kiln-floor-sub2-"));
+  writeFile(join(sub, "a.txt"), "a");
+  commitAll(sub, "sub");
+  const root = project(["main"]);
+  git(root, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "mod"]);
+  commitAll(root, "add submodule");
+  installFloor(root);
+  return root;
+}
+
+function remoteFor(checkout) {
+  const remote = tempRoot("kiln-floor-remote2-");
+  git(remote, ["init", "-q", "--bare"]);
+  gitOutput(checkout, ["remote", "remove", "origin"]);
+  git(checkout, ["remote", "add", "origin", remote]);
+  return remote;
+}
+
+/**
+ * Measured on a real monorepo: every push from every one of four submodules died with
+ * `Cannot find module .../AdminPage/.kiln/hooks/pre-push.mjs`. `--show-toplevel` inside a
+ * submodule is the submodule — git's documentation says so — and `.kiln/` lives only in the
+ * superproject. The branch being pushed was not protected; the floor never got to look.
+ */
+test("a push from a submodule reaches the superproject's runner", () => {
+  const root = submoduleProject();
+  const mod = join(root, "mod");
+  remoteFor(mod);
+
+  const blocked = spawnSync("git", ["push", "origin", "HEAD:refs/heads/main"], { cwd: mod, encoding: "utf8" });
+  assert.equal(blocked.status, 1, blocked.stderr);
+  assert.match(blocked.stderr, /main is a protected branch/);
+  assert.doesNotMatch(blocked.stderr, /Cannot find module/, "the runner is found from inside the submodule");
+
+  const feature = spawnSync("git", ["push", "origin", "HEAD:refs/heads/feature/x"], { cwd: mod, encoding: "utf8" });
+  assert.equal(feature.status, 0, `an unprotected branch still pushes: ${feature.stderr}`);
+});
+
+/**
+ * git exports GIT_DIR and GIT_WORK_TREE into every hook and they beat `-C`, so a walk that
+ * does not clear them answers for the starting repository at every step. Measured with them
+ * left set: a submodule two levels down got an empty answer at the second step and its push
+ * to a protected branch was allowed unchecked.
+ */
+test("the walk survives the environment git hands a hook", () => {
+  const root = submoduleProject();
+  const mod = join(root, "mod");
+  remoteFor(mod);
+
+  const inherited = { ...process.env, GIT_DIR: gitOutput(mod, ["rev-parse", "--absolute-git-dir"]) };
+  const run = spawnSync("git", ["push", "origin", "HEAD:refs/heads/main"], { cwd: mod, encoding: "utf8", env: inherited });
+  assert.equal(run.status, 1, run.stderr);
+  assert.match(run.stderr, /main is a protected branch/);
+});
+
+/**
+ * A floor that refuses a push it cannot judge is a wall. D33: no config means kiln is not
+ * driving this repository, so it says so once and gets out of the way.
+ */
+test("no runner above this checkout allows the push, and says why", () => {
+  const alone = initRepo(tempRoot("kiln-floor-alone-"));
+  writeFile(join(alone, "a.txt"), "a");
+  commitAll(alone, "first");
+  writeFile(join(alone, ".git", "hooks", "pre-push"), hookBody());
+  spawnSync("chmod", ["755", join(alone, ".git", "hooks", "pre-push")]);
+  remoteFor(alone);
+
+  const run = spawnSync("git", ["push", "origin", "HEAD:refs/heads/main"], { cwd: alone, encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stderr, /no \.kiln\/hooks\/pre-push\.mjs above/);
 });
