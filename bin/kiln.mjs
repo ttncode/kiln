@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync, writeFileSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
-import { installFloor } from "../lib/floor.mjs";
+import { floorStatus, installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
@@ -778,8 +778,32 @@ function runOpen(argv) {
 
   const state = newWork(openedAt(root, { id, rest }));
   out(writeState(root, state));
+  const floor = floorWarning(root);
+  if (floor) process.stderr.write(`${floor}\n`);
   out(autoLine(state.path, { config, state }));
   return 0;
+}
+
+/**
+ * `/plugin update kiln` replaces the plugin and touches nothing in the project, so a
+ * checkout that already had the floor keeps the hook the older version wrote. `kiln doctor`
+ * reports that as `stale` — but only if somebody runs doctor, and the one instruction kiln
+ * gives about updating said `/plugin update kiln`. That is all.
+ *
+ * Measured on a real monorepo after rc.19: five checkouts all reporting `stale`, having run
+ * the whole of rc.18 with the submodule bug rc.19 fixed. The floor was degraded and every
+ * run said `Ready.`
+ *
+ * Said at `open` because it is once per run, it is the moment the run's safety is being
+ * established, and it costs two git calls per checkout rather than one per tool call. It
+ * warns rather than blocks: an absent floor is what D54 calls a thing nothing at runtime
+ * can notice, and refusing to start work over it would be kiln policing its own upgrade.
+ */
+function floorWarning(root) {
+  const broken = floorStatus(root).filter((row) => row.state === "stale" || row.state === "missing" || row.state === "no-runner");
+  if (broken.length === 0) return null;
+  return `kiln: the push floor is not armed in ${broken.length} checkout(s) — ${broken.map((row) => row.state).join(", ")}.
+Run \`kiln doctor --write\` to install it. Until then D7 item 1 rests on the PreToolUse guard alone.`;
 }
 
 function openedAt(root, { id, rest }) {

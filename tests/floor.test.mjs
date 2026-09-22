@@ -8,6 +8,7 @@ import { STATUS, runChecks } from "../lib/doctor.mjs";
 import { floorStatus, hookBody, installFloor, runnerPath } from "../lib/floor.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { refusal } from "../lib/floor/pre-push.mjs";
+import { kiln, nodeProject, ok } from "./helpers/journey.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
@@ -288,4 +289,31 @@ test("an installed hook with no runner above it is not called installed", () => 
   const [row] = runChecks(root, loadConfig(root)).filter((r) => r.title === "push floor");
   assert.equal(row.status, STATUS.warn);
   assert.match(row.detail, /it checks nothing/);
+});
+
+/**
+ * `/plugin update kiln` replaces the plugin and touches nothing in the project, so a
+ * checkout that already had the floor keeps the hook the older version wrote. Doctor calls
+ * that `stale` — but only if somebody runs doctor, and the one instruction kiln gave about
+ * updating was `/plugin update kiln. That is all.`
+ *
+ * Measured on a real monorepo after rc.19: five checkouts all `stale`, having run the whole
+ * of rc.18 with the submodule bug rc.19 fixed, while every run printed `Ready.`
+ */
+test("opening a work says so when the push floor is not armed", () => {
+  const root = nodeProject({ name: "floor-open" });
+  ok(root, ["init"]);
+  writeFile(join(root, ".git", "hooks", "pre-push"), "# installed by kiln\n# an older body\n");
+
+  const run = kiln(root, ["open", "w1", "--session", "s"]);
+  assert.equal(run.status, 0, "a degraded floor warns; it does not refuse to start work");
+  assert.match(run.stderr, /push floor is not armed/);
+  assert.match(run.stderr, /kiln doctor --write/, "and names the command that repairs it");
+});
+
+test("an armed floor says nothing at open", () => {
+  const root = nodeProject({ name: "floor-quiet" });
+  ok(root, ["init"]);
+  const run = kiln(root, ["open", "w2", "--session", "s"]);
+  assert.doesNotMatch(run.stderr, /push floor/, "a line printed every run is a line nobody reads");
 });
