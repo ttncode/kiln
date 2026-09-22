@@ -246,3 +246,38 @@ test("--auto is read as an instruction, not as part of the subject", () => {
   assert.equal(modifiersOf("the auto-save filter is broken").auto, false, "a hyphenated word is somebody's subject");
   assert.equal(modifiersOf("Remove the filter").path, null);
 });
+
+/**
+ * "Remove this filter at this URL http://localhost:2380/admin/product_list/" minted
+ * `20260922-remove-filter-url-http-localhost-2380`, and the route case was worse: four of
+ * its six words were the URL. The branch was named after where the thing lives rather than
+ * what is being done to it.
+ */
+test("a URL is an address, not a subject", () => {
+  const now = new Date("2026-09-22T00:00:00Z");
+  const id = (text) => mintId({ text, now });
+
+  assert.equal(
+    id("Remove this filter at this URL `http://localhost:2380/admin/product_list/`. Only code, not db."),
+    "20260922-remove-filter-admin-product-list-only",
+    "the path says which screen; the host and port say nothing",
+  );
+  assert.equal(id("See www.example.com/docs/setup for the failing step"), "20260922-see-docs-setup-failing-step");
+
+  for (const noise of ["http", "https", "localhost", "2380", "www"]) {
+    assert.doesNotMatch(id(`Fix the thing at http://localhost:2380/admin/x`), new RegExp(noise));
+  }
+});
+
+test("a URL quoted mid-sentence does not carry the quote into the slug", () => {
+  const now = new Date("2026-09-22T00:00:00Z");
+  assert.equal(mintId({ text: "Broken at `http://host/admin/product_list/`.", now }), "20260922-broken-admin-product-list");
+});
+
+test("`url` names the form of an address; `page` names a screen and stays", () => {
+  const now = new Date("2026-09-22T00:00:00Z");
+  // Long enough that the filler pass leaves four words; a shorter sentence keeps every word
+  // it has rather than becoming a one-word slug.
+  assert.doesNotMatch(mintId({ text: "The CSV export is broken at this URL http://host/admin/reports", now }), /url/);
+  assert.match(mintId({ text: "The export button on the reports page does nothing", now }), /reports-page/);
+});
