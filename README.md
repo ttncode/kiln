@@ -183,6 +183,8 @@ Three limits are stated rather than papered over, and each has a test asserting 
 ## Configuration
 
 One file, `.kiln/config.json`, and exactly one environment variable (`KILN_ROOT`).
+`kiln config set <key>=<value>` changes a value after `init` — a change may tighten what is
+enforced or re-aim it, never loosen it.
 
 ```jsonc
 {
@@ -255,7 +257,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 379, green on every pull request |
+| Tests | 386, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |

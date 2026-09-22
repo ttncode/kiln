@@ -12,7 +12,10 @@ import {
   loadConfig,
   parseJsonText,
 } from "../lib/config.mjs";
-import { cleanupFixtures, tempRoot, writeConfig } from "./helpers/fixture.mjs";
+import { spawnSync } from "node:child_process";
+import { setPath } from "../bin/kiln.mjs";
+import { protectedBranchesFor } from "../lib/modules.mjs";
+import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
 
@@ -119,4 +122,112 @@ test("findRoot terminates on a malformed path rather than spinning", () => {
 test("findRoot returns null when no ancestor holds a config", () => {
   const root = join(tempRoot(), "nested", "deeper");
   assert.equal(findRoot(root), null, "an absolute path is not affected by where the tests run");
+});
+
+/**
+ * D48 keeps the config out of the agent's reach, which left no way to change a value after
+ * init: the guard refuses the edit, init overwrites nothing, and there was no verb — so a
+ * user who said "the integration branch is v3-master" was told to edit JSON by hand. That
+ * happened three times across three sessions.
+ *
+ * #68 settled the principle for a per-run flag; this applies it to a durable change. What
+ * matters is the direction.
+ */
+function configured(overrides = {}) {
+  const root = initRepo(tempRoot("kiln-configset-"));
+  writeFile(join(root, "a.txt"), "a");
+  commitAll(root, "first");
+  writeConfig(root, {
+    ...DEFAULTS,
+    vcs: { ...DEFAULTS.vcs, integration_branch: "v3-develop", protected: ["master", "v3-master", "v3-develop"] },
+    stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] },
+    ...overrides,
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
+  return root;
+}
+
+const cli = (root, args) => spawnSync(process.execPath, [new URL("../bin/kiln.mjs", import.meta.url).pathname, ...args], { cwd: root, encoding: "utf8" });
+const onDisk = (root) => JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+
+test("config set re-aims enforcement and says what changed", () => {
+  const root = configured();
+  const run = cli(root, ["config", "set", "vcs.integration_branch=v3-master"]);
+
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /vcs\.integration_branch: "v3-develop" → "v3-master"/);
+  assert.equal(onDisk(root).vcs.integration_branch, "v3-master");
+});
+
+test("config set refuses to stop protecting a branch", () => {
+  const root = configured();
+  const run = cli(root, ["config", "set", "vcs.protected=v3-master"]);
+
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /stop protecting master/);
+  assert.match(run.stderr, /never loosen it/);
+  assert.deepEqual(onDisk(root).vcs.protected, ["master", "v3-master", "v3-develop"], "and writes nothing");
+});
+
+test("config set refuses to hand the gates to auto mode", () => {
+  const root = configured();
+  const run = cli(root, ["config", "set", "auto.bounded=true"]);
+
+  assert.equal(run.status, 2);
+  assert.match(run.stderr, /stays your own edit/);
+  assert.equal(onDisk(root).auto.bounded, false);
+});
+
+test("adding a protected branch is a tightening, so it is allowed", () => {
+  const root = configured();
+  assert.equal(cli(root, ["config", "set", "vcs.protected=master,v3-master,v3-develop,main"]).status, 0);
+  assert.ok(onDisk(root).vcs.protected.includes("main"));
+});
+
+/**
+ * `--set` after the file exists was read and dropped in silence, and the run still printed
+ * "kiln decided these for you" listing defaults that were not what the file held.
+ */
+test("init refuses --set on a project it will not overwrite, and describes no proposal", () => {
+  const root = configured();
+  const run = cli(root, ["init", "--set", "vcs.integration_branch=v3-master"]);
+
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /would be read and dropped/);
+  assert.match(run.stderr, /kiln config set/);
+  assert.equal(onDisk(root).vcs.integration_branch, "v3-develop");
+
+  const plain = cli(root, ["init"]);
+  assert.doesNotMatch(plain.stdout, /kiln decided these for you/, "the file on disk is not a proposal");
+});
+
+/**
+ * `--set vcs.protected=v3-master` stored the string, `protectedBranchesFor` spread it into
+ * ["v","3","-","m",…], and a push to v3-master was ALLOWED — D7 item 1, defeated through the
+ * documented flag, on a project with exactly one protected branch.
+ */
+test("a value takes the shape already at its key", () => {
+  const draft = { vcs: { protected: ["main"], integration_branch: "main" }, auto: { bounded: false }, rules: { budget_lines: 200 } };
+
+  setPath(draft, "vcs.protected=v3-master");
+  assert.deepEqual(draft.vcs.protected, ["v3-master"], "one branch is still a list");
+
+  setPath(draft, "vcs.protected=master, v3-master ,v3-develop");
+  assert.deepEqual(draft.vcs.protected, ["master", "v3-master", "v3-develop"], "and several are trimmed");
+
+  setPath(draft, "auto.bounded=true");
+  assert.equal(draft.auto.bounded, true, "`\"true\"` is not true, and autoEligible compares with ===");
+
+  setPath(draft, "rules.budget_lines=400");
+  assert.equal(draft.rules.budget_lines, 400);
+
+  setPath(draft, "vcs.integration_branch=v3-develop");
+  assert.equal(draft.vcs.integration_branch, "v3-develop", "a string stays a string");
+});
+
+test("one protected branch protects that branch", () => {
+  const root = configured({ vcs: { protected: ["main"], integration_branch: "main", provider: "github", branch_pattern: "${id}" } });
+  assert.equal(cli(root, ["config", "set", "vcs.protected=v3-master,main"]).status, 0);
+
+  assert.deepEqual(protectedBranchesFor(onDisk(root)).sort(), ["main", "v3-master"]);
 });
