@@ -372,3 +372,33 @@ test("the report says whether anything was verified", () => {
   writeState(root, { ...skipped, verify: [{ id: "unit", exit: 0 }], last_verified: "deadbeef123" });
   assert.match(kiln(root, ["report", "wv"]).stdout, /Verified: 1 step\(s\) ran · green at deadbeef1/);
 });
+
+/**
+ * `open` on a work that exists, with no `--session`, adopted `undefined`: the owner was
+ * wiped, pushed into `displaced`, and its very next source edit refused. `claimUnbound`
+ * then re-claimed the now-unowned work, so the work listed its own owner as displaced —
+ * twice over on a real run, because the skill re-opens a work to change its path.
+ */
+test("open without a session leaves the owner alone", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "w1", "--session", "sess-A"]);
+
+  const again = kiln(root, ["open", "w1"]);
+  assert.match(again.stdout, /already exists and is driven by session sess-A. Nothing changed/);
+
+  const state = readState(root, "w1");
+  assert.equal(state.session_id, "sess-A", "the owner is untouched");
+  assert.deepEqual(state.displaced, [], "and nobody was displaced");
+});
+
+test("a work never lists its own owner as displaced", () => {
+  const root = autoProject({});
+  kiln(root, ["open", "w1", "--session", "sess-A"]);
+  kiln(root, ["open", "w1", "--session", "sess-B"]);
+  assert.deepEqual(readState(root, "w1").displaced, ["sess-A"], "a real takeover still displaces");
+
+  kiln(root, ["open", "w1", "--session", "sess-A"]);
+  const state = readState(root, "w1");
+  assert.equal(state.session_id, "sess-A");
+  assert.deepEqual(state.displaced, ["sess-B"], "taking it back removes you from the list");
+});

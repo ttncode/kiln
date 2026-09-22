@@ -569,11 +569,22 @@ function runScope(argv) {
  * session none. The previous session's next source edit will be blocked" warned a user
  * about a session that did not exist.
  */
+/**
+ * `open` on a work that exists, with no `--session`, is not a takeover — there is nobody to
+ * hand it to. It used to adopt `undefined` anyway: the owner was wiped, pushed into
+ * `displaced`, and its very next source edit was refused. Measured, and it happened twice
+ * in one real run because the skill re-opens a work to change its path.
+ */
 function adoptExisting(root, { id, sessionId }) {
   const before = readState(root, id);
-  const adopted = adoptSession(before, sessionId);
-  writeState(root, adopted);
-  out(before.session_id
+  if (!sessionId) {
+    out(before.session_id
+      ? `work ${id} already exists and is driven by session ${before.session_id}. Nothing changed.`
+      : `work ${id} already exists and has no session yet. Nothing changed.`);
+    return 0;
+  }
+  writeState(root, adoptSession(before, sessionId));
+  out(before.session_id && before.session_id !== sessionId
     ? `took over work ${id} from session ${before.session_id}. That session's next source edit will be blocked.`
     : `claimed work ${id}, which had no session. Nothing was taken from anyone.`);
   return 0;
