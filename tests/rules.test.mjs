@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { matchingRules, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { newWork, openNextPass, recordRules } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, tempRoot, writeFile } from "./helpers/fixture.mjs";
@@ -241,4 +241,35 @@ test("the template init writes routes nothing and resolves clean", () => {
   ok(root, ["init"]);
   assert.deepEqual(readRoutes(root).map((row) => row.state), ["empty"], "the placeholder row is not a route and not an error");
   assert.match(ok(root, ["doctor"]).stdout, /0 route\(s\), all resolved/);
+});
+
+/**
+ * `resolve` is string arithmetic and does not know what a symlink is. Measured on a probe
+ * built for the pre-v1.0 audit: `| src/** | evil.md |` with `evil.md -> /etc/hostname`
+ * resolved inside `.kiln/rules/`, doctor called the route resolved, and `kiln rules`
+ * printed the machine's hostname into the run. Point the link at `.env` or a private key
+ * and the router is a file-read primitive handing the contents to the agent.
+ *
+ * D52 settled this for writes and the reader did not get the same rule.
+ */
+test("E11: a rule file may not be a symlink, nor sit behind one", () => {
+  const root = router(["src/** | leak.md"], {});
+  const secret = join(tempRoot("kiln-rules-secret-"), "secret.txt");
+  writeFile(secret, "SECRET VALUE\n");
+  symlinkSync(secret, join(root, ".kiln", "rules", "leak.md"));
+
+  assert.deepEqual(readRoutes(root).map((row) => row.state), ["escapes"]);
+  const { files, text } = report(root, ["src/a.ts"]);
+  assert.deepEqual(files, [], "nothing is handed over");
+  assert.doesNotMatch(text, /SECRET VALUE/, "and nothing is read");
+});
+
+test("E11: a rule behind a symlinked directory is refused too", () => {
+  const root = router(["src/** | theirs/x.md"], {});
+  const outside = tempRoot("kiln-rules-outside-");
+  writeFile(join(outside, "x.md"), "SECRET VALUE\n");
+  symlinkSync(outside, join(root, ".kiln", "rules", "theirs"));
+
+  assert.deepEqual(readRoutes(root).map((row) => row.state), ["escapes"], "refusing only the leaf leaves the directory");
+  assert.doesNotMatch(report(root, ["src/a.ts"]).text, /SECRET VALUE/);
 });
