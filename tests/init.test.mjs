@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyInit, detectStack, detectVcs, gitOutput, planInit, proposeConfig, unsatisfiedSteps } from "../lib/init.mjs";
+import { applyInit, detectStack, detectVcs, gitOutput, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
@@ -103,12 +103,36 @@ test("B01: init asks only what it cannot detect, and every question carries a de
   const { questions } = proposeConfig(nodeProject());
   assert.deepEqual(
     questions.map((row) => row.key).sort(),
-    ["stack.cmd.test", "tracker.provider", "vcs.integration_branch", "vcs.protected"],
+    ["stack.cmd.test", "stack.cmd.test_fast", "tracker.provider", "vcs.integration_branch", "vcs.protected"],
     "no remote here, so the forge and the default branch are both unreadable",
   );
   for (const question of questions) {
     assert.notEqual(question.default, undefined, `${question.key} has no default`);
   }
+});
+
+/**
+ * `kiln verify --phase fast` runs after every task, and no adapter could fill that phase:
+ * php-ci3 offered only `migrate`, which init drops when the project has no migrate command,
+ * and node offered nothing. On a real PHP project the per-task check refused to run and the
+ * work reached IMPLEMENT with `verify: []` — eight watched red/green cycles, none recorded.
+ *
+ * There is no portable spelling to ship (jest --onlyChanged, pytest --lf, phpunit --filter),
+ * so it is asked, and a blank answer leaves the phase honestly empty.
+ */
+test("the fast phase is filled by an answer, or left empty", () => {
+  const asked = proposeConfig(nodeProject()).questions.find((row) => row.key === "stack.cmd.test_fast");
+  assert.equal(asked.default, "", "blank is the default, because most projects have no such command");
+
+  assert.deepEqual(stepsFor({ test: "make test" }).map((step) => step.phase ?? "full"), ["full"]);
+  assert.deepEqual(
+    stepsFor({ test: "make test", test_fast: "make test FILE=$CHANGED" }),
+    [
+      { id: "unit-fast", phase: "fast", run: "${cmd.test_fast}" },
+      { id: "unit", run: "${cmd.test}" },
+    ],
+    "the fast step runs first and is the only one in its phase",
+  );
 });
 
 test("B02: init asks for no token, no Docker, no Python and no CI", () => {
