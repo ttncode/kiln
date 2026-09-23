@@ -16,24 +16,40 @@
       {
         "id": "next-api",
         "kind": "API",
-        "files": "(?:^|/)pages/api/.+\\.[cm]?[jt]sx?$|(?:^|/)app/(?:.+/)?route\\.[jt]s$"
+        "files": "^(?!.*(?:^|/)components/)(?:.*/)?(?:pages/api/.+\\.[cm]?[jt]sx?|app/(?:.+/)?route\\.[jt]s)$"
       },
       {
         "id": "next-page",
         "kind": "SCREEN",
-        "files": "(?:^|/)pages/(?!_).+\\.[jt]sx$|(?:^|/)app/(?:.+/)?page\\.[jt]sx$"
+        "files": "^(?!.*(?:^|/)components/)(?:.*/)?(?:pages/(?![_.]).+\\.[jt]sx?|app/(?:.+/)?page\\.[jt]sx?)$"
+      },
+      {
+        "id": "sveltekit-endpoint",
+        "kind": "API",
+        "files": "(?:^|/)routes/(?:.+/)?\\+server\\.[jt]s$"
+      },
+      {
+        "id": "sveltekit-page",
+        "kind": "SCREEN",
+        "files": "(?:^|/)routes/(?:.+/)?\\+page\\.svelte$"
+      },
+      {
+        "id": "nest-controller",
+        "kind": "API",
+        "files": "\\.[cm]?[jt]s$",
+        "contains": "@Controller\\s*\\([\\s\\S]*@(?:Get|Post|Put|Patch|Delete|All)\\s*\\("
       },
       {
         "id": "schedule",
         "kind": "BATCH",
         "files": "\\.[cm]?[jt]s$",
-        "contains": "\\bcron\\.schedule\\s*\\(|\\bnew CronJob\\s*\\(|\\bscheduleJob\\s*\\("
+        "contains": "\\bcron\\.schedule\\s*\\(|\\bnew CronJob\\s*\\(|\\bscheduleJob\\s*\\(|@Cron\\s*\\("
       },
       {
         "id": "http-route",
         "kind": "API",
         "files": "\\.[cm]?[jt]s$",
-        "contains": "\\b(?:app|router|server|fastify|api)\\.(?:get|post|put|patch|delete|route)\\s*\\(\\s*['\\\"`/]"
+        "contains": "\\b(?:app|router|server|fastify)\\.(?:get|post|put|patch|delete|all|route)\\s*\\(\\s*['\\\"`]/"
       }
     ]
   }
