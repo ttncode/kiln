@@ -218,3 +218,33 @@ test("ship without --opened still only prints, and changes nothing", () => {
   ok(root, ["ship", "w1"]);
   assert.equal(state(root, "w1").status, "in_progress", "printing a plan is not evidence anything was opened");
 });
+
+/**
+ * `--opened`'s help read "The work is shipped, and stops claiming the files it predicted."
+ * The first half is true and the second is one step late: `activeWorks` is `in_progress` or
+ * `halted`, so the claim is released when the review gate makes the work `reviewed`.
+ *
+ * On a real run the agent read that line, believed it, and told the user twice that a
+ * finished work was still holding a file it had already let go. A sentence about a
+ * consequence that is already false travels further than a wrong remedy: the agent repeats
+ * it in its own words, where nothing checks it.
+ */
+test("a reviewed work has already stopped claiming, before any URL is recorded", () => {
+  const root = nodeProject({ name: "claim-released" });
+  ok(root, ["init"]);
+  ok(root, ["open", "w1", "--session", "s1"]);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  ok(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
+
+  ok(root, ["open", "w2", "--session", "s2"]);
+  writeFile(join(root, ".kiln", "work", "w2", "plan.md"), "# plan\n");
+  const blocked = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
+  assert.equal(blocked.status, 2, "while w1 is in progress the claim is real");
+
+  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "1. Approve this review (recommended)"]);
+  assert.equal(state(root, "w1").status, "reviewed");
+
+  const allowed = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
+  assert.equal(allowed.status, 0, "no URL was recorded, and the claim is gone anyway");
+});

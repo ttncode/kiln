@@ -80,8 +80,8 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln ship <id> [--opened <url,url>]
       Group this work's diff by repository and print what has to be opened:
       one pull request per repository, all carrying the work id as their topic.
-      --opened  record the pull requests that now exist. The work is shipped,
-                and stops claiming the files it predicted.
+      --opened  record the pull requests that now exist. The work becomes
+                shipped, which is what lets a second pass open on it.
 
   kiln report <id>
       Print the run's report, including what auto mode decided on your behalf.
@@ -1061,9 +1061,17 @@ function runResume(argv) {
 
 /** Prints; writes nothing. What the run has to open, and what kiln cannot promise about it. */
 /**
- * `--opened` is what makes a work stop claiming. kiln cannot see a pull request — the agent
- * opens it with its own `gh`/`glab` — so the only honest record is the one handed back, and
- * printing a plan is not evidence that anything was opened.
+ * `--opened` records what exists. kiln cannot see a pull request — the agent opens it with
+ * its own `gh`/`glab` — so the only honest record is the one handed back, and printing a plan
+ * is not evidence that anything was opened.
+ *
+ * What it is **not** is what releases the claim. `activeWorks` is `in_progress` or `halted`,
+ * so a work stops claiming the moment the review gate makes it `reviewed` — one step earlier.
+ * The help here used to read "and stops claiming the files it predicted", and on a real run
+ * the agent read that, believed it, and told the user twice that a finished work was still
+ * holding a file it had already let go. A sentence about a consequence that is already false
+ * is the same defect as a remedy that does not exist, and it travels further: the agent
+ * repeats it in its own words, where nothing checks it.
  *
  * It also gives tier D's fourth line something to measure. "Human edits after accept" was
  * recorded as unmeasurable because no run had reached a pull request; the urls are where
