@@ -242,6 +242,9 @@ an empty router at `.kiln/rules/index.md`; you fill in the table.
 | **/*.sql              | schema.md |
 ```
 
+In a session you do not type a command for this: say what the rule is — *"controllers must
+never contain SQL"* — and the agent writes it, picks the glob, and calls the verb.
+
 `kiln rules add <file>.md --trigger "<glob>"` writes the file and the row together and
 refuses a name or a glob that would not resolve; editing the table by hand works too. A run
 may call it and **cannot** rewrite or remove a rule — a rule is one of the terms the run is
@@ -332,7 +335,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 481, green on every pull request |
+| Tests | 484, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
@@ -358,7 +361,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 109 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 110 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |

@@ -67,7 +67,8 @@ test("B10: a URL is recognised before anything else tries to interpret it", () =
 });
 
 test("B12 / D79: a reserved word resolves ahead of every other branch", () => {
-  assert.deepEqual(RESERVED, ["init", "doctor", "dna"]);
+  assert.deepEqual(RESERVED, ["init", "doctor", "rules", "dna"],
+    "`rules` joined once a user typed it: a word a user types is reserved, or work/<word>/ shadows the command");
   for (const word of RESERVED) {
     assert.equal(resolveArgument({ arg: word, root: tempRoot() }).kind, "reserved");
   }
@@ -295,4 +296,39 @@ test("`url` names the form of an address; `page` names a screen and stays", () =
   // it has rather than becoming a one-word slug.
   assert.doesNotMatch(mintId({ text: "The CSV export is broken at this URL http://host/admin/reports", now }), /url/);
   assert.match(mintId({ text: "The export button on the reports page does nothing", now }), /reports-page/);
+});
+
+/**
+ * Measured: `/kiln:kiln rules add controllers.md` minted the work id
+ * `20260923-rules-add-controllers-md` and started investigating it. The user's most natural
+ * attempt at a command, answered by silently doing something else.
+ *
+ * D79 set this law for `dna` and gave the reason — a word a user types is reserved, or
+ * `work/<word>/` shadows the command. It was written as an exact match because `init` and
+ * `doctor` take no arguments, and `rules` does.
+ */
+test("a reserved word is read from the first word, so a verb with arguments still resolves", () => {
+  const resolved = resolveArgument({ arg: "rules add controllers.md --trigger '**/*.php'", root: tempRoot() });
+  assert.equal(resolved.kind, "reserved");
+  assert.equal(resolved.command, "rules");
+  assert.equal(resolved.rest, "add controllers.md --trigger '**/*.php'");
+});
+
+test("a bare reserved word carries no arguments", () => {
+  const resolved = resolveArgument({ arg: "doctor", root: tempRoot() });
+  assert.equal(resolved.rest, "");
+});
+
+/**
+ * The trade, asserted so it stays deliberate: a sentence opening with a reserved word is
+ * refused rather than run. That is the cheaper error — a refusal is visible and one rephrase
+ * away, while minting a junk work and investigating it is silent and expensive.
+ */
+test("a sentence that merely opens with a reserved word is caught here, not minted as work", () => {
+  const resolved = resolveArgument({ arg: "rules for the export page are wrong", root: tempRoot() });
+  assert.equal(resolved.kind, "reserved", "the visible error beats the silent one");
+
+  for (const sentence of ["the export button does nothing", "initialise the cache on boot"]) {
+    assert.equal(resolveArgument({ arg: sentence, root: tempRoot() }).kind, "description", sentence);
+  }
 });

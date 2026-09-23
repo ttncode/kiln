@@ -1,6 +1,6 @@
 ---
 description: Drive one unit of work — a sentence, a ticket ref, or a URL — to a reviewed pull request.
-argument-hint: "[<sentence> | <ticket-ref> | <url> | init | doctor]"
+argument-hint: "[<sentence> | <ticket-ref> | <url> | init | doctor | rules …]"
 ---
 
 ## /kiln:kiln $ARGUMENTS

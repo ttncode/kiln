@@ -135,7 +135,7 @@ Act on `kind`, and on nothing else:
 | `kind` | Do |
 |---|---|
 | `list` | run `kiln list`, print it, stop |
-| `reserved` | a `message` means the word is held for a later version — print it verbatim and stop. No `message` means it is a command: run it, stop |
+| `reserved` | a `message` means the word is held for a later version — print it verbatim and stop. No `message` means it is a command: run it with `rest` as its arguments, and stop. A sentence that merely opens with one of these words is refused here rather than minted as work — say so, and offer to rephrase it |
 | `url` | fetch it with your own tools, then treat the text as a description |
 | `ticket` | fetch the ref with `gh`/`glab`/MCP, then treat the text as a description |
 | `work` | resume — see step 6 |
@@ -414,6 +414,22 @@ Say the two things kiln cannot do, in your own words, before the user goes to me
 - **They do not merge atomically.** A forge without cross-project submit can leave the topic
   half-merged. Gerrit says this about its own topics; kiln is not better placed to promise.
 - **The order is yours.** Nothing in the repositories says which depends on which.
+
+### When the user asks for a project rule
+
+They will say it in words — *"controllers must never contain SQL"*, *"every migration needs a
+down()"*. You write it, you choose the glob, and you call the verb. They do not type a command
+and they do not hand-edit a table:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules add <file>.md --trigger "<glob>" --text "<the rule>"
+```
+
+The glob is repo-root relative and must match files that exist — `**/application/controllers/**`,
+`src/auth/**`, `**/*.sql`. The verb refuses one that matches nothing, and prints the three
+questions D20 asks before a rule is kept: what already covers those files, the line count before
+and after, and the routing. **Read them back to the user.** Question one is theirs to answer —
+if an existing rule already covers those files, offer to edit that file instead.
 
 ### Where a temp file goes
 

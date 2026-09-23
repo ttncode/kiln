@@ -674,7 +674,19 @@ function runRulesAdd(argv) {
   return 0;
 }
 
+const RULES_USAGE = `kiln rules — the project's own rules, routed by path glob
+
+  kiln rules add <file>.md --trigger "<glob>" [--text "<the rule>"]
+      Write a rule and route it. Adds only; it never rewrites or removes one.
+
+  kiln rules <id> [--stage plan|review]
+      Print the rules routed to the files that stage names.
+
+In a session you do not type either: say what the rule is, and the orchestrator
+calls the first one for you.`;
+
 function runRules(argv) {
+  if (argv.length === 0) return out(RULES_USAGE) ?? 0;
   if (argv[0] === "add") return runRulesAdd(argv.slice(1));
   const [id, ...rest] = argv;
   const stage = flag(rest, "--stage") ?? "plan";
