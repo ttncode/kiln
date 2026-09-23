@@ -1,7 +1,7 @@
 {
   "name": "kiln",
   "description": "Let an AI coding agent work a whole ticket without watching every command it runs.",
-  "version": "1.0.0-rc.22",
+  "version": "1.0.0-rc.23",
   "homepage": "https://github.com/ttncode/kiln",
   "repository": "https://github.com/ttncode/kiln",
   "license": "MIT",
