@@ -41,12 +41,15 @@ implementation skill, writing product code, scaffolding, installing
 product dependencies, or creating an external project, complete the
 selected path's prerequisites:
 
-- Spike: the human partner approves the question and probe.
-- Bounded: the human partner approves the short in-chat design.
-- Full: the human partner reviews and approves the written spec,
-  then reviews the written implementation plan and selects its execution
-  method. Conversational design approval only permits writing the spec;
-  written-spec approval only permits invoking writing-plans.
+- Spike: the human partner approves the question and probe at the
+  `probe` gate — an explicit yes, recorded by kiln.
+- Bounded: the human partner agrees the short in-chat design; the plan
+  gate then records their approval of the short `plan.md` that
+  kiln-writing-plans writes from it.
+- Full: the human partner reviews and approves the written spec at the
+  `spec` gate, then the written plan at the `plan` gate. Conversational
+  design approval only permits writing the spec; written-spec approval
+  only permits invoking kiln-writing-plans.
 
 A reply approves the stage actually presented. Approval of an idea or
 feature scope does not approve artifacts that do not exist yet. Resume
@@ -57,15 +60,15 @@ allowed while those prerequisites remain incomplete.
 
 ## Three Paths
 
-Before your first question, classify the request and say the
-classification out loud — "this looks bounded, so I'll present a short
-design here rather than write a spec" — so your human partner can
-override it:
+kiln classifies at the end of INVESTIGATE, and says it out loud so your
+human partner can override it — usually before this skill is invoked.
+If what you learn here changes the path, say so and let the orchestrator
+ratchet it up:
 
 - **Spike** — a feasibility question ("can we...", "is it possible...",
   "quick and dirty is fine") whose output is an answer, not code you
   keep. Present the question and what you'll try in 2-3 sentences, get
-  a nod, then find out as cheaply as correctness allows. No design
+  an explicit yes at the probe gate, then find out as cheaply as correctness allows. No design
   doc, no spec file. Report findings as a recommendation; anything you
   built stays labeled throwaway.
 - **Bounded** — a well-scoped change to code that already exists in
@@ -75,9 +78,10 @@ override it:
   flow to change, the task is not bounded. Ask the clarifying
   questions that matter, present a short design IN CHAT (a few
   sentences to a few short paragraphs), and STOP. Implementation
-  starts only after your human partner says yes to that design — a
-  bounded task's approval is as hard a gate as the full
-  path's. No spec file, no implementation plan document.
+  starts only after the plan gate — a bounded task's approval is as
+  hard a gate as the full path's. No spec file; kiln-writing-plans turns
+  the agreed design into a short `plan.md`, and that is what the plan
+  gate approves.
 - **Full** — new projects, new subsystems, changes that
   restructure how components fit together or alter interfaces others
   depend on. Follow the full process: questions, approaches, sectioned
@@ -130,7 +134,7 @@ your path and complete them in order.
 **Spike:**
 1. **Explore project context** — enough to frame the probe
 2. **Present question + probe plan** — 2-3 sentences
-3. **Get approval** — a nod is enough
+3. **Get approval** — an explicit yes, recorded at the probe gate
 4. **Investigate** — as cheaply as correctness allows
 5. **Report findings** — a recommendation; label anything built as throwaway
 
@@ -139,7 +143,7 @@ your path and complete them in order.
 2. **Ask clarifying questions** — one at a time, the ones that matter
 3. **Present short design in chat** — approach, files touched, testing
 4. **Get approval** — STOP and wait for an explicit yes; presenting the design and starting in the same breath is skipping the gate
-5. **Implement** — proceed with the normal development workflow (TDD applies); no plan document
+5. **Write the plan** — invoke kiln-writing-plans for a short `plan.md`; implementation starts after the plan gate
 
 **Full:**
 1. **Explore project context** — check files, docs, recent commits
@@ -162,7 +166,7 @@ digraph brainstorming {
     "Present short design in chat" [shape=box];
     "Human approves?" [shape=diamond];
     "Investigate; report recommendation" [shape=doublecircle];
-    "Implement via normal workflow (no plan doc)" [shape=doublecircle];
+    "Short plan via kiln-writing-plans" [shape=doublecircle];
     "Explore project context" [shape=box];
     "Ask clarifying questions" [shape=box];
     "Propose 2-3 approaches" [shape=box];
@@ -171,7 +175,7 @@ digraph brainstorming {
     "Write design doc" [shape=box];
     "Spec self-review\n(fix inline)" [shape=box];
     "User reviews spec?" [shape=diamond];
-    "Invoke writing-plans skill" [shape=doublecircle];
+    "Invoke kiln-writing-plans skill" [shape=doublecircle];
     "Hidden complexity? Upgrade path" [shape=box];
 
     "Classify: spike / bounded / full" -> "Present question + probe (2-3 sentences)" [label="spike"];
@@ -181,7 +185,7 @@ digraph brainstorming {
     "Ask clarifying questions (bounded)" -> "Present short design in chat";
     "Present short design in chat" -> "Human approves?";
     "Human approves?" -> "Investigate; report recommendation" [label="spike: yes"];
-    "Human approves?" -> "Implement via normal workflow (no plan doc)" [label="bounded: yes"];
+    "Human approves?" -> "Short plan via kiln-writing-plans" [label="bounded: yes"];
     "Hidden complexity? Upgrade path" -> "Classify: spike / bounded / full";
     "Explore project context" -> "Ask clarifying questions";
     "Ask clarifying questions" -> "Propose 2-3 approaches";
@@ -192,21 +196,20 @@ digraph brainstorming {
     "Write design doc" -> "Spec self-review\n(fix inline)";
     "Spec self-review\n(fix inline)" -> "User reviews spec?";
     "User reviews spec?" -> "Write design doc" [label="changes requested"];
-    "User reviews spec?" -> "Invoke writing-plans skill" [label="approved"];
+    "User reviews spec?" -> "Invoke kiln-writing-plans skill" [label="approved"];
 }
 ```
 
 **Terminal states are path-bound.** Full: the ONLY skill you
 invoke after brainstorming is kiln-writing-plans — never frontend-design,
-mcp-builder, or any other implementation skill. Bounded: after
-approval, implementation proceeds directly through the normal
-development workflow; no plan document. Spike: the terminal state is a
-reported recommendation.
+mcp-builder, or any other implementation skill. Bounded: after the
+design is agreed, kiln-writing-plans writes a short `plan.md` for the
+plan gate. Spike: the terminal state is a reported recommendation.
 
 ## The Process
 
 The subsections below serve the bounded and full paths (a
-spike stops at "present the probe, get a nod"). Sections from
+spike stops at "present the probe, get an explicit yes"). Sections from
 **Exploring approaches** onward are full-path depth — for
 bounded work, context plus a few questions plus a short in-chat design
 is the whole process.
@@ -269,14 +272,14 @@ Fix any issues inline. No need to re-review — just fix and move on.
 **User Review Gate:**
 After the spec review loop passes, ask the user to review the written spec before proceeding:
 
-> "Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
+> "Spec written to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
 
 Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
 
 **Implementation:**
 
-- Invoke the writing-plans skill to create a detailed implementation plan
-- Do NOT invoke any other skill. writing-plans is the next step.
+- Invoke the kiln-writing-plans skill to create a detailed implementation plan
+- Do NOT invoke any other skill. kiln-writing-plans is the next step.
 
 ## Visual Companion
 
@@ -295,7 +298,8 @@ A browser-based companion for showing mockups, diagrams, and visual options duri
 A question about a UI topic is not automatically a visual question. "What does personality mean in this context?" is a conceptual question — use the terminal. "Which wizard layout works better?" is a visual question — use the browser.
 
 If they agree to the companion, read the detailed guide before proceeding:
-`skills/brainstorming/visual-companion.md`
+`visual-companion.md`, in this skill's own directory
+(`${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/visual-companion.md`).
 
 ## Verification
 

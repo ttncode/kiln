@@ -35,12 +35,12 @@ The server watches a directory for HTML files and serves the newest one to the b
 ```bash
 # Start AFTER the user approves the companion. --open auto-opens their browser on
 # the first screen; --project-dir persists mockups and enables same-port restart.
-bash scripts/start-server.sh --project-dir /path/to/project --open
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/start-server.sh" --project-dir "$PWD/.kiln/tmp/<id>" --open
 
 # Returns: {"type":"server-started","port":52341,
 #           "url":"http://localhost:52341/?key=ab12…",
-#           "screen_dir":"/path/to/project/.superpowers/brainstorm/12345-1706000000/content",
-#           "state_dir":"/path/to/project/.superpowers/brainstorm/12345-1706000000/state"}
+#           "screen_dir":"<project>/.kiln/tmp/<id>/.superpowers/brainstorm/12345-1706000000/content",
+#           "state_dir":"<project>/.kiln/tmp/<id>/.superpowers/brainstorm/12345-1706000000/state"}
 ```
 
 Save `screen_dir` and `state_dir` from the response. With `--open`, the browser opens itself when you push the first screen — you don't need to ask the user to open it, but still share the URL as a fallback (headless/remote setups won't auto-open).
@@ -53,16 +53,16 @@ the network can't read the screens or inject events. After the first load the
 browser remembers the key via a cookie, so reloads and `/files/*` assets work
 without repeating it.
 
-**Finding connection info:** The server writes its startup JSON to `$STATE_DIR/server-info`. If you launched the server in the background and didn't capture stdout, read that file to get the URL and port. When using `--project-dir`, check `<project>/.superpowers/brainstorm/` for the session directory.
+**Finding connection info:** The server writes its startup JSON to `$STATE_DIR/server-info`. If you launched the server in the background and didn't capture stdout, read that file to get the URL and port. When using `--project-dir`, check `.kiln/tmp/<id>/.superpowers/brainstorm/` for the session directory.
 
-**Note:** Pass the project root as `--project-dir` so mockups persist in `.superpowers/brainstorm/` and survive server restarts. Without it, files go to `/tmp` and get cleaned up. Remind the user to add `.superpowers/` to `.gitignore` if it's not already there.
+**Note:** In a kiln run, pass `.kiln/tmp/<id>` as `--project-dir`. That is the one place the run may write before its first gate — the brainstorm happens before any gate — and it is gitignored, so mockups persist across server restarts without reaching a pull request. Another directory is refused: the project's own tree is source until the plan gate, and `/tmp` is outside the project. `kiln ship` removes it with the rest of the run's scratch.
 
 **Launching the server by platform:**
 
 **Claude Code:**
 ```bash
 # Default mode works — the script backgrounds the server itself.
-bash scripts/start-server.sh --project-dir /path/to/project --open
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/start-server.sh" --project-dir "$PWD/.kiln/tmp/<id>" --open
 ```
 
 On Windows, the script auto-detects and switches to foreground mode (which blocks the tool call). Use `run_in_background: true` on the Bash tool call so the server survives across conversation turns, then read `$STATE_DIR/server-info` on the next turn to get the URL and port.
@@ -71,14 +71,14 @@ On Windows, the script auto-detects and switches to foreground mode (which block
 ```bash
 # Codex reaps background processes. The script auto-detects CODEX_CI and
 # switches to foreground mode. Run it normally — no extra flags needed.
-bash scripts/start-server.sh --project-dir /path/to/project --open
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/start-server.sh" --project-dir "$PWD/.kiln/tmp/<id>" --open
 ```
 
 **Gemini CLI:**
 ```bash
 # Use --foreground and set is_background: true on your shell tool call
 # so the process survives across turns
-bash scripts/start-server.sh --project-dir /path/to/project --open --foreground
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/start-server.sh" --project-dir "$PWD/.kiln/tmp/<id>" --open --foreground
 ```
 
 **Copilot CLI:**
@@ -87,7 +87,7 @@ bash scripts/start-server.sh --project-dir /path/to/project --open --foreground
 # server survives across turns. Keep --foreground so the harness, not the
 # script, owns backgrounding. The launcher is a .sh, so invoke it via bash
 # (on Windows, call Git Bash's bash.exe from the PowerShell tool).
-bash scripts/start-server.sh --project-dir /path/to/project --open --foreground
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/start-server.sh" --project-dir "$PWD/.kiln/tmp/<id>" --open --foreground
 ```
 
 **Other environments:** The server must keep running in the background across conversation turns. If your environment reaps detached processes, use `--foreground` and launch the command with your platform's background execution mechanism.
@@ -95,8 +95,8 @@ bash scripts/start-server.sh --project-dir /path/to/project --open --foreground
 If the URL is unreachable from your browser (common in remote/containerized setups), bind a non-loopback host:
 
 ```bash
-bash scripts/start-server.sh \
-  --project-dir /path/to/project \
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/start-server.sh" \
+  --project-dir "$PWD/.kiln/tmp/<id>" \
   --host 0.0.0.0 \
   --url-host localhost
 ```
@@ -288,12 +288,12 @@ If `$STATE_DIR/events` doesn't exist, the user didn't interact with the browser 
 ## Cleaning Up
 
 ```bash
-bash scripts/stop-server.sh $SESSION_DIR
+bash "${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/stop-server.sh" $SESSION_DIR
 ```
 
-If the session used `--project-dir`, mockup files persist in `.superpowers/brainstorm/` for later reference. Only `/tmp` sessions get deleted on stop.
+Mockup files persist in `.kiln/tmp/<id>/.superpowers/brainstorm/` until `kiln ship` removes the run's scratch.
 
 ## Reference
 
-- Frame template (CSS reference): `scripts/frame-template.html`
-- Helper script (client-side): `scripts/helper.js`
+- Frame template (CSS reference): `${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/frame-template.html`
+- Helper script (client-side): `${CLAUDE_PLUGIN_ROOT}/skills/kiln-brainstorming/scripts/helper.js`

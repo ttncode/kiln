@@ -20,15 +20,20 @@ Subagent (general-purpose):
 
     [PLAN_OR_REQUIREMENTS]
 
-    ## Git Range to Review
+    ## The Change to Review
 
     **Base:** [BASE_SHA]
-    **Head:** [HEAD_SHA]
+
+    Nothing is committed until the change ships, so the change is the
+    working tree against the base — not a range of commits:
 
     ```bash
-    git diff --stat [BASE_SHA]..[HEAD_SHA]
-    git diff [BASE_SHA]..[HEAD_SHA]
+    git diff --stat [BASE_SHA]
+    git diff [BASE_SHA]
+    git status --short   # new files are in no diff; read each one it lists
     ```
+
+    `.kiln/` is the run's own record, not the change.
 
     ## The spec is a vision document
 
@@ -154,8 +159,7 @@ Subagent (general-purpose):
 **Placeholders:**
 - `[DESCRIPTION]` — brief summary of what was built
 - `[PLAN_OR_REQUIREMENTS]` — what it should do (plan file path, task text, or requirements)
-- `[BASE_SHA]` — starting commit
-- `[HEAD_SHA]` — ending commit
+- `[BASE_SHA]` — the work's `base`, from `.kiln/work/<id>/state.json`
 
 **Reviewer returns:** Strengths, Issues (Critical / Important / Minor), Recommendations, Assessment
 

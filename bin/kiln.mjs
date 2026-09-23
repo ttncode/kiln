@@ -1051,7 +1051,7 @@ function openedAt(root, { id, rest }) {
 function autoLine(path, { config, state }) {
   const verdict = autoEligible(path, { config, state });
   return verdict.eligible
-    ? `auto mode is ON for ${path} (${verdict.from}): kiln will rule its gates and say so in \`kiln report\`.`
+    ? `auto mode is ON for ${path} (${verdict.from}): kiln will rule its gates and print each ruling as it makes it.`
     : `auto mode is off for ${path} (${verdict.reason}) — every gate stops for you.`;
 }
 

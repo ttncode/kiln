@@ -155,15 +155,18 @@ test("the orchestrator names the move for a blocking unknown, not just the ban",
 
 /**
  * The first real run typed `1` twice at a gate that offered numbered options and refused
- * numbers. The classifier is right — a bare `1` is a click, not a reading — so the menu
- * was the thing that had to go.
+ * numbers. The classifier is right — a bare `1` is a click, not a reading — and D113 kept the
+ * menu anyway: every label is a whole sentence naming what is approved, and a `1` is expanded
+ * to that sentence before it is recorded. The gate block used to carry both forms at once,
+ * "Reply `approve`" above a numbered menu, which is two answers to one question.
  */
-test("a gate asks for a word, and does not offer a number it will refuse", () => {
+test("a gate offers one form of answer: a numbered menu of whole sentences, a number expanded to its sentence", () => {
   const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
   const gate = body.slice(body.indexOf("GATE — plan"), body.indexOf("GATE — plan") + 400);
 
-  assert.doesNotMatch(gate, /^\s+1\. /m, "a numbered menu invites a number");
-  assert.match(gate, /Reply `approve`/, "and the gate has to say what it does accept");
+  assert.doesNotMatch(gate, /Reply `approve`/, "one form of answer, not two");
+  assert.match(gate, /^1\. Approve this plan as written \(recommended\)$/m, "the label names what is approved");
+  assert.match(body, /expand it to that line's text/, "and a number is never recorded as a number");
   assert.match(body, /--predicted/, "the plan gate's claim set is not optional");
 });
 
@@ -322,4 +325,68 @@ test("no skill tells the agent that shipping is what releases the claim", () => 
       `${name}: the claim is released at the review gate, not by \`ship --opened\``,
     );
   }
+});
+
+/**
+ * SHIP is the run's one commit point (BMAD's policy, and agent-skills'). The forked skills
+ * carried superpowers' commit-per-task steps, so the plan told the implementer to commit
+ * and the design told it not to — and a per-task commit followed by a full verify then left
+ * REVIEW looking at zero files.
+ */
+test("no skill tells the implementer to commit before SHIP", () => {
+  for (const name of ["kiln-implement", "kiln-writing-plans", "kiln-tdd", "kiln-debugging"]) {
+    const { body } = frontmatter(name);
+    assert.doesNotMatch(body, /git commit -m|Frequent commits|Commit as the plan/, `${name} still commits mid-run`);
+  }
+});
+
+/**
+ * A path relative to the working directory is a path relative to the user's project, where
+ * the companion's scripts are not. Every script and guide a skill runs is named from the
+ * plugin's root.
+ */
+test("a skill runs its own scripts from the plugin root, not from wherever the agent stands", () => {
+  for (const name of skillNames()) {
+    for (const path of skillFiles(name)) {
+      const text = readFileSync(path, "utf8");
+      assert.doesNotMatch(text, /bash scripts\/|skills\/brainstorming\//, `${path} names a path that resolves in the user's project`);
+    }
+  }
+});
+
+test("D62: a skill names its siblings by their kiln- names", () => {
+  for (const name of skillNames()) {
+    for (const path of skillFiles(name)) {
+      assert.doesNotMatch(readFileSync(path, "utf8"), /(?<![\w-])writing-plans(?! skill)|(?<!kiln-)writing-plans skill/, `${path} names writing-plans without its kiln- prefix`);
+    }
+  }
+});
+
+/**
+ * A description written as a YAML block scalar (`>` or `|`) is read by this file's parser as
+ * one character long, and would pass every budget above without being measured at all.
+ * agent-skills rejects the same shapes for the same reason (their #494).
+ */
+test("A11: every description is one line, so the budget measures what the harness loads", () => {
+  for (const name of skillNames()) {
+    const block = /^---\n([\s\S]*?)\n---/.exec(frontmatter(name).body)[1];
+    assert.doesNotMatch(block, /^description:\s*[>|]/m, `${name}: a folded description escapes the budget`);
+  }
+});
+
+/**
+ * Each of these fails silently: an unregistered event, a missing matcher, a guard with no
+ * timeout that hangs every call. §1.6 measured that the flat shape registers nothing, and a
+ * hook that times out is allowed.
+ */
+test("A9: hooks.json registers the three entries the dispatcher answers, each with a timeout", () => {
+  const { hooks } = JSON.parse(readFileSync(join(ROOT, "hooks", "hooks.json"), "utf8"));
+  const entries = Object.entries(hooks).flatMap(([event, rows]) => rows.map((row) => ({ event, ...row })));
+  const phases = entries.map((row) => `${row.event}:${row.matcher}:${/dispatch\.mjs" (\S+)$/.exec(row.hooks[0].command)?.[1]}`);
+  assert.deepEqual(phases.sort(), [
+    "PostToolUse:Edit|Write|NotebookEdit:post-edit",
+    "PreToolUse:Bash:pre-bash",
+    "PreToolUse:Edit|Write|NotebookEdit:pre-edit",
+  ]);
+  for (const row of entries) assert.equal(row.hooks[0].timeout, 5, `${row.event} ${row.matcher} has no bound on how long it may hang`);
 });
