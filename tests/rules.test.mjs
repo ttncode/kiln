@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { matchingRules, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { newWork, openNextPass, recordRules } from "../lib/state.mjs";
-import { cleanupFixtures, commitAll, tempRoot, writeFile } from "./helpers/fixture.mjs";
+import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
+import { loadConfig } from "../lib/config.mjs";
+import { runChecks } from "../lib/doctor.mjs";
 import { kiln, nodeProject, ok, state } from "./helpers/journey.mjs";
 
 after(cleanupFixtures);
@@ -384,4 +386,46 @@ test("the budget delta is measured, not asserted", () => {
   const run = ok(root, ["rules", "add", "b.md", "--trigger", "**/*.php", "--text", "four"]);
   const [, before, after] = /(\d+) → (\d+) lines/.exec(run.stdout);
   assert.ok(Number(after) > Number(before), `adding lines has to move the number: ${before} → ${after}`);
+});
+
+/**
+ * Measured on a real monorepo, on the owner's validation run. A rule routed to
+ * `**\/application/controllers/**` was reported by doctor as matching no file here — and the
+ * rule fires perfectly well: `kiln rules` matches the paths a stage names, and those come
+ * from `actualChanged`, which walks the submodules.
+ *
+ * `git ls-files` at a superproject lists a submodule as **one gitlink entry** — `AdminPage`,
+ * not its 71 controllers. So the dead-route check was blind to exactly the code kiln was
+ * installed to guard, and on that project the warning would have stood for every rule anyone
+ * ever wrote. A warning that is always wrong is a warning people stop reading — D89's own
+ * finding, one instrument over.
+ *
+ * Worse in rc.24, which this run predates: `kiln rules add` refuses a glob matching nothing
+ * git lists, so the very rule the owner needed would have been refused outright.
+ */
+function superproject() {
+  const inner = initRepo(tempRoot("kiln-sub-"));
+  writeFile(join(inner, "application", "controllers", "Account.php"), "<?php\n");
+  commitAll(inner, "a controller");
+
+  const root = initRepo(tempRoot("kiln-super-"));
+  writeFile(join(root, "README.md"), "super\n");
+  commitAll(root, "super");
+  git(root, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", inner, "AdminPage"]);
+  commitAll(root, "add AdminPage");
+  writeFile(join(root, ".kiln", "config.json"), JSON.stringify({ schema_version: 1, stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] } }, null, 2));
+  writeFile(join(root, ".kiln", "rules", "index.md"), HEADER);
+  return root;
+}
+
+test("a submodule's files are not invisible to the router's checks", () => {
+  const root = superproject();
+  assert.equal(git(root, ["ls-files"]).includes("application/controllers"), false,
+    "the superproject lists the submodule as one gitlink entry — this is the trap");
+
+  writeFile(join(root, ".kiln", "rules", "sql.md"), "No SQL in controllers.\n");
+  writeFile(join(root, ".kiln", "rules", "index.md"), `${HEADER}| **/application/controllers/** | sql.md |\n`);
+
+  const routing = runChecks(root, loadConfig(root)).filter((row) => row.title === "rules routing");
+  assert.deepEqual(routing.map((row) => row.status), ["ok"], `a live route reported as dead: ${JSON.stringify(routing)}`);
 });
