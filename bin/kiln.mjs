@@ -1295,8 +1295,8 @@ function runReport(argv) {
 }
 
 function runDna(argv) {
-  const { root } = loadConfig(process.cwd());
-  return runDnaCommand(root, { argv, out });
+  const { root, config } = loadConfig(process.cwd());
+  return runDnaCommand(root, { argv, out, config });
 }
 
 const COMMANDS = {
