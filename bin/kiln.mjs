@@ -173,14 +173,17 @@ export function setPath(target, assignment) {
  * a migrate endpoint) got them recorded under `cmd` and `"steps": []` beside them, which
  * is the config a real setup run produced and `kiln verify` then reported green over.
  *
- * Re-deriving only when the answer is still empty keeps a hand-written `--set
- * stack.steps=...` authoritative.
+ * The first fix re-derived only when the steps were still empty, and that missed the answer
+ * init asks for by name: `--set stack.cmd.test_fast=...` on a project whose `test` was
+ * detected left `steps` at `[unit]`, so the fast phase the user had just filled stayed empty
+ * and the check after every task refused. Measured on a real session's first `init`. The
+ * steps now follow the commands unless the caller wrote the steps themselves.
  */
 function applyOverrides(config, argv) {
-  for (let i = 0; i < argv.length - 1; i += 1) {
-    if (argv[i] === "--set") setPath(config, argv[i + 1]);
-  }
-  if (config.stack.steps.length === 0) config.stack.steps = stepsFor(config.stack.cmd, stackOrNull(config.stack.id));
+  const assignments = argv.filter((_, index) => argv[index - 1] === "--set");
+  for (const assignment of assignments) setPath(config, assignment);
+  const stepsWritten = assignments.some((assignment) => assignment.startsWith("stack.steps="));
+  if (!stepsWritten) config.stack.steps = stepsFor(config.stack.cmd, stackOrNull(config.stack.id));
   return config;
 }
 
@@ -281,7 +284,7 @@ function runInit(argv) {
   }
   reportDetection(detected.stack);
   out(`integration branch: ${integrationBranch(detected)}`);
-  out(`${planInit(root).missing.length} file(s) to write`);
+  out(`${planInit(root).missing.length} file(s) to write, and the push floor wherever it is missing`);
   return writeInit(root, { config, questions, argv, configured });
 }
 

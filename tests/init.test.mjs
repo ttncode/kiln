@@ -369,3 +369,26 @@ test("a second init still says how to start", () => {
   const again = spawnSync(process.execPath, [bin, "init"], { cwd: root, encoding: "utf8" });
   assert.match(again.stdout.trim().split("\n").at(-1), /Already set up\. \/kiln:kiln/);
 });
+
+/**
+ * Measured on a real session's first `init`: the user answered the fast-subset question, the
+ * answer was stored under `cmd`, and `steps` stayed `[unit]` — derived before the answer was
+ * read. The per-task check then refused on the very project that had just been asked for it.
+ */
+test("D95: answering the fast-subset question at init gives the fast phase a step", () => {
+  const root = initRepo(nodeProject());
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "init", "--set", "stack.cmd.test_fast=npm test"], { cwd: root, encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  const written = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+  assert.deepEqual(written.stack.steps.map((step) => step.phase ?? "full"), ["fast", "full"]);
+});
+
+test("a step list the user wrote is kept as written", () => {
+  const root = initRepo(nodeProject());
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const steps = '[{"id":"only","run":"${cmd.test}"}]';
+  spawnSync(process.execPath, [bin, "init", "--set", "stack.cmd.test_fast=npm test", "--set", `stack.steps=${steps}`], { cwd: root, encoding: "utf8" });
+  const written = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+  assert.deepEqual(written.stack.steps.map((step) => step.id), ["only"]);
+});
