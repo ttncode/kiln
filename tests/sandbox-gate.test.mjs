@@ -422,3 +422,42 @@ test("a symlink pointing at nothing says so, rather than naming a file that is n
   const message = blockMessage("pre-edit", payload({ file: link, root: project.root }));
   assert.match(message, /points at something that does not exist/);
 });
+
+/**
+ * D19 listed three allowed writes: project source, `.kiln/work/<active-id>/`, and
+ * `.kiln/tmp/<active-id>/`. The third was never implemented, so scratch space was judged as
+ * source and needed the plan gate — which is exactly what an agent has not got yet while it
+ * is investigating.
+ *
+ * Measured on a real run: every path an agent might put a temp file in was refused before
+ * the plan gate. The harness's own scratchpad is outside the project, so the sandbox refuses
+ * it; the repository refuses it for want of a gate; and `.kiln/tmp/` refused it for the same
+ * reason. Nowhere to write, and no message naming anywhere.
+ */
+test("a temp file has somewhere to go before the plan gate", async () => {
+  const project = kilnProject();
+  assert.equal(await edit(join(project.root, ".kiln", "tmp", "42", "notes.txt"), project), ALLOW, "no gate is approved here");
+  assert.equal(await bash(`echo x > ${join(project.root, ".kiln", "tmp", "42", "out.log")}`, project), ALLOW, "and through the shell");
+  assert.equal(await edit(project.source, project), BLOCK, "source still needs its gate");
+});
+
+test("scratch belongs to one work, like its artifacts do", async () => {
+  const project = kilnProject();
+  assert.equal(await edit(join(project.root, ".kiln", "tmp", "99", "notes.txt"), project), BLOCK, "another run's step logs are its evidence");
+  assert.equal(await edit(join(project.root, ".kiln", "tmp", "loose.txt"), project), BLOCK, "and the tree root belongs to nobody");
+});
+
+/**
+ * kiln cannot verify that a path outside the project is the harness's scratchpad — it is
+ * handed a command, not the harness's configuration, and matching `/tmp/claude-*` would be
+ * the guessing this project refuses. So the boundary does not move; what changes is that the
+ * refusal names a place that exists. A block naming nowhere to go is the shape that makes an
+ * agent invent one.
+ */
+test("a write outside the project names the place a temp file does belong", async () => {
+  const project = kilnProject();
+  const message = blockMessage("pre-edit", payload({ file: "/tmp/somewhere-else/notes.txt", root: project.root }));
+  assert.match(message, /outside the project root/);
+  assert.match(message, /\.kiln\/tmp\/42\//, "the remedy is a path, not a principle");
+  assert.match(message, /gitignored/);
+});
