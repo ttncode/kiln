@@ -424,6 +424,13 @@ Ask what has to be opened before opening anything:
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id>
 ```
 
+Once they exist, hand the urls back. A work that does not say it shipped goes on claiming
+the files it predicted, and the next work touching one of them halts against it:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id> --opened <url,url>
+```
+
 One unit of work can span several repositories — a superproject and its submodules — and
 each one needs its own pull request. The work id is the **topic** they share, which is how
 Gerrit and Android's `repo` link changes across hundreds of repositories, so no new concept
@@ -500,4 +507,4 @@ Before you say the work is done:
 - [ ] `kiln rules` ran at PLAN and at REVIEW, and every rule it printed is either satisfied or answered in writing.
 - [ ] The full step set ran and every exit code is recorded.
 - [ ] The SHIP commit named its paths.
-- [ ] A pull request exists for **every** repository `kiln ship` listed, each on a branch and each carrying the topic.
+- [ ] A pull request exists for **every** repository `kiln ship` listed, each on a branch and each carrying the topic, and their urls went back to `kiln ship --opened`.
