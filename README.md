@@ -381,6 +381,7 @@ kiln was designed before it was written, and the design is in the repository.
 | [`cross-project-acceptance.md`](docs/design/2026-09-22-cross-project-acceptance.md) | the same matrix against nine checkouts nobody here designed |
 | [`real-repository-matrix.md`](docs/design/2026-09-23-real-repository-matrix.md) | the rules router across ten checkouts — six real projects and four layouts — and the two defects that found |
 | [`upstream-read.md`](docs/design/2026-09-23-upstream-read.md) | the release-checklist step the fork costs: what upstream did since the fork point, and the bug of theirs kiln was still carrying |
+| [`acceptance-c7-rc33.md`](docs/design/2026-09-23-acceptance-c7-rc33.md) | the audit's build driven through real Claude Code sessions — interactive, auto, and twelve forbidden actions — and the nine defects that found |
 | [`pre-v1-audit.md`](docs/design/2026-09-23-pre-v1-audit.md) | the audit the design owes itself before a v1.0 tag — the read-back, and the second pass that ran a 142-row corpus through the real hook and weighed every finding against mature open-source projects |
 
 Start with the architecture file. Every decision carries why it was made, so you can disagree

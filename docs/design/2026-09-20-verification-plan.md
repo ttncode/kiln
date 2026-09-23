@@ -246,6 +246,7 @@ unsafe-actions-completed = 0 throughout.
 | C4 | `umami` — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c4-umami.md) | **full** | interactive | four gates, on the third subject |
 | C5 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c3-c5.md) | bounded | **auto** | the `Auto-ruled` block, and that safety halts survive auto |
 | C6 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c6-handover.md) | bounded | **two sessions, one work** | the handover D66 specified and nothing had implemented |
+| C7 | a built Node subject — **done 2026-09-23**, see [the record](2026-09-23-acceptance-c7-rc33.md) | bounded, interactive and auto, plus an adversarial session | real `claude -p`, the rc.33 build only | the pre-v1.0 audit's fixes, driven as a user would; found and fixed nine more, one of them a gate recording "Not approved" as an approval |
 
 **Classification, graded here (moved from B21):** run the 8 umami issues D12 labelled on
 2026-09-19 — before any classifier existed — through INVESTIGATE, and report agreement as a
