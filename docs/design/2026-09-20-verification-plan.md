@@ -11,7 +11,7 @@
 > 2. **UNIOSS is not cloned, read, or contacted.** `stack-php-ci3` is exercised against a fixture
 >    that reproduces its shape. No company credentials, no remote, no merge request.
 >
-> Derived from D1–D85 and §3h. Last updated: 2026-09-20.
+> Derived from D1–D147 and §3h. Last updated: 2026-09-23.
 
 ---
 
@@ -35,19 +35,21 @@ stranger, and real wall-clock cost.
 
 ## 1. Fixtures
 
-Each is created by a script under `tests/fixtures/`, from nothing, on every run — never a
-committed tree, so a fixture cannot drift from the script that documents it.
+Each is built by a helper under `tests/helpers/`, from nothing, on every run — never a
+committed tree, so a fixture cannot drift from the code that documents it. The plan named a
+`tests/fixtures/` directory; the helpers are what was built, and the table says which one
+stands for each row. Where a shape is assembled inside the test that needs it, it says so.
 
-| Fixture | Shape | Exercises |
-|---|---|---|
-| `fx-node` | git repo · `package.json` · a test script · single repo · tracker none | the default path |
-| `fx-node-migrate` | `fx-node` + a declared `migrate` effect and a step requiring it | D30's effect point, second adapter (D61) |
-| `fx-php-ci3` | `composer.json` · timestamped migrations dir · `v3-master` as integration branch | `stack-php-ci3`, its two guards |
-| `fx-multi` | a workspace root that is **not** a git repo, holding 4 checkouts: 2 ticket-owning apps, 2 submodules, mixed integration branch names | D38, D81, sandbox boundary |
-| `fx-nogit` | a plain directory | D60.5 |
-| `fx-empty` | `git init`, zero commits | D60.5 |
-| `fx-bom` | config with a UTF-8 BOM and CRLF line endings | D60.6 |
-| `repo-null` | every port expressible, `steps: []` | §4 — ports are expressible, runs in seconds |
+| Fixture | Shape | Exercises | Built as |
+|---|---|---|---|
+| `fx-node` | git repo · `package.json` · a test script · single repo · tracker none | the default path | `nodeProject()` in `helpers/journey.mjs` |
+| `fx-node-migrate` | `fx-node` + a declared `migrate` effect and a step requiring it | D30's effect point, second adapter (D61) | `nodeProject({ steps })` with the effect in config, in `stacks.test.mjs` |
+| `fx-php-ci3` | `composer.json` · timestamped migrations dir · `v3-master` as integration branch | `stack-php-ci3`, its two guards | `kilnProject({ stack: "php-ci3" })` for the guards; `monorepo()` for `v3-master` |
+| `fx-multi` | a workspace root that is **not** a git repo, holding 4 checkouts: 2 ticket-owning apps, 2 submodules, mixed integration branch names | D38, D81, sandbox boundary | `monorepo()` — a superproject **with** its own git repo. The non-git workspace root is covered only by the sandbox-boundary test that builds one inline |
+| `fx-nogit` | a plain directory | D60.5 | `tempRoot()` inline |
+| `fx-empty` | `git init`, zero commits | D60.5 | `initRepo()` with no commit, inline |
+| `fx-bom` | config with a UTF-8 BOM and CRLF line endings | D60.6 | inline, in `config.test.mjs`, `doctor.test.mjs` and `failclosed.test.mjs` |
+| `repo-null` | every port expressible, `steps: []` | §4 — ports are expressible, runs in seconds | `nodeProject({ steps: [] })` |
 
 ---
 
@@ -69,7 +71,9 @@ The seven D7 tests, plus the static checks. Binary: one failure fails the build.
 | A10 | no `superpowers:`-prefixed reference survives in a forked skill, and every skill one names is a skill kiln ships | D69 |
 | A11 | budget: aggregate ≤ 6,000 chars · per-description ≤ 500 warns · a description containing `v\d+\.\d+` or a changelog verb is rejected | §2 Superseded |
 | A12 | every file under `rules/` appears in `index.md`'s trigger table, **every row resolves**, and a routed rule reaches the stage its glob matches | D20, D101 |
-| A13 | lint, 8 of 10 rules; only the visual companion under `vendor/` excluded | D26, D69 |
+| A13 | lint, all 10 rules; only the visual companion (`skills/kiln-brainstorming/scripts/`) excluded; shellcheck over every shell script | D26, D69 |
+| A15 | the guard corpus: every must-deny, must-allow and ceiling row, through the real dispatcher, each deny checked against its reason | D125 |
+| A16 | no `catch` in the guard layer ends in ALLOW without saying why | D33, D133 |
 | A14 | version-sync across manifests | D17 |
 
 ---
@@ -170,8 +174,9 @@ Grouped by what a developer is actually doing. Every row is one `node --test` ca
 |---|---|---|
 | B51 | `in_progress` | resumes at the recorded step, and runs a **cheap preflight** rather than trusting the checkboxes |
 | B52 | `halted` | re-presents the halt menu; never continues past it |
-| B53 | `shipped` → pass N+1 | `gates` **cleared**, `predicted[]` **cleared**, `base` and `last_verified` advanced to the shipped HEAD, `carry_over[]` untouched |
-| B54 | pass N+1, `plan.md` byte-identical | the next source write is still **blocked** — the unchanged hash must not be trusted across the boundary (D85) |
+| B53 | `shipped`, resolved again | not reopened: `follow_up` with the next `<id>.<n>`; `open` on the shipped id refuses and names the command (D136) |
+| B54 | the follow-up opened with `--follows` | no gate carried over: the first source write is **blocked** until its own plan gate (D136) |
+| B54a | a full VERIFY failing after the review gate | the work returns to `in_progress`, the review approval is dropped, `verify_failed` is recorded, and the fix can be made (D137) |
 
 ### 3.9 Multi-repo
 

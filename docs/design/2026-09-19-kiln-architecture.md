@@ -1,7 +1,7 @@
 # kiln — Architecture Design
 
 > **STATUS: BUILD-READY.** kiln's own third path is named `full`, not upstream's `architectural` (D68).
-> Section 1 (v1 scope) and Sections A–H all locked. Decision log runs to **D89** after five
+> Section 1 (v1 scope) and Sections A–H all locked. The decision log runs to **D147**. It reached D89 after five
 > review passes on 2026-09-20: a pre-build audit (7 blockers, 10 high, 14 medium → D48–D62), the
 > **pre-P0 hook test, which PASSED** — a `PreToolUse` hook does block a real write in Claude Code
 > 2.1.270, and ten further measured answers are in **§1.6** → D63–D64 — a source review of what
@@ -12,15 +12,15 @@
 > D77–D84), plus **D85** from a closing attack on that pass's own fixes. Findings and evidence
 > live in **`2026-09-19-design-audit.md`**, the companion to this file.
 > **Built.** P0–P5 are complete, six acceptance runs are recorded, and the decision log gained
-> **D86–D89** from building it and running it. What remains for a v1.0 tag is the four
-> human-graded scorecard lines; see `2026-09-21-acceptance-c6-handover.md`.
-> **One decision is config-only at v1, and is labelled rather than implied:** D81's per-module
-> `integration_branch` map is accepted, validated and stored, and nothing in v1 reads it per
-> module — the drift check that does arrives with the Knowledge tier (D22, D82). `kiln doctor`
-> reports the map and names the branch every v1 reader actually gets, so it cannot pass for
-> being in force.
-> Nothing is parked. Q2 and Q3 remain open by design and block nothing (§5).
-> Last updated: 2026-09-20.
+> **D86–D124** from building it and running it on real projects, and **D125–D147** from the
+> pre-v1.0 audit that read this file against the product and against mature open-source
+> projects. Tier D is graded (`2026-09-21-acceptance-c6-handover.md`). What remains for a v1.0
+> tag is one validation run on a production repository, on the build that carries D125–D147.
+> **D81's per-module `integration_branch` map is read for protection** — every module's
+> shipping branch is protected whether or not it is listed — and by `kiln doctor`. The drift
+> check that would read it per module arrives with the Knowledge tier (D22, D82).
+> Nothing is parked. Q3 remains open by design and blocks nothing (§5).
+> Last updated: 2026-09-23.
 >
 > **This file is the durable state.** If the conversation is lost, resume from here —
 > nothing below needs to be re-derived. See §6 "How to resume".
@@ -383,7 +383,57 @@ recorded here rather than left in a pull request. Evidence:
 | **D123** | **A stack kiln never detected is not a stack kiln cannot serve** | `init` writes `stack.id: "unknown"` when detection recognises nothing — D92's ask-the-user, not a guess — and there is no `stacks/unknown.json` and no intention of one. The hook looked it up anyway: `loadStack` threw, the throw reached `main()`'s catch-all, and **every edit in the project** came back *"This is a bug in kiln, not in your change. Run `kiln doctor`"*, while doctor named the config line correctly. Any project outside the two shipped stacks met that on its first edit after `init`, with nothing open and nothing wrong. Found while reproducing D122 on a bare Python repository. Two situations were being treated as one: the sentinel now contributes no guards, and a stack **named** and missing still blocks — that one is the project's own guards silently not running, which D33 refuses to fail open on — with a message naming `stack.id` instead of blaming kiln. | 09-23 |
 | **D124** | **A promise kiln makes in a message is kiln's to keep** | Every sandbox refusal ends with *"A temp file goes in `.kiln/tmp/<id>/` — inside the project, gitignored, and removed at the end of SHIP"*, and the orchestrator says the same. Nothing removed it. Worse, the run could not remove it either: a work leaves `activeWorks` at the **review gate**, so one step before the run ends the session stops owning its own scratch tree, and the refusal it then met — *"a work directory, and this session has no work open — run `kiln open` first"* — asked the agent to start a run in order to tidy up after one. Measured on the owner's run, which ended reporting a leftover folder it had been blocked from deleting. Both halves are kiln's: `ship --opened` now removes the tree, which is the sentence the message was already making; and with nothing open, `.kiln/tmp/` is no longer policed at all — `work/` is the run's evidence and stays kiln's either way, but scratch with no run is leftovers. | 09-23 |
 
+#### Pre-v1.0 audit entries (2026-09-23, design read against the product and against OSS)
+
+An audit read this file against the code, then had every finding re-run by an adversarial
+pass and weighed against how mature open-source projects solve the same problem —
+superpowers, BMAD and agent-skills for the workflow, and the two most-used Claude Code guard
+hooks, cc-safety-net and destructive_command_guard (dcg), for the guards. A 142-row corpus run
+through the real dispatcher found 33 wrong verdicts. The owner ruled four questions (D136,
+D137, D142, D146) and set the standing rule these entries follow: **where a mature OSS project
+has a better approach, it is the one adopted, and a fix is general across projects or it is
+not a fix.**
+
+| # | Decision | Rationale | Date |
+|---|---|---|---|
+| **D125** | **The guards are tested through the production entry point, as a labelled corpus, and a verdict is asserted with its reason** | A unit test had built its own `repoFor` without the dispatcher's `?? ctx.cwd`, so it proved the opposite of what production did (D132). cc-safety-net spawns its built CLI with JSON on stdin and asserts the reason constant; dcg keeps `true_positives / false_positives / bypass_attempts` corpora. kiln adopts the shape — `tests/corpus.test.mjs`, must-deny, must-allow and `ceiling` rows, every deny checked against its message and against "bug in kiln". Neither tool's cases are reused: both **allow** `git push origin main`, which kiln must refuse, and dcg's licence carries a rider excluding use by or for Anthropic, benchmarking included. No standard benchmark measures a guard (the academic suites measure a model's propensity to do harm), so this corpus is the instrument, and "never" is stated as what it is: zero misses in *n* rows bounds the rate near 3/*n*, not at zero. | 09-23 |
+| **D126** | **A heredoc body is data, and the commands after its terminator are commands** | The earlier fix cut every command at its first `<<`. That hid everything after the body: `cat > ok <<EOF … EOF` then `echo x > /elsewhere` was allowed, and so was a `git push origin main` on the next line. The lexer now removes exactly the body — a command substitution opens a fresh quoting context, which is what makes `git commit -m "$(cat <<'EOF' … )"` a real heredoc — and one quote-aware split with operators serves every guard, so the protected-branch scan stopped reading `git commit` out of a note being written to a file. A body whose terminator never arrives is judged as written rather than guessed at. Still lexical (D34, D93): quotes and heredocs are what the shell settles before anything runs. | 09-23 |
+| **D127** | **Moving a control file away, or anything that holds one, is removing it** | `mv .kiln/work/<id>/state.json old.md` was allowed — only a `mv` *destination* was checked — and the next source edit found no gate record to hold it to. cc-safety-net guards its policy file against a `mv` whose source is the file, its directory, or an ancestor; kiln adopts that rule for `config.json`, every `state.json`, `.kiln/hooks/` and `.git/hooks/`, across `rm`, `mv`, `git mv`, and `chmod`/`chown`/`chattr` (a work directory made unreadable used to vanish from the guard's view). A symlink is removed as the link, never resolved through, so `rm link.md` is no longer reported as a bug in kiln. | 09-23 |
+| **D128** | **`rm` is read as tokens, `-r` alone is recursive, and `~` and `$HOME` are expanded** | A regex over lowercase short flags missed `rm -Rf` and `rm --recursive --force`. cc-safety-net's `rm-flags` reads `-r`/`-R` in any cluster and long-option prefixes; dcg refuses a recursive remove without `-f`, because `-f` only silences prompts. `rm -rf ~/data` — the example D34 was written for — resolved as a directory named `~` inside the project and was allowed. Every other variable stays unread: the ceiling. D34's scope is unchanged: outside the project root, during a run. | 09-23 |
+| **D129** | **An inline program is any program the interpreter reads from its arguments or stdin, and its body is searched too** | D98 knew `-c`, `-e`, `-r`; `node -p`, `node --eval` and `python3 - <<EOF` named `.kiln/config.json` and ran. dcg #425 is the same bug. The flag list is replaced by the question: does the interpreter get a script file (the ceiling SECURITY.md names) or a program inline — a flag, `-`, a pipe, a heredoc. Only a word in command position is an interpreter, so `cat .kiln/config.json | grep node` stays a read. | 09-23 |
+| **D130** | **The disarm guard reads git's option grammar: long-option prefixes, clustered short flags, and every config override** | `git push --no-verif` is `--no-verify` to git (gitcli(7): an unambiguous prefix) and got past a literal match; `git commit -nm x` skipped the hooks; `GIT_CONFIG_PARAMETERS` redirected `core.hooksPath`. Measured with a failing hook, each let the operation through, and the test claiming "git rejects the abbreviations" was false. Prefixes from `--no-v`, `-n` read from a cluster until a value-taking letter, `GIT_CONFIG_PARAMETERS`, and husky's and lefthook's own `=0` switches. A quoted commit message is not a flag. The division D90 drew holds: a finite, documented grammar is the easy half; the forge's branch protection is still the ceiling. | 09-23 |
+| **D131** | **A branch the chain moves to is the branch a later command writes to, created or not** | D116 carried a *created* branch across `&&`. `git checkout main && git commit` moved to an existing one and was judged against the branch the session stood on — a commit on `main`, allowed. An existing branch carries across `&&` as the branch, and across `;` as one more candidate beside the current one; a created branch still carries nothing across `;`. | 09-23 |
+| **D132** | **An unknown directory stays unknown** | The dispatcher passed `chain[index] ?? ctx.cwd`, turning `cwdChain`'s "cannot tell" into "here". A push from a submodule on a protected branch behind `cd $DIR &&` was allowed, and an unplaceable `git commit` was refused against the session's branch — both directions wrong. D105's candidate set and one-branch rule now receive the unknown they were written for; cc-safety-net likewise never falls back to the session cwd after an untracked `cd`. | 09-23 |
+| **D133** | **Unreadable is not absent, at every layer — and the law is now checked** | Four branches ended in ALLOW on something kiln could not read: a config that exists but does not parse (no stack guards ran, so `DROP COLUMN` passed on php-ci3), a work directory returning EACCES, a stack guard exporting no `check` or rejecting asynchronously, and the push floor, which parsed its config inside the walk and so skipped a BOM'd or broken one. Each now blocks, naming the file; the floor also protects the branches the project ships from, as the guard does, and a stale runner is replaced by `doctor --write` and reported at `open`. `findRoot` treats a config it cannot read as present. The invariant D33 stated in 09-19 and never checked is a test: every `catch` in the guard layer throws, blocks, or carries a `fail-open:`/`fail-closed:` line saying why — cc-safety-net's architecture test is the model. Malformed hook stdin stays allowed, deliberately and asserted: it means the harness is broken, and dcg makes the same call. | 09-23 |
+| **D134** | **The project root is compared as its real path** | Targets were resolved through symlinks and the root was not, so a project reached through a linked directory — macOS's `/tmp` is one — had every source edit refused as "outside the project root" while `.kiln/config.json` was not recognised as kiln's own. | 09-23 |
+| **D135** | **Every checkout's hooks are verification files, and so is `.husky/`** | The floor is installed in every checkout (D90), and a submodule keeps its hooks and config under `.git/modules/<name>/`. Only the superproject's `.git/hooks` was protected. | 09-23 |
+| **D136** | **A shipped work is never reopened; follow-up work is a new work that names the one it follows (supersedes D85 and D24's "opens pass N+1")** | `openNextPass` had no caller, so reopening a shipped work left pass 1's gates in place and — a shipped work being in no set the guards read — every guard off for the whole second pass. superpowers treats follow-up work as new work with its own approval ("they approved the spike, so the follow-up is approved too" is one of its red flags); BMAD ingests a done story as context for a new spec. So `resolve` answers `follow_up` with the next free `<id>.<n>`, `open` refuses a shipped id and names the command, and `--follows` records the link. `pass` stays in the schema at 1. Owner's ruling. | 09-23 |
+| **D137** | **A reviewed work is still guarded, and a full VERIFY that fails after review sends it back to implementation** | D119 released the claim at the review gate, and with it the work left every set the guards read: between review and ship, source edits were ungated. Identity now covers `reviewed` while claims do not; source is refused with the reason, the work's own artifacts and scratch stay writable. A failed full run is the one legitimate reason to change reviewed code, so it reopens implementation, drops the review (and ship) approval, and records `verify_failed` — BMAD's code review returns a story to in-progress the same way. Owner's ruling. | 09-23 |
+| **D138** | **`ship --opened` asks the same question `gh pr create` does** | On a work with no gate at all, `kiln ship <id> --opened <url>` set `shipped` and the guards stopped reading the work: the ship gate walked around through kiln's own verb. It now requires the path's ship-authorising gate, approved and still bound to its document; a spike is refused by the same table (D77). | 09-23 |
+| **D139** | **A gate hashes the document its key names; an approval with no document binds to nothing (strengthens D71)** | `--artifact` was optional, and a record with `artifact_sha: null` bound forever — editing the plan after approval changed nothing. The document is now the key's (`probe` → `brief.md`, `spec`, `plan`, `review` and `ship` → `review.md`); a gate whose document is missing, or a different file named for it, is refused. superpowers #2258 binds approval to the plan by procedure and BMAD re-reads the spec from disk and halts if it is gone; the hash is stronger than both, now that it cannot be skipped. | 09-23 |
+| **D140** | **REVIEW measures from the work's base; `last_verified` is provenance only (supersedes D67a's review anchor and D76's use of it)** | With commit-per-task and a full verify before review, `last_verified` moved to HEAD and REVIEW saw zero files, halting on "a commit on another branch". superpowers reviews from the branch point (merge-base) and BMAD from a baseline that never moves; neither anchors review on the last verification. D67a's concern — a week-old resume sweeping unrelated history — is D96's re-anchor, which already exists. | 09-23 |
+| **D141** | **Evidence names the tree it ran against, and a stale green is said to be stale** | `verify[]` recorded a commit range; kiln commits nothing before SHIP, so edits after a green run left the range unchanged and `kiln report` still printed green. Each entry now carries the working tree's git tree id (tracked and untracked, `.kiln/` excluded, from a copy of the index that keeps its mtime so git's racy-clean check still re-reads a same-size edit), and `report` and `ship` say "was green, and the tree has changed since" when it has. `isStaleVerify`, written and never called, is what they call. superpowers re-runs the check at the claim point (`task-done`, finishing-a-branch); a record without a tree is stale by definition. | 09-23 |
+| **D142** | **SHIP is the one commit point, and the forked skills say so** | The design never committed before SHIP (D36, D78) while the forked implement and writing-plans skills committed per task, as superpowers does. OSS is split: BMAD and agent-skills leave the tree uncommitted until the work is done. Owner's ruling: BMAD's. The skills drop the commit steps; rulings go to `.kiln/work/<id>/ledger.md`, the record the agent can actually write — the text had told it to write `carry_over[]`, which only kiln's verbs can. The reviewer diffs the working tree against the base, untracked files included. | 09-23 |
+| **D143** | **The ratchet halts with D78's menu once anything is recorded; before that, choosing the path is classification** | The code switched the path and carried on, which decided by not asking. It now halts with `git diff --stat`, the untracked files, and a numbered menu, and the choice is recorded with `resume`. Before any gate or change there is nothing to launder, so the path may still move either way — the exception the code already made, recorded here so it no longer contradicts D87 by silence. | 09-23 |
+| **D144** | **Reserved ids are refused where ids are made; a minted collision is refused; a ref two modules could own names both** | `kiln open dna` created `work/dna/` — the reserved check lived only in `resolve`. A sentence minting an existing id on the same day was offered as new work. D51's prefix took the first ticket-owning module for every ref, so both modules' `#42` shared one id; `resolve` now returns the candidates and the URL or the user supplies the module. | 09-23 |
+| **D145** | **The knobs and repairs the design promised exist** | `work.committed: false` (D36) had no reader; it now ignores `.kiln/work/`. `doctor --write` repairs a module path `.gitmodules` answers (D39, unioss's `scan --write`) and rewrites an older schema, which every command now mentions in one line; a newer `state.json` is refused with both numbers, as a config is. Config writes are atomic, now that an unreadable config stops every write. | 09-23 |
+| **D146** | **The visual companion runs in a kiln run (keeps D11)** | Its screens went to `.superpowers/brainstorm/` in the project — source until the plan gate, so every screen was refused — and it was launched by a path relative to the user's project. It now keeps its session under `.kiln/tmp/<id>/`, the one place a run may write before its first gate, and runs from `${CLAUDE_PLUGIN_ROOT}`. The forked brainstorming text is adapted to kiln's gates: a spike's probe and a bounded plan are approved at gates, not by a nod or in chat alone. Owner's ruling: fix, not drop. | 09-23 |
+| **D147** | **`--auto` in the request satisfies `full`'s opt-in (amends D16's wording)** | D16 says `full` is "explicit opt-in only", and the code has treated the flag typed into the request as that opt-in since the flag existed, with the reason in a comment: the harness refuses an agent editing the config that governs its own gates, so the request is the only place a human can opt in during a run. Recorded here so the log says what the product does. | 09-23 |
+
+
 ### Superseded
+
+- ~~D85 and D24's "a shipped work opens pass N+1"~~ → superseded by **D136**. The pass
+  machinery was specified and never reached by any command, so pass 2 ran with pass 1's gates and
+  every guard off. Follow-up work is a new work that names the one it follows.
+- ~~D67a / D76's REVIEW anchor on `last_verified`~~ → superseded by **D140**. REVIEW measures from
+  `base`; `last_verified` records the last green full run and nothing reads it as a range.
+- ~~D26's "vendored code lives under `vendor/`" and "shellcheck joins CI only if kiln writes its
+  own bash"~~ → the companion lives in `skills/kiln-brainstorming/scripts/` and is the only
+  lint-excluded tree; kiln writes its own bash since D90 (`lib/floor/pre-push.sh`), so shellcheck
+  runs in CI over every shell script, which is D26's own condition met.
+- ~~D98's inline-program flags `-c`, `-e`, `-r`~~ → widened by **D129** to the question the flags
+  stood for.
 
 - ~~Section 2 "Port contracts" (5 code ports)~~ → retracted 2026-09-19 by D13. Tracker, VCS and Verify are **not code ports**; they are a config line plus skill instructions telling the agent which of its own tools to use. Only **Stack** (its `steps[]` must execute deterministically and its `guards[]` must run inside hooks) and **Knowledge** (grep / DNA are real code) remain code ports. 5 → 2.
 - ~~"`description` ≤ 200 chars, hard cap"~~ → **wrong measure, corrected 2026-09-19.** The validated OSS run 200–455 chars (superpowers `brainstorming` ~200; agent-skills `browser-testing-with-devtools` ~325, `interview-me` ~455). A 200-char cap would force dropping the `"Use when…"` trigger clauses that make routing work. claude_skill's disease was not *length* but **changelog occupying the routing-signal slot** (`tps-quantification-intake`: 20,902 chars). Replaced by: per-description **≤ 500 chars as a warning**; a **content-kind check** that rejects a description containing a version string (`v\d+\.\d+`) or changelog verbs; and the **aggregate always-on cap (≤ 6,000 chars) as the real budget**. Check the kind, not the length — the length check punishes the healthy.
@@ -464,7 +514,7 @@ recorded here rather than left in a pull request. Evidence:
 | Stages | 7 on the `full` path (D23, D28) |
 | Gates | 4 (`full`) / 2 (`bounded`) / 1 (`spike`) |
 | Guards | core: `guard-interpreter` (D98), `guard-verification` (D90), `guard-protected-branch`, `guard-sandbox`, `guard-gate` — **5**, in that dispatch order (D19, §3c). The first two arrived after this table was written, each closing a way to reach the files the other four are made of. stack: php-ci3 → migrations + lint; node → `[]` |
-| Commands | `/kiln init`, `/kiln <arg>`, `/kiln doctor` — **three** at v1 (D24). `init` · `doctor` · `dna` are reserved words a work id may not take (D79) |
+| Commands | `/kiln init`, `/kiln <arg>`, `/kiln doctor` — **three** at v1 (D24). `init` · `doctor` · `rules` · `dna` are reserved words a work id may not take (D79, D110, D144) |
 | Platform | Linux, WSL2, macOS |
 | Harness | Claude Code |
 | Inherited skills | **5 forked** from upstream v6.4.1 and owned by kiln (D69) — `kiln-brainstorming` (**with** the visual companion, D11), `kiln-writing-plans`, `kiln-implement`, `kiln-tdd`, `kiln-debugging` — plus upstream's `code-reviewer.md` as a reference file under kiln's own review skill. The `kiln-*` names also close the collision D62 found. Dropped from the closure: `subagent-driven-development`, `using-git-worktrees`, `finishing-a-development-branch`, `verification-before-completion` |
@@ -478,7 +528,7 @@ serves no part of D7, the other waits on evidence.
 
 | Deferred | Dependency added | Target |
 |---|---|---|
-| Knowledge tier 1–2 (DNA), and the `/kiln dna` command that serves it (D79) | `uv` + Python 3.11+ | v1.2 |
+| Knowledge tier 1–2 (DNA), and the `/kiln dna` command that serves it (D79) | none any more — D107 builds it in Node from the `tps-project-dna` contract, so the dependency that set this row's target is gone | when scoped (D107) |
 | `kiln-judge` (review/sizing/benchmark as a separate plugin) | — (also: serves no part of D7) | v2 |
 | Other harnesses, Windows native | — (gated on evidence, see D8/D9) | on evidence |
 
@@ -578,14 +628,14 @@ Four deliberate properties of what the user sees:
 | Property | Origin |
 |---|---|
 | classification **said out loud**, user can override (`"full"`) | superpowers three-path rule |
-| gates are **numbered menus**, recommendation first | unioss, kept — one of the three things inherited verbatim |
+| gates are **numbered menus**, one option marked `(recommended)` (D113) | unioss, kept — one of the three things inherited verbatim |
 | artifacts printed as **absolute paths the moment they are written** | unioss, kept |
 | ceremony scales — `bounded` is 2 gates, not 4 | the answer to *"is the token overhead worth it?"* |
 
 ### Auto mode differs in exactly one place
 
-`--auto` (or `config.auto.bounded`) turns approval gates into recorded rulings. The final report
-**must** print what was decided on the user's behalf:
+`--auto` (or `config.auto.bounded`) turns approval gates into recorded rulings. Each ruling is
+printed as it is made, and the gate that authorises shipping prints the whole block (D118):
 
 ```
 Auto-ruled 2 gates:
@@ -612,7 +662,8 @@ myapp/
 ├─ .kiln/
 │  ├─ config.json              committed
 │  ├─ rules/index.md           committed — router + the D20 budget gate
-│  ├─ work/<id>/               committed — brief · plan · review · state.json
+│  ├─ hooks/pre-push.mjs       committed — the push floor's runner (D90.3)
+│  ├─ work/<id>/               committed — brief · plan · review · ledger · state.json
 │  └─ tmp/                     gitignored — deleted at the end of SHIP
 └─ (your source)
 ```
@@ -674,10 +725,15 @@ Gate keys are fixed and total: `probe` · `spec` · `plan` · `review` · `ship`
 | no active kiln work | **ALLOW** — kiln must not police sessions it is not driving |
 | `state.json` unreadable | **BLOCK**, naming the path and the fix. Fail-open here means editing source before a gate = a D7 violation. Atomic writes (tmp + rename) make this rare. Consistent with the inherited law *"environment failures — stop, never improvise"*. |
 
-### The three core guards
+### The core guards
+
+Three at the time of writing; five since D90 and D98, in dispatch order `guard-interpreter` →
+`guard-verification` → the three below.
 
 | Guard | Blocks | Reads |
 |---|---|---|
+| `guard-interpreter` | an inline program — a flag, `-`, a pipe or a heredoc — that names a file the enforcement is made of (D98, D129) | the command |
+| `guard-verification` | what switches git's own hooks off: `--no-verify` by any prefix, a clustered `-n` on commit, `core.hooksPath`, `GIT_CONFIG_*` overrides; writes to any checkout's hooks (D90, D130, D135) | the command |
 | `guard-protected-branch` | 7 git write-ops on protected branches; `checkout`/`pull`/`fetch` still allowed | config |
 | `guard-sandbox` | writes outside `work/<active-id>` + project source; **another ticket's work dir**; `.kiln/config.json` and any `state.json` (D48); on `Bash`, `rm -rf` / `git clean -xfd` resolving outside the repo root (D34) | state |
 | `guard-gate` | source edits before the authorizing gate is approved; **PR-creation verbs** (`gh pr create`, `glab mr create`) before this path's ship-authorizing gate — `SHIP_AUTHORIZING = { spike: null, bounded: "review", full: "ship" }`, `null` meaning never (D77) | state |
@@ -729,7 +785,8 @@ re-counted at P1 rather than re-guessed here (§6.1 rule 2).
 
 ### Noted risk
 
-`guard-gate` has never run anywhere; `guard-protected-branch` has real production mileage in unioss. Its fail-closed path on unreadable state could genuinely annoy. Mitigations: atomic writes, an error naming the exact path and fix, and a **mandatory** acceptance item in Section G.
+`guard-gate` had never run anywhere when this was written; it has since run in the live harness,
+six acceptance runs and ten real checkouts (pre-v1 audit §3). `guard-protected-branch` has real production mileage in unioss. Its fail-closed path on unreadable state could genuinely annoy. Mitigations: atomic writes, an error naming the exact path and fix, and a **mandatory** acceptance item in Section G.
 
 The risk grew twice after this section was written, and the mitigation did not: D64 put shell write verbs under `guard-gate` and D77 put the PR verbs there, so the guard with no mileage is now the guard with the widest surface. Section G's adversarial item — it must block a real pre-gate edit **and** be shown not to false-block — therefore has to exercise all three matchers, not only `Edit`.
 
@@ -871,8 +928,9 @@ may depend on it.
 
 ```
 read stdin once
-├─ pre-bash  : guard-protected-branch → guard-sandbox(bash) → guard-gate(bash)
-├─ pre-edit  : guard-sandbox(file)    → guard-gate(file)
+├─ pre-bash  : unreadable config → guard-interpreter → guard-verification →
+│              guard-protected-branch → guard-sandbox(bash) → guard-gate(bash)
+├─ pre-edit  : unreadable config → guard-sandbox(file) → guard-gate(file)
 └─ post-edit : stack hooks (php-lint, …)
 
 core guards first, fixed order, hardcoded — never read from config
@@ -939,7 +997,7 @@ graded the same way rather than counted as enforcement, each stated at its own w
 
 | Ceiling | Width, after the decisions that narrowed it |
 |---|---|
-| Source edits through `Bash` | D53 opened it, **D64 partly closed it** — redirection, `tee`, `sed -i`, `cp`/`mv` into source are covered. The residue is **interpreters and heredocs** (`python -c`, a heredoc into a script), which need shell parsing D34 refuses |
+| Source edits through `Bash` | D53 opened it, **D64 partly closed it** — redirection, `tee`, `sed -i`, `cp`/`mv` into source are covered, and an inline program naming an enforcement file is refused (D98, D129). The residue is **programs kiln does not read**: a script file, and an inline program that writes source without naming a control file |
 | A failure that stops the dispatcher | fails **open**, and no invariant over guard code can reach it (D54) |
 | Opening a PR outside the agent's CLI | `gh pr create` / `glab mr create` are covered (D77); the forge's **web UI** and a **direct API call** are not |
 
@@ -961,6 +1019,7 @@ graded the same way rather than counted as enforcement, each stated at its own w
 │  ├─ spec.md                     full only
 │  ├─ plan.md                     bounded + full
 │  ├─ review.md                   bounded + full
+│  ├─ ledger.md                   the implementer's own record: a line per task, every ruling (D142)
 │  └─ findings.md                 spike only
 └─ tmp/<id>/steps/<step>.log      gitignored; deleted at the end of SHIP
 ```
@@ -973,13 +1032,14 @@ Field notes added by the audit and the source review:
 
 | Field | What it is for |
 |---|---|
-| `pass` | the sitting this work is on. Incrementing it **clears `gates` and `predicted[]`** — a gate record belongs to the pass that earned it (D85) |
+| `pass` | always 1 since D136: a shipped work is never reopened, and follow-up work is a new work carrying `follows: <id>` |
+| `follows` | the shipped work this one continues, if any (D136) |
 | `gates.<key>` | `{decision, artifact_sha, answer, by}`, cleared at every `pass` increment (D85) — `artifact_sha` is checked on **every** gate key, not only the authorizing one (D65 as extended by D85), and is what makes approval bind to the document the user actually read, `answer` is their words verbatim, `by` is `user` or `auto` (D65). Written by the one command that reads the answer, hashes the artifact itself and classifies the answer against D21's explicit-yes list; the agent supplies only `answer` (D71) |
 | `session_id` | the **identity resolver** — which work this session drives, so `guard-gate` knows whose gates apply — and the handover record when a second session adopts the work (D66, D70) |
 | `stage` · `step` | where a resume picks up — believed only far enough to trigger a cheap drift preflight (D58, D67d) |
 | `predicted[]` | cleared at every `pass` increment, being the previous pass's claim set (D85). Doubles as the run's **claim set**: the paths another active work may not write. An overlap is refused when this field is written, at the plan gate — not first at write time (D31, D66, D72) |
 | `base` · `last_verified` | both advance to the shipped `HEAD` when a new pass opens (D85). Within a pass, `base` is immutable provenance and `last_verified` starts at `base` and advances to the `HEAD` a `full`-phase set ran against **only when every step in it exited 0**; a `fast` pass never advances it. REVIEW anchors on `last_verified`, so a week-old resume does not review the whole repository (D67a, D76) |
-| `verify[]` | `{id, cmd, exit, ms, range}` where `range` is `base..HEAD`; an entry outside the current range is stale, not evidence (D57 as corrected by D67a) |
+| `verify[]` | `{id, cmd, exit, ms, range, phase, tree}` where `range` is `base..HEAD` and `tree` is the working tree's git tree id; an entry for another range **or another tree** is stale, not evidence (D57, D67a, D141) |
 | `carry_over[]` | `{from_pass, kind, text}` (D58) — the **one** field designed to cross a pass boundary, and the only one a `pass` increment leaves alone (D85) |
 
 There is **no command that sets any of these** — each is written as the side effect of a command
@@ -1060,7 +1120,7 @@ over; a work id comes from the tracker ref (D24).
 | `hooks/hooks.json` is the wrapped `{"hooks": …}` shape, and the edit matcher names `NotebookEdit` | §1.6 rows 2 and 5 — both failures are silent, and either one turns D7 off wholesale |
 | every `superpowers:`-prefixed reference is absent from the forked skills, and every skill they do name is one kiln ships | D69 — a dangling sub-skill reference is silent (agent-skills #361, #136, #67) |
 | `gh pr create` on the `spike` path → exit 2; on `full` before `gates.ship` → exit 2; after → exit 0 | D77 — **not** an eighth D7 test: item 4 is about source edits, and inflating the seven would blur what they prove |
-| lint, 8 of 10 rules; only the visual companion under `vendor/` is excluded | D26 as narrowed by D69 |
+| lint, all 10 rules; only the visual companion (`skills/kiln-brainstorming/scripts/`) is excluded | D26 as narrowed by D69 |
 | version-sync | D17 |
 
 ### Tier 2 — acceptance
@@ -1188,7 +1248,7 @@ grep-tier blast radius, predicted-vs-actual (D31), the drift check at INVESTIGAT
 
 ### P5 — release readiness
 
-Docs, `LICENSE` + `NOTICE`, `vendor/` hygiene (D11, D26), the six acceptance runs (D44), budget
+Docs, `LICENSE` + `NOTICE`, companion hygiene (D11, D26), the six acceptance runs (D44), budget
 checks, and the one human step the fork costs: read upstream's releases since the `NOTICE` fork
 commit and adopt anything worth adopting **as a decision entry, never as a merge** (D69).
 
@@ -1261,11 +1321,10 @@ If the conversation is gone:
    no decisions and this file outranks it, but reading it is how the fifth pass found two
    blockers four builder-seat passes had missed. Re-run that read-back before P1 and before v1.0.
 5. Read §4 to see which section is next.
-6. **P0–P5 are built** and the six acceptance runs are recorded; the header above says so and
-   this step used to contradict it by naming P0 as the next action. What remains is the v1.0
-   release condition in §6 of the verification plan: tier D graded by a person, plus that
-   person's decision to tag. If something genuinely new appears, it is a decision entry in §2,
-   not a rewrite.
+6. **P0–P5 are built**, the six acceptance runs are recorded and tier D is graded. What remains
+   is the v1.0 release condition in §6 of the verification plan: one validation run on a
+   production repository, on the current build, and the owner's decision to tag. If something
+   genuinely new appears, it is a decision entry in §2, not a rewrite.
 
 ### 6.1 Working method — read this before contributing a single line
 
@@ -1324,6 +1383,9 @@ owner, not only to what lands in this file.
 Companion files in this repository:
 - `2026-09-19-design-audit.md` — evidence, and the five review passes
 - `2026-09-20-user-view.md` — the same design from the user's chair (derived; this file outranks it)
+- `2026-09-20-verification-plan.md` — the test tiers and the scenario matrix
+- `2026-09-23-pre-v1-audit.md` — the read-back owed before a v1.0 tag, and D125–D147's audit
+- `2026-09-23-upstream-read.md` — the release-checklist step the superpowers fork costs
 
 Source material referenced (read-only, not part of kiln):
 - `/home/ttndev/workspace/company/tps/projects/unioss-plugin`

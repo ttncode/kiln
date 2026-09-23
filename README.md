@@ -18,7 +18,7 @@ it is **wrong**.
 real-world acceptance runs its own release bar requires are done — `unsafe actions completed: 0`
 on every one. The four scorecard lines only a person who did not build it can grade are
 [graded](docs/design/2026-09-21-acceptance-c6-handover.md). What holds the v1.0 tag back is one
-validation run of the newest feature on a production repository — see [Status](#status).
+validation run on a production repository, on the current build — see [Status](#status).
 
 ## Table of Contents
 
@@ -67,16 +67,18 @@ Requires Node 20.10 or newer. Nothing else — kiln has **zero runtime dependenc
 A plugin command carries its plugin's namespace, so `/kiln:kiln` is the form that always
 resolves. The short form without the namespace works only where nothing else claims it.
 
-`init` reads your project, proposes a config, and asks at most three questions — each with a
-default, so answering none of them still leaves you working. It writes `.kiln/config.json`,
+`init` reads your project, proposes a config, and asks three questions on a typical clone —
+what must never be pushed to, what runs the tests, what runs a fast subset of them — plus up
+to three more only where it cannot detect the answer. Each has a default, so answering none
+of them still leaves you working. It writes `.kiln/config.json`,
 an empty [rules router](#project-rules), and one `.gitignore` line. It never overwrites a file you already have.
 
 **No token. No Docker. No Python. No CI.** Any of those appearing in `init` is a bug.
 
-**Updating:** `/plugin update kiln`, then `kiln doctor` in each project. The update replaces
+**Updating:** `/plugin update kiln`, then `/kiln:kiln doctor` in each project. The update replaces
 the plugin and touches nothing in your repository — which also means a project that already
 has the push floor keeps the hook the older version installed. Doctor reports that as `stale`
-and `kiln doctor --write` replaces it; `kiln open` warns once per run until it is done.
+and `/kiln:kiln doctor --write` replaces it; every run warns once until it is done.
 
 ## Usage
 
@@ -96,9 +98,10 @@ Say a path or `--auto` at the **start** of the request to choose how it runs:
 /kiln:kiln --auto the export button does nothing
 ```
 
-Anything the orchestrator calls underneath — `open`, `gate`, `scope`, `verify`, `ship`,
-`report`, `config set`, `halt`, `ratchet`, `blast`, `list` — is `kiln <verb>`; run `kiln`
-with no arguments for the list.
+Underneath, the orchestrator calls `node <plugin>/bin/kiln.mjs <verb>` — `resolve`, `open`,
+`gate`, `rules`, `scope`, `verify`, `ship`, `report`, `halt`, `resume`, `ratchet`, `blast`,
+`list`, `config set`, `init`, `doctor`. This README writes that as `kiln <verb>`; `--help`
+prints the list with every flag.
 
 ## Your first run
 
@@ -134,7 +137,7 @@ Spec complete — 7 requirements, 4 acceptance criteria. What would you like to 
 A gate is where you act, and "sounds good" is not an approval:
 
 ```
-$ kiln gate 42 plan --artifact plan.md --answer "sounds good"
+$ kiln gate 42 plan --answer "sounds good"
 { "recorded": false,
   "ask": "Pick one: (1) approve this plan as written, or (2) tell me what to change." }
 exit=2
@@ -172,9 +175,13 @@ says which path out loud, and you can override it.
 | `bounded` | a well-scoped change to code already here | 2 | yes |
 | `full` | a new subsystem, or anything that moves interfaces | 4 | yes |
 
-The ratchet only goes **up**. Ratcheting out of a spike halts, prints the uncommitted work it
-found, and touches none of it: deleting your probe would destroy data you did not ask kiln to
-destroy, and carrying it forward silently would launder pre-plan code past a gate.
+The ratchet only goes **up** once a gate or a change exists. Ratcheting out of a spike halts,
+prints what it found with a numbered menu, and touches none of it: deleting your probe would
+destroy data you did not ask kiln to destroy, and carrying it forward silently would launder
+pre-plan code past a gate.
+
+A shipped work is finished. Follow-up work — review feedback, the next part — is a new work
+that names the one it follows, and gets its own gates.
 
 ## Auto mode
 
@@ -190,7 +197,7 @@ Off by default — every gate stops for you.
 |---|---|
 | Already set up? | edit `auto` in `.kiln/config.json` — `kiln config set` refuses this key |
 | Is it on? | `kiln doctor`, and `kiln open` prints it |
-| What did it decide? | `kiln report <id>` |
+| What did it decide? | printed at each gate as it rules, and the whole list at the gate that authorises shipping; `kiln report <id>` repeats it |
 | Never auto | a `spike`, and a halted work |
 
 `--auto` in a request wins over `auto.*` in the file, for that run.
@@ -198,17 +205,19 @@ Off by default — every gate stops for you.
 ## What it blocks
 
 Seven promises, seven tests. [`tests/d7.test.mjs`](tests/d7.test.mjs) is the whole list in one
-file — read it there rather than trusting this table.
+file — read it there rather than trusting this table — and
+[`tests/corpus.test.mjs`](tests/corpus.test.mjs) runs each promise against well over a hundred
+commands and edits, the must-deny and the must-allow, through the real hook.
 
 | # | Promise | How |
 |---|---|---|
-| 1 | never pushes to a protected branch | the ref is **resolved by git**, not matched as text, in the repository the command actually runs in — `HEAD`, `@`, `+main`, `HEAD:v3-master`, `--force`, `-C <dir>`, `cd <dir> &&`, and a submodule on its own branch. A local `commit`/`merge` onto a protected branch is blocked too where kiln can tell which checkout it lands in — and deliberately not guessed where it cannot (D105) |
-| 2 | never destroys data unasked | `rm -rf` outside the repo, `git clean -xfd`, destructive DDL in a migration |
+| 1 | never pushes to a protected branch | the ref is **resolved by git**, not matched as text, in the repository the command actually runs in — `HEAD`, `@`, `+main`, `HEAD:v3-master`, `--force`, `-C <dir>`, `cd <dir> &&`, `git checkout main && git commit`, and a submodule on its own branch. A local `commit`/`merge` onto a protected branch is blocked too where kiln can tell which checkout it lands in — and deliberately not guessed where it cannot (D105) |
+| 2 | never destroys data unasked | a recursive `rm` outside the project however its flags are spelled — `-rf`, `-Rf`, `-r`, `--recursive` — including under `~` and `$HOME`; `git clean -xfd`; destructive DDL in a migration |
 | 3 | never reports a failing test as passing | verdict from the exit code; stdout is never parsed |
-| 4 | no source edit without a gate record matching the **current** artifact | including through `>`, `tee`, `sed -i`, `cp` and `mv` |
+| 4 | no source edit without a gate record matching the **current** artifact | including through `>`, `tee`, `sed -i`, `cp`, `mv`, and a command after a heredoc. The gate hashes the document it approves, so editing it afterwards closes source again. After the review gate, source is closed until VERIFY fails |
 | 5 | never writes outside its sandbox | resolved paths compared by segment; a symlink leaf is rejected, not followed |
 | 6 | kiln's own code performs no network egress | a **static** check, and its test says so |
-| 7 | the agent cannot approve its own gate, or switch off what judges it | `state.json` and `config.json` are not writable by the agent; neither are the repository's git hooks, and `--no-verify` / `core.hooksPath` are refused |
+| 7 | the agent cannot approve its own gate, or switch off what judges it | `state.json` and `config.json` cannot be written, moved, deleted or made unreadable by the agent — nor can any checkout's git hooks — and an inline program naming them is refused. `--no-verify` by any prefix, `commit -n`, `core.hooksPath` and git's config-override variables are refused |
 
 Item 1 has a second layer. kiln installs a `pre-push` hook in every checkout, and git
 hands that hook the **resolved** destination — after `HEAD`, `push.default`, aliases, `-C`
@@ -222,8 +231,10 @@ cannot; a command that never reaches your machine's git is the one case neither 
 
 Three limits are stated rather than papered over, and each has a test asserting the limit:
 
-- **Interpreters and heredocs.** `python -c` and a heredoc into a script edit source without
-  going through a watched verb. Closing that needs shell parsing, which kiln does not do.
+- **Programs kiln does not read.** A script file, or an inline program that writes source
+  without naming one of kiln's own files, edits source without going through a watched verb.
+  Closing that needs program parsing, which kiln does not do — the two most-used Claude Code
+  guard hooks record the same limit.
 - **A failure that stops the dispatcher fails open.** If `node` is missing from `PATH`, a hook
   never starts, and a hook that never starts is allowed. `kiln doctor` checks for it, because
   nothing at runtime can.
@@ -300,7 +311,7 @@ enforced or re-aim it, never loosen it.
 
 ## Adding a stack
 
-A stack adapter is a JSON file. `stacks/node.json` is ten lines and zero code:
+A stack adapter is a JSON file. `stacks/node.json` is a few lines and zero code:
 
 ```json
 {
@@ -335,14 +346,14 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 538, green on every pull request |
-| Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
+| Tests | 540, plus one case per row of the guard corpus; green on every pull request |
+| Code | ~5,900 lines of Node, much of it comments saying why; ~7,300 lines of tests; 0 runtime dependencies |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
 | Platform | Linux, WSL2, macOS |
 | Acceptance | **6 of 6** done across kiln, [zod](docs/design/2026-09-21-acceptance-c2-zod.md) and [umami](docs/design/2026-09-21-acceptance-c4-umami.md), plus the [journey matrix](docs/design/2026-09-22-journey-matrix.md) run against [nine real checkouts](docs/design/2026-09-22-cross-project-acceptance.md) — Node, PHP, Python, C, a pnpm workspace, husky, submodules, and a project shipping from `8.2`; plus [ten more](docs/design/2026-09-23-real-repository-matrix.md) for the rules router — six real projects and four layouts |
 | Tier D | **graded** 2026-09-23 by the project owner, who wrote none of it: first-run survival **y** · would I run it again **y** · gates **2 shown · 1 overridden** · human edits after accept **unmeasured**, because that run never reached a PR and `0` would have meant something else |
-| **Not done** | one validation run of the [rules router](#project-rules) on a production repository. Ten checkouts is not a user |
+| **Not done** | one validation run on a production repository, on the build that carries the pre-v1.0 audit's fixes (D125–D147). Ten checkouts is not a user |
 
 `0 files` and `no measurement` render identically in a table and mean opposite things. The
 fourth line stays unmeasured until a run reaches a merged pull request, rather than being
@@ -361,7 +372,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 124 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 147 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
@@ -370,7 +381,7 @@ kiln was designed before it was written, and the design is in the repository.
 | [`cross-project-acceptance.md`](docs/design/2026-09-22-cross-project-acceptance.md) | the same matrix against nine checkouts nobody here designed |
 | [`real-repository-matrix.md`](docs/design/2026-09-23-real-repository-matrix.md) | the rules router across ten checkouts — six real projects and four layouts — and the two defects that found |
 | [`upstream-read.md`](docs/design/2026-09-23-upstream-read.md) | the release-checklist step the fork costs: what upstream did since the fork point, and the bug of theirs kiln was still carrying |
-| [`pre-v1-audit.md`](docs/design/2026-09-23-pre-v1-audit.md) | the audit the design owes itself before a v1.0 tag — one security defect, two false claims, six stale statements |
+| [`pre-v1-audit.md`](docs/design/2026-09-23-pre-v1-audit.md) | the audit the design owes itself before a v1.0 tag — the read-back, and the second pass that ran a 142-row corpus through the real hook and weighed every finding against mature open-source projects |
 
 Start with the architecture file. Every decision carries why it was made, so you can disagree
 with the reasoning rather than only the result.

@@ -6,8 +6,9 @@ import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanupFixtures, commitAll, writeFile } from "./helpers/fixture.mjs";
-import { SESSION, kiln, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
+import { cleanupFixtures, commitAll, writeConfig, writeFile } from "./helpers/fixture.mjs";
+import { DEFAULTS } from "../lib/config.mjs";
+import { SESSION, kiln, monorepo, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
 import { judge } from "./helpers/hook.mjs";
 
 after(cleanupFixtures);
@@ -135,4 +136,31 @@ test("D39: a config from an older kiln is read, said once, and rewritten only on
   assert.equal(JSON.parse(readFileSync(path, "utf8")).schema_version, 0, "never rewritten behind the user's back");
   ok(root, ["doctor", "--write"]);
   assert.equal(JSON.parse(readFileSync(path, "utf8")).schema_version, 1);
+});
+
+test("B44: the effect point runs from a node config, the second adapter D61 names", () => {
+  const root = nodeProject({
+    name: "effect",
+    cmd: { test: "true", migrate: "true", smoke: "true" },
+    steps: [
+      { id: "migrate", run: "${cmd.migrate}", provides: "migrate" },
+      { id: "unit", run: "${cmd.test}" },
+      { id: "smoke", run: "${cmd.smoke}", requires: ["migrate"] },
+    ],
+  });
+  ok(root, ["open", "w1", "--session", SESSION]);
+  assert.match(ok(root, ["verify", "w1"]).stdout, /skip {2}smoke — requires migrate/, "no migration in this change, so the step that needs one is skipped with its reason");
+  assert.match(ok(root, ["verify", "w1", "--effects", "migrate"]).stdout, /pass {2}smoke/);
+});
+
+test("B56: from inside a submodule, the sandbox is the project, not the checkout the agent stands in", async () => {
+  const root = monorepo({ modules: [["admin", "AdminPage", "feature/x"], ["common", "common", "feature/x"]] });
+  writeConfig(root, { ...DEFAULTS, stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] } });
+  throughPlanGate(root, "w1", { predicted: "common/src/User.php" });
+  const inside = join(root, "AdminPage");
+  const sibling = await judge("pre-edit", { session_id: SESSION, cwd: inside, tool_input: { file_path: join(root, "common", "src", "User.php") } });
+  assert.equal(sibling.status, ALLOW, "a sibling checkout is inside the project");
+  const away = await judge("pre-edit", { session_id: SESSION, cwd: inside, tool_input: { file_path: join(root, "..", "elsewhere.txt") } });
+  assert.equal(away.status, DENY);
+  assert.match(away.stderr, /outside the project root/);
 });
