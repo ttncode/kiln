@@ -8,7 +8,7 @@ import { branchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { slugOfId } from "../lib/resolve.mjs";
 import { newWork } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
-import { kiln, nodeProject, ok, state } from "./helpers/journey.mjs";
+import { kiln, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
 
 after(cleanupFixtures);
 
@@ -279,4 +279,22 @@ test("a reviewed work has already stopped claiming, before any URL is recorded",
 
   const allowed = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
   assert.equal(allowed.status, 0, "no URL was recorded, and the claim is gone anyway");
+});
+
+/**
+ * Measured on a real run: the agent staged the two source files and left the work's record
+ * out, so the history D18 says lives in `git log -- .kiln/work/<id>/` was empty. The plan now
+ * prints the exact path list, record included unless `work.committed` is false.
+ */
+test("the ship plan names the exact paths to stage, the work's record included", () => {
+  const root = nodeProject({ name: "stage-list" });
+  throughPlanGate(root, "w1");
+  writeFile(join(root, "src", "app.js"), "export const a = 2;\n");
+  assert.match(ok(root, ["ship", "w1"]).stdout, /stage: git add -- src\/app\.js \.kiln\/work\/w1$/m);
+
+  const kept = nodeProject({ name: "stage-list-uncommitted" });
+  ok(kept, ["config", "set", "work.committed=false"]);
+  throughPlanGate(kept, "w1");
+  writeFile(join(kept, "src", "app.js"), "export const a = 2;\n");
+  assert.match(ok(kept, ["ship", "w1"]).stdout, /stage: git add -- src\/app\.js$/m, "work.committed: false keeps the record out of the pull request");
 });

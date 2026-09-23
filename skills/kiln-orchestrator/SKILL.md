@@ -430,7 +430,9 @@ belongs in a new work.
 ### 9. SHIP
 
 SHIP is the run's **one** commit point. Commit an **explicit path list** — never `git add -A`,
-and never a broad commit because the tree is dirty. Open the PR with your own `gh`/`glab`. The body carries the change summary and
+and never a broad commit because the tree is dirty. `kiln ship <id>` prints that list on its
+`stage:` lines, one per repository, the work's own record included where the project keeps it:
+stage exactly those. Open the PR with your own `gh`/`glab`. The body carries the change summary and
 the verify rows; **no log content goes to the remote**.
 
 Ask what has to be opened before opening anything:
