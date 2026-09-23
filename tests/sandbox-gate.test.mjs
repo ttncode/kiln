@@ -448,6 +448,25 @@ test("scratch belongs to one work, like its artifacts do", async () => {
 });
 
 /**
+ * A work leaves `activeWorks` at the review gate, so the session that made the scratch tree
+ * stops owning it one step before the run ends. Measured: the agent was refused the deletion
+ * of the directory kiln had just told it to put its temp files in, and told to `kiln open`
+ * first — start a run in order to tidy up after one. `work/` is the run's evidence and stays
+ * kiln's either way; `tmp/` with nothing open is leftovers.
+ */
+test("leftover scratch is not a run's evidence, and tidying it needs no run", async () => {
+  const project = kilnProject();
+  rmSync(join(project.root, ".kiln", "work", project.id), { recursive: true, force: true });
+
+  assert.equal(await edit(join(project.root, ".kiln", "tmp", "42", "notes.txt"), project), ALLOW);
+  assert.equal(
+    await edit(join(project.root, ".kiln", "work", "42", "plan.md"), project),
+    BLOCK,
+    "the record of a run is still kiln's, open or not",
+  );
+});
+
+/**
  * kiln cannot verify that a path outside the project is the harness's scratchpad — it is
  * handed a command, not the harness's configuration, and matching `/tmp/claude-*` would be
  * the guessing this project refuses. So the boundary does not move; what changes is that the
