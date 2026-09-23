@@ -399,3 +399,12 @@ test("kiln dna infra: services from code directories and compose images, surface
   assert.equal(applied.status, 0, applied.stderr);
   assert.equal(readStore(root).data.surfaces.length, 3);
 });
+
+test("DNA gates: a finding owned twice, or an rd_id naming no finding, fails; one owned by nothing is a warning", () => {
+  const data = { ...empty(), capabilities: [{ id: "DOM-TXT-01" }], findings: [{ id: "RD-0001" }, { id: "RD-0002" }, { id: "RD-0003" }], features: [{ id: "DOM-TXT-01-01", capability_id: "DOM-TXT-01", rd_ids: ["RD-0001", "RD-0009"] }], excluded: [{ id: "EXC-1", rd_ids: ["RD-0001"] }] };
+  const report = runGates({ data, settings: {} });
+  const failed = report.failed.map((result) => result.label);
+  assert.ok(failed.includes("a finding belongs to at most one feature or excluded entry"));
+  assert.ok(failed.includes("rd_ids resolve to findings"));
+  assert.deepEqual(report.warnings.find((result) => result.label.startsWith("findings no feature")).warn, "2/3");
+});
