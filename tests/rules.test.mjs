@@ -344,3 +344,44 @@ test("a rule file is one name ending in .md, inside .kiln/rules/", () => {
     assert.match(run.stderr, /cannot be a rule file/);
   }
 });
+
+/**
+ * D20 mechanized two of its three questions and left the first — *can it merge into a rule
+ * that already exists?* — as judgment. Judgment still needs its raw material, and the
+ * material is a fact kiln can compute: which rules already cover the files this trigger
+ * covers, and how many.
+ *
+ * The source (the marketplace this rule came from) says the quiet part that D20 kept only
+ * the goal of: *every rule line is a token the agent pays on every later ticket, and the
+ * longer the rules get the lower the model's compliance with each one — adding a rule to
+ * force compliance can backfire.* Cursor's users arrive at the same finding from the other
+ * side: past about ten always-on rules the model satisfies none of them well.
+ */
+test("adding a rule answers all three questions where the rule is written", () => {
+  const root = project("three");
+  writeFile(join(root, "AdminPage", "application", "models", "Agency_model.php"), "<?php\n");
+  commitAll(root, "a model");
+
+  ok(root, ["rules", "add", "controllers.md", "--trigger", "**/application/controllers/**"]);
+  const second = ok(root, ["rules", "add", "php.md", "--trigger", "**/*.php"]);
+
+  assert.match(second.stdout, /1\. merge\?\s+already covering these 2 file\(s\): controllers\.md \(1\)/);
+  assert.match(second.stdout, /prefer editing one of those/, "question 1's own answer in the source");
+  assert.match(second.stdout, /2\. flat\?\s+\d+ → \d+ lines of 200/);
+  assert.match(second.stdout, /compliance falls as the total grows/, "the reason, not only the goal");
+  assert.match(second.stdout, /3\. routed\?\s+yes/);
+});
+
+test("a rule nothing else covers says so, rather than staying silent", () => {
+  const root = project("nomerge");
+  const run = ok(root, ["rules", "add", "controllers.md", "--trigger", "**/application/controllers/**"]);
+  assert.match(run.stdout, /nothing else covers these 1 file\(s\)/, "silence would read the same as not having asked");
+});
+
+test("the budget delta is measured, not asserted", () => {
+  const root = project("delta");
+  ok(root, ["rules", "add", "a.md", "--trigger", "**/*.php", "--text", "one\ntwo\nthree"]);
+  const run = ok(root, ["rules", "add", "b.md", "--trigger", "**/*.php", "--text", "four"]);
+  const [, before, after] = /(\d+) → (\d+) lines/.exec(run.stdout);
+  assert.ok(Number(after) > Number(before), `adding lines has to move the number: ${before} → ${after}`);
+});
