@@ -1,6 +1,6 @@
 {
   "name": "kiln",
-  "version": "1.0.0-rc.23",
+  "version": "1.0.0-rc.24",
   "description": "Let an AI coding agent work a whole ticket without watching every command it runs.",
   "license": "MIT",
   "type": "module",
