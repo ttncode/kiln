@@ -87,3 +87,20 @@ MIT grants copyright rights, not trademark rights. The Superpowers name and
 brand marks are not used, and the brand image fetch present upstream is removed
 (D11).
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+tps-project-dna — https://gitlab.tpssoft.com/ai-champion/discovery/claude_skill
+Copyright (c) TPS Soft — AI Champion, Discovery team
+
+Used by written grant from the project owner, given 2026-09-23 (D107). The
+repository carries no LICENSE file and no SPDX header, so the grant is the whole
+permission record and this entry is where a stranger can find it.
+
+Scope of the grant as given: full use and copying.
+
+What kiln actually uses under it, as of this entry: nothing yet. Knowledge tier 1
+is specified from that project's DNA store contract, ERD, id schemes and
+update/bootstrap playbooks, and implemented in Node — so the grant covers a
+specification kiln reads, not code kiln ships. If that ever changes, the files
+copied are listed here before they are committed, the way the superpowers fork
+above is listed.

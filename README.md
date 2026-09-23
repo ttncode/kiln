@@ -350,7 +350,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 106 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 107 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |
