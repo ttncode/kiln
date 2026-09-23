@@ -1,7 +1,7 @@
 # kiln — Architecture Design
 
 > **STATUS: BUILD-READY.** kiln's own third path is named `full`, not upstream's `architectural` (D68).
-> Section 1 (v1 scope) and Sections A–H all locked. The decision log runs to **D149**. It reached D89 after five
+> Section 1 (v1 scope) and Sections A–H all locked. The decision log runs to **D150**. It reached D89 after five
 > review passes on 2026-09-20: a pre-build audit (7 blockers, 10 high, 14 medium → D48–D62), the
 > **pre-P0 hook test, which PASSED** — a `PreToolUse` hook does block a real write in Claude Code
 > 2.1.270, and ten further measured answers are in **§1.6** → D63–D64 — a source review of what
@@ -12,7 +12,7 @@
 > D77–D84), plus **D85** from a closing attack on that pass's own fixes. Findings and evidence
 > live in **`2026-09-19-design-audit.md`**, the companion to this file.
 > **Built.** P0–P5 are complete, six acceptance runs are recorded, and the decision log gained
-> **D86–D124** from building it and running it on real projects, and **D125–D149** from the
+> **D86–D124** from building it and running it on real projects, and **D125–D150** from the
 > pre-v1.0 audit that read this file against the product and against mature open-source
 > projects. Tier D is graded (`2026-09-21-acceptance-c6-handover.md`). What remains for a v1.0
 > tag is one validation run on a production repository, on the build that carries D125–D147.
@@ -421,6 +421,7 @@ not a fix.**
 | **D147** | **`--auto` in the request satisfies `full`'s opt-in (amends D16's wording)** | D16 says `full` is "explicit opt-in only", and the code has treated the flag typed into the request as that opt-in since the flag existed, with the reason in a comment: the harness refuses an agent editing the config that governs its own gates, so the request is the only place a human can opt in during a run. Recorded here so the log says what the product does. | 09-23 |
 | **D148** | **kiln judges only calls that touch a project it drives — found from every directory the call touches, not only the session's (amends D33's fallback row)** | Found by the acceptance run itself: with the plugin installed, a scratch repository that had never run `kiln init` could not `git push origin main`. With no config anywhere, the guard fell back to protecting `main` and `master`, so installing kiln changed the rules of every repository on the machine — the false block D122 names, one layer over. No config in reach is D33's proven branch: kiln is not driving this. The other half is what keeps that from being a way around: the session's cwd is not the only place a call can land. The file an edit names, the directories `cd` and `-C` move to, and the paths a command writes or removes are all asked; the first under a `.kiln/config.json` is the project, judged by its own config. That also closed an older hole — an edit to `/proj/.kiln/config.json` from a session standing elsewhere was compared against the wrong root and allowed. The hardcoded list survives for the case D33 wrote it for: a project whose config is there and cannot be read. | 09-23 |
 | **D149** | **A negation before the verdict word is a refusal; "accept" is a yes** | Found reproducing the acceptance run's review gate. The classifier matched the approving verb first, wherever it stood in the opening clause, so "I don't approve this", "Not approved", "I cannot approve this yet" and "don't ship it" were each recorded as **approved** — a hard no opening the gate D21 exists to keep shut, and an approval authorises source edits. Order is now the verdict: a negation before the verb negates it; one after it is a condition on a yes ("Approve -> no need to run the suite"), which is the case the opening-clause rule was written for. The same run rendered "1. Accept this review and ship the change", and the user's `1` would have been refused as not a yes — D112's shape, a verb refusing a reasonable answer — so `accept` joins the affirmatives under the same negation rule. | 09-23 |
+| **D150** | **A literal assignment earlier in the line is expanded where it is used; an interpreter reads stdin only when something is sent there (refines D129)** | Both found as false blocks in the acceptance run's auto session, each on the investigation itself. `W=.kiln/work/<id> && cat > $W/brief.md` read `$W/brief.md` as a literal path in the project — source, before the gate. And `node --version` beside a `cat .kiln/config.json` was refused: with no script named it was taken for a program on stdin, and the file name was searched in the whole line rather than in the program. cc-safety-net resolves paths from literal assignments and nothing else; kiln adopts that rule — a standalone `NAME=value` or `export NAME=value` whose value holds no `$` or backtick is substituted into the commands after it, and any other variable stays unread. An interpreter with no program reads stdin only behind a pipe, a heredoc or a `<`, and the name is searched in that segment, plus its heredoc body when it reads one. | 09-23 |
 
 
 ### Superseded
