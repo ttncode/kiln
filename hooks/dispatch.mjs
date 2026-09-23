@@ -13,7 +13,7 @@ import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/
 import { interpreterMessage, interpreterReach } from "../lib/guards/interpreter.mjs";
 import { isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
-import { guardsFor, loadStack } from "../lib/stack.mjs";
+import { StackError, UNDETECTED, guardsFor, loadStack } from "../lib/stack.mjs";
 
 const BLOCK = 2;
 const ALLOW = 0;
@@ -67,9 +67,31 @@ async function runStackGuard(guard, payload) {
   }
 }
 
+/**
+ * A stack kiln cannot load is two different situations, and treating them alike made the
+ * common one fatal. `unknown` is the sentinel `init` writes when detection recognised
+ * nothing (D92) — there is no `stacks/unknown.json` and there is not meant to be, so
+ * looking one up threw `StackError`, the throw reached main()'s catch-all, and **every
+ * edit in the project** was refused with "This is a bug in kiln, not in your change. Run
+ * `kiln doctor`" — while doctor, correctly, named the config line. D103's shape again: a
+ * remedy that does not exist, over a state kiln itself wrote. Any project outside the two
+ * shipped stacks got it on its first edit after `init`.
+ *
+ * A stack named and missing is the other situation, and it stays fatal: that is the
+ * project's own guards silently not running, which is what D33 refuses to fail open on.
+ * The message names the config line instead of blaming kiln.
+ */
 async function runStackGuards(payload, { phase, stackId }) {
-  if (!stackId) return ALLOW;
-  for (const guard of guardsFor(loadStack(stackId), phase)) {
+  if (!stackId || stackId === UNDETECTED) return ALLOW;
+  let stack;
+  try {
+    stack = loadStack(stackId);
+  } catch (error) {
+    if (!(error instanceof StackError)) throw error;
+    return block(`kiln blocked this: ${error.message}
+\`stack.id\` in .kiln/config.json names a stack that is not there, so the guards it contributes cannot run. Run \`kiln doctor\`.`);
+  }
+  for (const guard of guardsFor(stack, phase)) {
     const verdict = await runStackGuard(guard, payload);
     if (verdict?.blocked) return block(verdict.reason);
   }
