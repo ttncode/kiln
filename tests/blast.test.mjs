@@ -281,6 +281,46 @@ test("reconciliation sees files changed inside a submodule", () => {
 });
 
 /**
+ * The state every submodule run ends in, and the one neither half above covered: committed
+ * inside the submodule, not yet recorded by the superproject. The submodule's status is then
+ * clean and the superproject's is ` M AdminPage`. Measured on a real monorepo — the review
+ * stage matched its rules against `AdminPage` and routed none of them, so "controllers must
+ * not contain SQL" went unchecked on the commit that existed to satisfy it.
+ */
+test("a submodule committed ahead of its superproject still names its files", () => {
+  const sub = tempRoot("kiln-blast-ahead-sub-");
+  initRepo(sub);
+  writeFile(join(sub, "controllers", "Genre_list.php"), "<?php\n");
+  commitAll(sub, "sub first");
+
+  const root = tempRoot("kiln-blast-ahead-super-");
+  initRepo(root);
+  writeFile(join(root, "README.md"), "super\n");
+  commitAll(root, "super first");
+  git(root, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", sub, "AdminPage"]);
+  commitAll(root, "add submodule");
+  const base = git(root, ["rev-parse", "HEAD"]);
+
+  writeFile(join(root, "AdminPage", "controllers", "Genre_list.php"), "<?php // edited\n");
+  commitAll(join(root, "AdminPage"), "edit inside the submodule");
+  assert.equal(git(join(root, "AdminPage"), ["status", "--short"]), "", "the submodule is clean");
+  assert.match(git(root, ["status", "--short"]), /AdminPage/, "the superproject still holds the old gitlink");
+
+  assert.deepEqual(
+    actualChanged(root, base),
+    ["AdminPage/controllers/Genre_list.php"],
+    "the gitlink alone is not what changed",
+  );
+
+  writeFile(join(root, "AdminPage", "controllers", "Other.php"), "<?php\n");
+  assert.deepEqual(
+    actualChanged(root, base).sort(),
+    ["AdminPage/controllers/Genre_list.php", "AdminPage/controllers/Other.php"],
+    "committed-ahead and still-dirty are both true at once",
+  );
+});
+
+/**
  * Measured on a real monorepo: a work opened on v3-master, whose branch was then cut from
  * another ticket's branch, reported `predicted 11 · actual 283`. `base...HEAD` is correct
  * git — merge-base to HEAD — and the merge-base was far enough back to sweep in the other
