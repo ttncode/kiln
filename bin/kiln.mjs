@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
-import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
+import { existsSync, rmSync } from "node:fs";
+import { configPath, integrationBranch, loadConfig, writeConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { floorStatus, installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
-import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
+import { applyInit, ensureIgnored, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict, worktreeTree } from "../lib/blast.mjs";
 import { STAGES, addRoute, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
@@ -337,7 +337,8 @@ function runConfig(argv) {
     process.stderr.write(`kiln refused that config change: ${refusal}\n`);
     return 2;
   }
-  writeFileSync(configPath(root), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  writeConfig(root, next);
+  if (ensureIgnored(root, next)) out("  .gitignore: now ignores what this config keeps out of a pull request");
   for (const key of keys) out(`  ${key}: ${JSON.stringify(valueAt(config, key))} → ${JSON.stringify(valueAt(next, key))}`);
   out("Run `kiln doctor` to check it.");
   return 0;
@@ -556,13 +557,14 @@ function describeConflicts(conflicts) {
 const MARK = { ok: " ok ", warn: "warn", fail: "FAIL" };
 
 /** Writes config, which no tool may edit — so kiln's own code is the only writer (D48). */
-function applyRepairs({ root, config }) {
+function applyRepairs({ root, config, migrated }) {
   const installed = installFloor(root);
   for (const path of installed) out(`repaired: installed ${path}`);
-  const repair = repairs(config);
-  if (!repair) return out(installed.length > 0 ? "Done." : "Nothing to repair.") ?? 0;
-  writeFileSync(configPath(root), `${JSON.stringify(repair.config, null, 2)}\n`, "utf8");
-  out(`repaired: ${repair.what}`);
+  if (ensureIgnored(root, config)) out("repaired: .gitignore");
+  const repair = repairs({ root, config, migrated });
+  if (repair.what.length === 0) return out(installed.length > 0 ? "Done." : "Nothing more to repair.") ?? 0;
+  writeConfig(root, repair.config);
+  for (const what of repair.what) out(`repaired: ${what}`);
   return 0;
 }
 
@@ -1067,24 +1069,44 @@ function runRatchet(argv) {
   const [id, to] = argv;
   const { root } = loadConfig(process.cwd());
   const state = readState(root, id);
-  if (!canRatchet(state.path, { to, untouched: nothingRecorded(root, state) })) {
+  const untouched = nothingRecorded(root, state);
+  if (!canRatchet(state.path, { to, untouched })) {
     process.stderr.write(`${ratchetRefusal(state.path, to)}\n`);
     return 1;
   }
-  // `git diff` shows tracked modifications only, and a spike's output is usually new
-  // files. Reporting "clean" over an untracked probe is the one thing this must not do —
-  // and a submodule collapses to its own directory name unless statusPaths expands it.
-  const pending = statusPaths(root);
   out(`ratcheting ${state.path} → ${to}. ${ceremonyFor(to).gates.length} gate(s) on the new path.`);
-  out(pending.length === 0 ? "Working tree is clean." : `Uncommitted work kiln will not touch:\n${pending.join("\n")}`);
-  out("Anything you keep will surface at REVIEW as beyond prediction. That is the reconciliation working.");
-  writeState(root, {
-    ...state,
-    path: to,
-    gates: {},
-    carry_over: [...state.carry_over, { from_pass: state.pass, kind: "ratchet", text: `${state.path} → ${to}` }],
-  });
-  return 0;
+  const moved = { ...state, path: to, gates: {}, carry_over: [...state.carry_over, { from_pass: state.pass, kind: "ratchet", text: `${state.path} → ${to}` }] };
+  if (untouched) {
+    writeState(root, moved);
+    return out("Nothing was recorded or changed yet, so there is nothing to decide.") ?? 0;
+  }
+  writeState(root, { ...moved, status: WORK_STATUS.halted });
+  return out(ratchetMenu(root, id)) ?? 0;
+}
+
+/**
+ * D78: the ratchet is a halt with a numbered menu, and it moves no byte. The spike's source
+ * was authorised by `probe`, not by `plan`; keeping it is the user's call and so is setting
+ * it aside, and kiln does neither on its own — deleting it would be D7 item 2 performed by
+ * kiln. It used to print a list, switch the path and carry on, which decided by not asking.
+ *
+ * `git status` alone lists untracked files, which is what a spike usually leaves; `--stat`
+ * says how much each tracked change is. `.kiln/` is kiln's own record, not the spike's work.
+ */
+function ratchetMenu(root, id) {
+  const stat = gitOutput(root, ["diff", "--stat", "HEAD", "--", ".", ":(exclude).kiln"]) || "(no tracked file changed)";
+  const untracked = statusPaths(root).filter((path) => !path.startsWith(".kiln/") && !stat.includes(path));
+  return [
+    "What the earlier path left in the tree — kiln will not touch any of it:",
+    stat,
+    ...untracked.map((path) => ` ${path} (untracked)`),
+    "",
+    "1. Keep it, and plan the work around it — anything kept surfaces at REVIEW as beyond prediction (recommended)",
+    "2. Set it aside yourself first (for example `git stash -u`), then continue",
+    "3. Stop here",
+    "",
+    `The work is halted until the answer is recorded: kiln resume ${id} --answer "<their choice>"`,
+  ].join("\n");
 }
 
 /**
@@ -1263,6 +1285,21 @@ function reportFailure(error) {
   return 1;
 }
 
+/**
+ * D39: an older config is read as current in memory, never rewritten behind the user's back
+ * — and one line says so, pointing at the command that does rewrite it. The line was
+ * specified and never printed, so the only place it appeared was a doctor nobody ran.
+ */
+function noteOlderConfig(command) {
+  if (command === "init" || command === "doctor") return;
+  try {
+    const { migrated, foundVersion } = loadConfig(process.cwd());
+    if (migrated) process.stderr.write(`note: .kiln/config.json was written by an older kiln (schema ${foundVersion}). It is read as current; \`kiln doctor --write\` rewrites it.\n`);
+  } catch {
+    // The command itself reports a config it cannot read, in its own words.
+  }
+}
+
 export function main(argv) {
   const [command, ...rest] = argv;
   const run = COMMANDS[command];
@@ -1270,6 +1307,7 @@ export function main(argv) {
     out(USAGE);
     return command === undefined || command === "--help" ? 0 : 1;
   }
+  noteOlderConfig(command);
   try {
     return run(rest);
   } catch (error) {

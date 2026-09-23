@@ -8,7 +8,7 @@ import {
   modifiersOf,
   looksLikeTicketRef,
   mintId,
-  modulePrefixFor,
+  ticketOwnersToChooseFrom,
   resolveArgument,
   resumeAction,
   slugify,
@@ -49,14 +49,25 @@ test("a ref is told apart from a sentence", () => {
   assert.equal(looksLikeTicketRef("the export button"), false);
 });
 
-test("D51: the module prefix appears only when two modules could own the same issue", () => {
+test("D51: when two modules could own the same issue, kiln names them rather than picking one", () => {
   const single = { repo: { kind: "single" } };
   const oneOwner = { repo: { kind: "multi", tickets: ["admin-page"] } };
-  const twoOwners = { repo: { kind: "multi", tickets: ["admin-page", "portal"] } };
+  const twoOwners = { repo: { kind: "multi", tickets: ["admin-page", "portal"] }, tracker: { provider: "gitlab" } };
 
-  assert.equal(modulePrefixFor(single), null);
-  assert.equal(modulePrefixFor(oneOwner), null, "one owner cannot collide with anything");
-  assert.equal(modulePrefixFor(twoOwners), "admin-page");
+  assert.equal(ticketOwnersToChooseFrom(single), null);
+  assert.equal(ticketOwnersToChooseFrom(oneOwner), null, "one owner cannot collide with anything");
+  const resolved = resolveArgument({ arg: "42", root: tempRoot(), config: twoOwners });
+  assert.equal(resolved.id, null, "the first module is not the owner of every #42");
+  assert.deepEqual(resolved.modules, ["admin-page", "portal"]);
+  assert.doesNotMatch(resolveArgument({ arg: "fix the export", root: tempRoot(), config: twoOwners }).id, /admin-page/, "a sentence has no owning module");
+});
+
+test("D51: a sentence that mints an existing work's id is refused, not resumed as new", () => {
+  const root = tempRoot();
+  const now = new Date("2026-09-23T10:00:00Z");
+  const first = resolveArgument({ arg: "the export button does nothing", root, now });
+  writeState(root, newWork({ id: first.id, sessionId: "s", base: "aaa" }));
+  assert.throws(() => resolveArgument({ arg: "the export button does nothing", root, now }), /already exists/);
 });
 
 test("B10: a URL is recognised before anything else tries to interpret it", () => {
@@ -81,7 +92,7 @@ test("B12 / D79: a reserved word resolves ahead of every other branch", () => {
  */
 test("B12: a word held for a later version says so, and names what exists instead", () => {
   const { message } = resolveArgument({ arg: "dna", root: tempRoot() });
-  assert.match(message, /v1\.2/, "it names the version the user is waiting for");
+  assert.match(message, /does not ship it yet/, "it says what the user is waiting for, without promising a version D107 took back");
   assert.match(message, /kiln blast/, "and the tier-0 command that works today");
 
   for (const word of ["init", "doctor"]) {
@@ -89,9 +100,11 @@ test("B12: a word held for a later version says so, and names what exists instea
   }
 });
 
-test("B14: a work directory cannot shadow a reserved word", () => {
+test("B14: a work directory cannot shadow a reserved word, because it cannot be made", () => {
   const root = tempRoot();
-  writeState(root, newWork({ id: "dna", sessionId: "s", base: "aaa" }));
+  for (const word of RESERVED) {
+    assert.throws(() => writeState(root, newWork({ id: word, sessionId: "s", base: "aaa" })), /is a command/);
+  }
   assert.equal(resolveArgument({ arg: "dna", root }).kind, "reserved", "the command wins");
 });
 

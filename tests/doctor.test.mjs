@@ -14,6 +14,7 @@ function project(overrides = {}) {
   const root = tempRoot("kiln-doctor-");
   writeConfig(root, { ...DEFAULTS, ...overrides, stack: { id: "node", cmd: { test: "npm test", typecheck: "tsc --noEmit" }, ...overrides.stack } });
   writeFile(join(root, ".kiln", "rules", "index.md"), "# Project rules\n\n| Trigger | Rule file |\n|---|---|\n");
+  writeFile(join(root, ".gitignore"), ".kiln/tmp/\n");
   return root;
 }
 
@@ -138,7 +139,35 @@ test("doctor --write on a healthy project repairs nothing and says so", () => {
   const root = project();
   const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
   const run = spawnSync(process.execPath, [bin, "doctor", "--write"], { cwd: root, encoding: "utf8" });
-  assert.match(run.stdout, /Nothing to repair/);
+  assert.match(run.stdout, /Nothing more to repair/);
+});
+
+test("doctor --write repairs what has one right answer: a moved module, an unignored work tree, an old schema", () => {
+  const root = initRepo(tempRoot("kiln-doctor-repair-"));
+  const sub = initRepo(tempRoot("kiln-doctor-sub-"));
+  writeFile(join(sub, "a.txt"), "a\n");
+  commitAll(sub, "sub");
+  git(root, ["-c", "protocol.file.allow=always", "submodule", "add", "-q", "--name", "admin-page", sub, "apps/AdminPage"]);
+  commitAll(root, "super");
+  writeConfig(root, {
+    ...DEFAULTS,
+    schema_version: 0,
+    repo: { kind: "multi", root: null, modules: { "admin-page": "AdminPage" }, tickets: ["admin-page"] },
+    work: { committed: false },
+    stack: { id: "node", cmd: { test: "npm test" } },
+  });
+  writeFile(join(root, ".kiln", "rules", "index.md"), "# Project rules\n\n| Trigger | Rule file |\n|---|---|\n");
+  assert.equal(row(root, "modules")[0].status, STATUS.fail);
+
+  const bin = new URL("../bin/kiln.mjs", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [bin, "doctor", "--write"], { cwd: root, encoding: "utf8" });
+  assert.match(run.stdout, /repo\.modules\.admin-page → apps\/AdminPage/);
+  assert.match(run.stdout, /schema_version → 1/);
+  const written = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
+  assert.equal(written.repo.modules["admin-page"], "apps/AdminPage");
+  assert.equal(written.schema_version, 1);
+  assert.match(readFileSync(join(root, ".gitignore"), "utf8"), /^\.kiln\/work\/$/m, "work.committed: false is read at last");
+  assert.equal(row(root, "modules")[0].status, STATUS.ok);
 });
 
 test("D81: a per-module map outside a multi-repo config is named, not resolved silently", () => {

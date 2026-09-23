@@ -147,6 +147,7 @@ test("doctor's closing line does not read as fine when something is warned about
     stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] },
   });
   writeFile(join(root, ".husky", "pre-push"), "#!/bin/sh\n# husky owns this\n");
+  writeFile(join(root, ".gitignore"), ".kiln/tmp/\n");
   git(root, ["config", "core.hooksPath", ".husky"]);
   installFloor(root);
 
