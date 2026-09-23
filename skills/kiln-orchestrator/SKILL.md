@@ -433,8 +433,9 @@ Ask what has to be opened before opening anything:
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id>
 ```
 
-Once they exist, hand the urls back. A work that does not say it shipped goes on claiming
-the files it predicted, and the next work touching one of them halts against it:
+Once they exist, hand the urls back. That record is what makes the work `shipped`, which is
+what lets a second pass open on it — and it is the only account anyone has of where the
+change went, because kiln cannot see a pull request:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id> --opened <url,url>

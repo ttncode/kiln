@@ -307,3 +307,19 @@ test("the recommendation rides on the option, and exactly one option carries it"
   }
   assert.match(body, /bare word and nothing else/, "a reason inside the mark turns a scannable list back into prose");
 });
+
+/**
+ * D119 corrected the CLI help that said `--opened` "stops claiming the files it predicted".
+ * The same sentence stood in the orchestrator, which is the copy the agent actually reads —
+ * and on the next run it read it there and told the user, again, that a finished work was
+ * still holding a file it had let go at the review gate. One fact, two places, one fixed.
+ */
+test("no skill tells the agent that shipping is what releases the claim", () => {
+  for (const name of skillNames()) {
+    const body = readFileSync(join(SKILLS, name, "SKILL.md"), "utf8");
+    assert.ok(
+      !/(?:goes on|stops) claiming/.test(body),
+      `${name}: the claim is released at the review gate, not by \`ship --opened\``,
+    );
+  }
+});
