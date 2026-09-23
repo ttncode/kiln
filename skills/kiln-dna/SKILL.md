@@ -142,7 +142,9 @@ with an `OPEN` one.
 **Phase 8 — baseline.** One `updates` record, `kind: "INITIAL_BUILD"`, carrying the totals,
 `audit_sample` and `flags`. `kiln dna check` passes. The store is tracked: commit
 `.kiln/dna/store/` on a branch of its own and hand the user the pull request — the pins take
-effect when it merges into the integration branch (D80). Never push to the integration branch.
+effect when it merges into the integration branch (D80). Merging it is the user's, through their
+forge: never offer to merge into or push to the integration branch yourself — the guard refuses
+it, and a menu that recommends it hands the user a step that fails.
 
 ## Update — `/kiln dna update`
 
@@ -194,6 +196,7 @@ proposals and the sample audit: the strongest tier you have — one wrong verdic
 - A subagent received a summary instead of the real findings or the real lines.
 - A process was invented to fill a stage.
 - The store was scanned off the integration branch and you are about to call it pinned.
+- Your closing menu offers to merge the store branch into the integration branch.
 
 ## Verification
 
