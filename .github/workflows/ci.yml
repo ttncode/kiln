@@ -19,4 +19,6 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run lint
+      # kiln writes its own bash since the push floor (D90), which is D26's condition for this.
+      - run: shellcheck lib/floor/pre-push.sh skills/kiln-brainstorming/scripts/*.sh
       - run: npm test

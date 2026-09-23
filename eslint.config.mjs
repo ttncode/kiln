@@ -1,9 +1,9 @@
 import js from "@eslint/js";
 
 export default [
-  // The visual companion is vendored code (D26, D69). Restyling it would mean
+  // The visual companion is forked code (D26, D69). Restyling it would mean
   // rewriting 1,400 lines kiln did not author and does not maintain.
-  { ignores: ["vendor/**", "node_modules/**", "tests/fixtures/**/tmp/**", "skills/kiln-brainstorming/scripts/**"] },
+  { ignores: ["node_modules/**", "skills/kiln-brainstorming/scripts/**"] },
   js.configs.recommended,
   {
     languageOptions: {

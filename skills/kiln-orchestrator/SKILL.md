@@ -89,7 +89,7 @@ question.
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" init --propose
 ```
 
-That writes nothing. It returns `config`, `detected`, and **`questions`** — at most five,
+That writes nothing. It returns `config`, `detected`, and **`questions`** — three on a typical clone, at most six,
 each carrying the answer kiln would use anyway. **Ask them.** Then write the answers in:
 
 ```bash
