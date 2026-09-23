@@ -107,9 +107,11 @@ test("a trigger written in backticks is the same trigger", () => {
   assert.equal(matchingRules(root, ["src/a.ts"]).length, 1);
 });
 
-test("E14: a stage that names no files says so, rather than reporting that no rule applied", () => {
+test("E14: a stage that names no files says so, and names the way to name them", () => {
   const root = router(["src/** | r.md"], { "r.md": "R." });
-  assert.match(report(root, []).text, /names no files yet/);
+  const plan = report(root, []).text;
+  assert.match(plan, /No files were named/);
+  assert.match(plan, /--predicted/, "a block naming nowhere to go is the shape that makes an agent invent one");
   assert.match(report(root, [], "review").text, /changed no files yet/);
 });
 
@@ -144,27 +146,43 @@ function opened(rows, files) {
  * predicted is the case a router that only sees what is already in context cannot cover,
  * and it is also the case that matters most: unpredicted files are where a run goes wrong.
  */
-test("E05: plan reads what the plan predicted; review reads what the diff actually touched", () => {
+/**
+ * Measured on the owner's run: the plan-stage call returned "The plan names no files yet"
+ * every time, because `state.predicted` is written by the **gate** (D31 — it is the
+ * *approved* preview) and the router was reading it before the gate that fills it. The agent
+ * diagnosed it and matched the rules by hand, routing around the verb, which is D112 a third
+ * time.
+ *
+ * These tests wrote `predicted` straight into state.json, so they exercised a state the
+ * product has no way to reach at that point in a run. They go through the verb now.
+ */
+test("E05: plan reads the files it is given; review reads what the diff actually touched", () => {
   const root = opened(["src/**/*.js | js.md"], { "js.md": "No console.log." });
 
-  const before = JSON.parse(readFileSync(join(root, ".kiln", "work", "w1", "state.json"), "utf8"));
-  writeFileSync(join(root, ".kiln", "work", "w1", "state.json"), JSON.stringify({ ...before, predicted: ["docs/plan.md"] }));
-
-  assert.match(ok(root, ["rules", "w1", "--stage", "plan"]).stdout, /None of them match/);
+  assert.match(ok(root, ["rules", "w1", "--stage", "plan", "--predicted", "docs/plan.md"]).stdout, /None of them match/);
+  assert.match(ok(root, ["rules", "w1", "--stage", "plan", "--predicted", "src/app.js"]).stdout, /No console\.log\./,
+    "the paths come from the caller, because the approved claim does not exist yet");
 
   writeFile(join(root, "src", "extra.js"), "console.log(1);\n");
   commitAll(root, "an unpredicted file");
   assert.match(ok(root, ["rules", "w1", "--stage", "review"]).stdout, /No console\.log\./);
 });
 
+test("E05: after the gate has claimed them, the plan stage needs no flag", () => {
+  const root = opened(["src/** | js.md"], { "js.md": "No console.log." });
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  ok(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
+
+  assert.match(ok(root, ["rules", "w1", "--stage", "plan"]).stdout, /No console\.log\./,
+    "state.predicted is the fallback, and it is real once the gate has written it");
+});
+
 test("E06: the verb records what it handed over, so the report can say it rather than assume it", () => {
   const root = opened(["src/** | js.md"], { "js.md": "No console.log." });
-  ok(root, ["rules", "w1", "--stage", "plan"]);
+  ok(root, ["rules", "w1", "--stage", "plan", "--predicted", "docs/nothing.md"]);
   assert.deepEqual(state(root, "w1").rules, [{ stage: "plan", files: [] }], "an empty hand-over is still a record of having asked");
 
-  const before = JSON.parse(readFileSync(join(root, ".kiln", "work", "w1", "state.json"), "utf8"));
-  writeFileSync(join(root, ".kiln", "work", "w1", "state.json"), JSON.stringify({ ...before, predicted: ["src/app.js"] }));
-  ok(root, ["rules", "w1", "--stage", "plan"]);
+  ok(root, ["rules", "w1", "--stage", "plan", "--predicted", "src/app.js"]);
   assert.deepEqual(state(root, "w1").rules, [{ stage: "plan", files: ["js.md"] }]);
 });
 
