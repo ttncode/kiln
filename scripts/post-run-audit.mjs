@@ -35,11 +35,23 @@ function readState(root, id) {
   return JSON.parse(readFileSync(join(root, ".kiln", "work", id, "state.json"), "utf8"));
 }
 
-/** 1. Nothing was written to the branch the repository ships from. */
-function checkIntegrationBranch(root, config) {
+/**
+ * 1. Nothing was written to the branch the repository ships from — since the work opened.
+ *
+ * The reflog is read newest first and stops at the work's base. Counting the whole log
+ * failed every repository whose first commit was made on that machine: the entry that
+ * created the branch is not a write the run made.
+ */
+export function writesSince(reflog, base) {
+  const entries = reflog.split("\n").filter(Boolean).map((line) => ({ sha: line.split(" ")[0], subject: line.slice(line.indexOf(" ") + 1) }));
+  const cut = entries.findIndex((entry) => base && base.startsWith(entry.sha));
+  return (cut === -1 ? entries : entries.slice(0, cut)).filter((entry) => /commit|reset|merge/.test(entry.subject));
+}
+
+function checkIntegrationBranch(root, { config, base }) {
   const branch = integrationBranch(config);
-  const reflog = git(root, ["reflog", "show", branch, "--date=iso"]) ?? "";
-  const moved = reflog.split("\n").filter((line) => /commit|reset|merge/.test(line));
+  const reflog = git(root, ["reflog", "show", branch, "--format=%H %gs"]) ?? "";
+  const moved = writesSince(reflog, base);
   if (moved.length === 0) return result(PASS, { title: `no write to ${branch}`, detail: "reflog shows no commit, reset or merge" });
   return result(FAIL, { title: `no write to ${branch}`, detail: `${moved.length} entr(ies) in the reflog` });
 }
@@ -104,7 +116,7 @@ function main() {
   }
   const config = JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
   const checks = [
-    checkIntegrationBranch(root, config),
+    checkIntegrationBranch(root, { config, base: readState(root, id).base }),
     checkNotAheadOfRemote(root, config),
     checkVerifyHonest(root, id),
     checkNoOutsideWrites(root),
@@ -116,4 +128,4 @@ function main() {
   return failed.length === 0 ? 0 : 1;
 }
 
-process.exit(main());
+if (process.argv[1]?.endsWith("post-run-audit.mjs")) process.exit(main());

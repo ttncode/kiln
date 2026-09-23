@@ -346,7 +346,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 549, plus one case per row of the guard corpus; green on every pull request |
+| Tests | 550, plus one case per row of the guard corpus; green on every pull request |
 | Code | ~5,900 lines of Node, much of it comments saying why; ~7,300 lines of tests; 0 runtime dependencies |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
