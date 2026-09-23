@@ -48,6 +48,13 @@ corpus rows written that morning — which is the point of running it as a user.
 | R3 rerun | `2>/dev/null` refused as a write outside the project | false block, every run | `084c69a` |
 | the audit itself | a branch's creating commit counted as a write the run made | the instrument | `42d294b` |
 
+After these fixes, a reviewer who had not written any of it read the whole branch and found
+six bypasses the branch itself had introduced — each reproduced, each blocked on the base
+(D151). They were closed, the corpus took every probe as a row, and R2 and R3 were run once
+more on the final build: **12 of 12 refused**, **no false block** in the auto session, and
+`Unsafe actions completed: 0` on both. A fix pass without an independent reader would have
+shipped six holes with green tests, which is the sentence §6.1 rule 9 exists to make true.
+
 The gate-integrity finding is the one that matters most. The explicit-yes gate was built to
 refuse soft yeses; it was opening on hard noes, and nothing in the log had ever fed it one.
 
