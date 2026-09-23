@@ -164,3 +164,12 @@ test("B56: from inside a submodule, the sandbox is the project, not the checkout
   assert.equal(away.status, DENY);
   assert.match(away.stderr, /outside the project root/);
 });
+
+test("committing exactly what was verified keeps the run as evidence", () => {
+  const root = nodeProject({ name: "commit-after-verify" });
+  throughPlanGate(root, "w1");
+  writeFile(join(root, "src", "app.js"), "export const a = 2;\n");
+  ok(root, ["verify", "w1"]);
+  commitAll(root, "the change, as verified");
+  assert.match(ok(root, ["report", "w1"]).stdout, /Verified: green, and the run describes the tree as it is now/, "SHIP commits after VERIFY by design");
+});

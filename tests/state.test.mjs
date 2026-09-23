@@ -95,10 +95,10 @@ test("D29: verify entries record the exit code, never a reading of stdout", () =
   assert.equal(state.verify[0].exit, 1);
 });
 
-test("an entry from another range, or another tree, is stale, not evidence", () => {
+test("an entry for another tree is stale, not evidence; a commit of the same tree is not", () => {
   const entry = { id: "unit", exit: 0, range: "aaaa111..bbbb222", tree: "t1" };
   assert.equal(isStaleVerify(entry, { range: "aaaa111..bbbb222", tree: "t1" }), false);
-  assert.equal(isStaleVerify(entry, { range: "aaaa111..cccc333", tree: "t1" }), true, "a new commit");
+  assert.equal(isStaleVerify(entry, { range: "aaaa111..cccc333", tree: "t1" }), false, "a commit of exactly what was verified moves the range, not the content");
   assert.equal(isStaleVerify(entry, { range: "aaaa111..bbbb222", tree: "t2" }), true, "an uncommitted edit");
   assert.equal(isStaleVerify({ id: "unit", exit: 0, range: "aaaa111..bbbb222" }, { range: "aaaa111..bbbb222", tree: "t1" }), true, "a record naming no tree");
 });
