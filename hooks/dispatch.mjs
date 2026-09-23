@@ -102,7 +102,7 @@ async function stackGuardsOnBashWrites(payload, ctx) {
  */
 function repoFor(part, { root, cwd }) {
   return {
-    branches: branchesFor(part, { root, cwd }),
+    ...branchesFor(part, { root, cwd }),
     resolveRef: (spec) => (cwd === null ? null : gitOutput(dirOf(part, cwd), ["rev-parse", "--abbrev-ref", spec])),
   };
 }
