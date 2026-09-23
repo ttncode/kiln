@@ -380,7 +380,8 @@ the diff, which is the one thing this stage buys.
 Write the code. Run the `fast` steps. A `fast` pass is **never reported as green**: it ran
 only what the change touched, and the project's suite is what defines green.
 
-Ask again, against what the diff actually touched rather than what the plan predicted:
+**Match the rules against the diff.** This is a different question from the one PLAN asked —
+that one was about files you intended to touch, this one is about files you did:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage review
@@ -388,6 +389,10 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage review
 
 A rule appearing here that did not appear at PLAN is the interesting case: the run reached a
 file the plan never named. Check the diff against it before anything else in the review.
+
+**The review gate refuses until this has run.** Not because the rules always matter, but
+because the run that most needs them is the one that wandered, and that run cannot be told
+from any other without asking.
 
 If the review settles a convention this project will want again, offer to record it — the
 user decides, and the command is the only way to write one:
