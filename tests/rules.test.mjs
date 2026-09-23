@@ -465,3 +465,49 @@ test("a submodule's files are not invisible to the router's checks", () => {
   const routing = runChecks(root, loadConfig(root)).filter((row) => row.title === "rules routing");
   assert.deepEqual(routing.map((row) => row.status), ["ok"], `a live route reported as dead: ${JSON.stringify(routing)}`);
 });
+
+/**
+ * Two runs reached REVIEW. The first called `kiln rules --stage review`; the second did not,
+ * and nothing noticed — a coin flip on the one claim D101 makes that nothing else covers: a
+ * rule reaching a file **the plan never predicted**.
+ *
+ * D20's evidence is that this is how prose ends, and it is measured rather than argued — the
+ * repository that authored the rule-budget law violated it 28 times because it was prose and
+ * not a gate. So the review gate asks.
+ */
+function atReview(rows, files) {
+  const root = routed(nodeProject({ name: `gate-${Object.keys(files).join("-") || "bare"}` }), rows, files);
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  return root;
+}
+
+const recordReview = (root) =>
+  kiln(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "1. Approve this review (recommended)"]);
+
+test("the review gate refuses until the diff has been matched against the rules", () => {
+  const root = atReview(["src/** | js.md"], { "js.md": "No console.log." });
+
+  const refused = recordReview(root);
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /nothing has matched this run's diff/);
+  assert.match(refused.stderr, /kiln rules w1 --stage review/, "and it names the command that clears it");
+
+  ok(root, ["rules", "w1", "--stage", "review"]);
+  assert.equal(recordReview(root).status, 0, "asked and answered, the gate records");
+});
+
+/**
+ * A precondition that buys nothing is friction the next person routes around — which is the
+ * failure this whole line of decisions is about.
+ */
+test("a project that has routed no rule is not asked", () => {
+  assert.equal(recordReview(atReview([], {})).status, 0);
+});
+
+test("the plan gate is not asked — its call shapes a document the user is about to read", () => {
+  const root = atReview(["src/** | js.md"], { "js.md": "No console.log." });
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  const run = kiln(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", "1. Approve this plan as written (recommended)"]);
+  assert.equal(run.status, 0);
+});

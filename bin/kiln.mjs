@@ -8,7 +8,7 @@ import { floorStatus, installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
-import { STAGES, addRoute, rulesReport } from "../lib/rules.mjs";
+import { STAGES, addRoute, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
@@ -398,13 +398,46 @@ function runGate(argv) {
     out(JSON.stringify({ recorded: false, ...reAskFor(key) }, null, 2));
     return 2;
   }
+  return gateOrRefuse(root, { id, key, decision, answer, rest });
+}
+
+/** Two preconditions, both refusals, both naming the command that clears them. */
+function gateOrRefuse(root, { id, key, decision, answer, rest }) {
+  const unread = unreadRules(root, { id, key });
+  if (unread) return process.stderr.write(`${unread}\n`) && 2;
+
   const claimed = claimedPaths(rest);
   const conflicts = claimConflicts(root, { paths: claimed, forId: id });
-  if (conflicts.length > 0) {
-    process.stderr.write(`${describeConflicts(conflicts)}\n`);
-    return 2;
-  }
+  if (conflicts.length > 0) return process.stderr.write(`${describeConflicts(conflicts)}\n`) && 2;
+
   return writeGate(root, { id, key, decision, answer, claimed, rest });
+}
+
+/**
+ * The review gate asks whether the rules were read, because prose did not make it happen.
+ *
+ * Two runs reached REVIEW. The first called `kiln rules --stage review`; the second did not,
+ * and nothing noticed — which is a coin flip on the one claim D101 makes that nothing else
+ * covers: a rule reaching a file **the plan never predicted**. D20's own evidence is that
+ * this is how prose ends, and it is measured rather than argued: the repository that authored
+ * the rule-budget law violated it 28 times because it was prose and not a gate.
+ *
+ * A project that has routed no rule is not asked: there is nothing to read, and a precondition
+ * that buys nothing is friction the next person routes around. Where a rule *is* routed the
+ * question is whether the router **ran**, never whether anything matched — `files: []` is the
+ * record of having asked, and it was built for exactly this.
+ *
+ * Review only. PLAN's call shapes a document the user is about to read, and a plan that
+ * ignored a rule is visible in the gate; REVIEW's call is the last moment anything looks at
+ * the files the run actually touched.
+ */
+function unreadRules(root, { id, key }) {
+  if (key !== "review") return null;
+  if (!readRoutes(root).some((row) => row.state === "route")) return null;
+  if ((readState(root, id).rules ?? []).some((row) => row.stage === "review")) return null;
+  return `kiln refused the review gate: nothing has matched this run's diff against the project's rules.
+Run \`kiln rules ${id} --stage review\` first, answer anything it prints, then record the gate.
+A rule reaching a file the plan never predicted is the case this catches, and it is the last moment to catch it.`;
 }
 
 function refuseAuto(key, refusal) {
