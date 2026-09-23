@@ -216,7 +216,9 @@ test("J6.1/J6.2 the exit code is the verdict, whatever the output says", () => {
   const pass = nodeProject({ name: "j61", cmd: { test: "echo everything is fine" } });
   ok(pass, ["open", "w1", "--session", SESSION]);
   assert.match(ok(pass, ["verify", "w1"]).stdout, /green/);
-  assert.match(ok(pass, ["report", "w1"]).stdout, /Verified: 1 step\(s\) ran · green/, "J6.1 — verifying before committing is the ordinary case");
+  assert.match(ok(pass, ["report", "w1"]).stdout, /Verified: green, and the run describes the tree as it is now/, "J6.1 — verifying before committing is the ordinary case");
+  writeFile(join(pass, "src", "app.js"), "export const a = 2;\n");
+  assert.match(ok(pass, ["report", "w1"]).stdout, /tree has changed since/, "an edit after the run is not covered by it, committed or not");
 
   const lying = nodeProject({ name: "j62", cmd: { test: "echo All tests passed && exit 1" } });
   ok(lying, ["open", "w1", "--session", SESSION]);
@@ -377,8 +379,8 @@ test("J9.1 an auto run on full reaches a pull request with no human gate, as des
   ok(root, ["open", "w1", "--path", "full", "--session", SESSION, "--auto"]);
 
   for (const key of ["spec", "plan", "review", "ship"]) {
-    writeFile(join(root, ".kiln", "work", "w1", `${key === "review" ? "review" : key}.md`), `# ${key}\n`);
-    assert.equal(ok(root, ["gate", "w1", key, "--artifact", `.kiln/work/w1/${key}.md`, "--auto"]).status, 0, key);
+    if (key !== "ship") writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
+    assert.equal(ok(root, ["gate", "w1", key, "--auto"]).status, 0, key);
   }
   assert.equal(await bash(root, "gh pr create --fill"), ALLOW, "the design says the PR becomes the gate");
   assert.match(ok(root, ["report", "w1"]).stdout, /Auto-ruled 4 gates/, "and every one of them is named");

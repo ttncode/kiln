@@ -372,7 +372,7 @@ test("the report says whether anything was verified", () => {
   assert.match(kiln(root, ["report", "wv"]).stdout, /Verified: never/, "a skipped step is not a step that ran");
 
   writeState(root, { ...skipped, verify: [{ id: "unit", exit: 0 }], last_verified: "deadbeef123" });
-  assert.match(kiln(root, ["report", "wv"]).stdout, /Verified: 1 step\(s\) ran · green at deadbeef1/);
+  assert.match(kiln(root, ["report", "wv"]).stdout, /was green at deadbeef1, and the tree has changed since/, "a record that names no tree is not evidence for this one");
 });
 
 /**

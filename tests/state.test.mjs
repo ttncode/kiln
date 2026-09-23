@@ -7,11 +7,9 @@ import {
   SHIP_AUTHORIZING,
   STATUS,
   StateError,
-  gateApproved,
   hashArtifact,
   isStaleVerify,
   newWork,
-  openNextPass,
   readState,
   recordFullVerified,
   recordGate,
@@ -83,32 +81,12 @@ test("D16: an auto-ruled gate records that nobody was asked", () => {
   assert.equal(state.gates.review.artifact_sha, null);
 });
 
-test("D85: a new pass clears the previous pass's approvals", () => {
-  const plan = writeFile(`${tempRoot()}/plan.md`, "# the plan\n");
-  let state = recordGate(seed(), { key: "plan", decision: "approved", artifactPath: plan, answer: "yes" });
-  state = recordGate(state, { key: "review", decision: "accepted", answer: "ship it" });
-  state = { ...state, predicted: [{ path: "src/a.ts", effect: "~" }], status: STATUS.shipped };
-
-  const next = openNextPass(state, "bbbb222");
-
-  assert.deepEqual(next.gates, {}, "an approval belongs to the pass that earned it");
-  assert.deepEqual(next.predicted, [], "the claim set was the previous pass's");
-  assert.equal(gateApproved(next, "plan"), false);
-  assert.equal(gateApproved(next, "review"), false);
-});
-
-test("D85: a new pass re-anchors on what shipped and keeps carry_over", () => {
-  const carried = [{ from_pass: 1, kind: "ratchet", text: "spike findings folded in" }];
-  const state = { ...seed(), pass: 1, carry_over: carried, verify: [{ id: "unit", exit: 0 }] };
-
-  const next = openNextPass(state, "bbbb222");
-
-  assert.equal(next.pass, 2);
+test("a follow-up work names the one it follows and inherits none of its approvals", () => {
+  const next = newWork({ id: "42.2", sessionId: "s", base: "bbbb222", follows: "42" });
+  assert.equal(next.follows, "42");
+  assert.deepEqual(next.gates, {});
+  assert.deepEqual(next.predicted, []);
   assert.equal(next.base, "bbbb222");
-  assert.equal(next.last_verified, "bbbb222", "D67a: REVIEW must not reach behind what shipped");
-  assert.deepEqual(next.carry_over, carried, "D58: the one field designed to cross the boundary");
-  assert.deepEqual(next.verify, [], "evidence for a shipped pass is not evidence for this one");
-  assert.equal(next.status, STATUS.inProgress);
 });
 
 test("D29: verify entries record the exit code, never a reading of stdout", () => {
@@ -117,10 +95,12 @@ test("D29: verify entries record the exit code, never a reading of stdout", () =
   assert.equal(state.verify[0].exit, 1);
 });
 
-test("D67a: an entry from another range is stale, not evidence", () => {
-  const entry = { id: "unit", exit: 0, range: "aaaa111..bbbb222" };
-  assert.equal(isStaleVerify(entry, "aaaa111..bbbb222"), false);
-  assert.equal(isStaleVerify(entry, "aaaa111..cccc333"), true);
+test("an entry from another range, or another tree, is stale, not evidence", () => {
+  const entry = { id: "unit", exit: 0, range: "aaaa111..bbbb222", tree: "t1" };
+  assert.equal(isStaleVerify(entry, { range: "aaaa111..bbbb222", tree: "t1" }), false);
+  assert.equal(isStaleVerify(entry, { range: "aaaa111..cccc333", tree: "t1" }), true, "a new commit");
+  assert.equal(isStaleVerify(entry, { range: "aaaa111..bbbb222", tree: "t2" }), true, "an uncommitted edit");
+  assert.equal(isStaleVerify({ id: "unit", exit: 0, range: "aaaa111..bbbb222" }, { range: "aaaa111..bbbb222", tree: "t1" }), true, "a record naming no tree");
 });
 
 test("D76: only a green full phase advances the anchor", () => {
@@ -134,7 +114,6 @@ test("every transition returns a new object rather than mutating its input", () 
   const snapshot = JSON.stringify(before);
   recordGate(before, { key: "plan", decision: "approved", answer: "y" });
   recordVerify(before, { id: "unit", exit: 0 });
-  openNextPass(before, "bbbb222");
   assert.equal(JSON.stringify(before), snapshot);
 });
 
