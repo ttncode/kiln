@@ -5,7 +5,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { destructiveTargets, opensPullRequest, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { dispatch } from "../hooks/dispatch.mjs";
@@ -460,4 +460,36 @@ test("a write outside the project names the place a temp file does belong", asyn
   assert.match(message, /outside the project root/);
   assert.match(message, /\.kiln\/tmp\/42\//, "the remedy is a path, not a principle");
   assert.match(message, /gitignored/);
+});
+
+/**
+ * D33: kiln does not police a session it is not driving. Measured on a user's machine —
+ * one `kiln init`, no work open, and every later Claude Code session in that project was
+ * refused a write to `~/.claude.json`, with `.kiln/tmp/<work-id>/` offered as the remedy
+ * for a work id that did not exist.
+ */
+test("with no work open there is no run to keep anything inside of", async () => {
+  const project = kilnProject();
+  rmSync(join(project.root, ".kiln", "work", project.id), { recursive: true, force: true });
+
+  assert.equal(
+    await edit("/tmp/somewhere-else/notes.txt", project),
+    ALLOW,
+    "nothing is being guarded, so nothing is blocked",
+  );
+  assert.equal(
+    await edit(join(project.root, ".git", "hooks", "pre-push"), project),
+    BLOCK,
+    "the push floor stands outside a run — it is what a run is not needed for",
+  );
+  assert.equal(
+    await edit(join(project.root, ".kiln", "config.json"), project),
+    BLOCK,
+    "kiln's own control files are not a session's to edit either",
+  );
+});
+
+test("with a work open the boundary has its whole force", async () => {
+  const project = kilnProject();
+  assert.equal(await edit("/tmp/somewhere-else/notes.txt", project), BLOCK);
 });
