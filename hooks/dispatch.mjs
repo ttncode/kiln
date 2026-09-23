@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 import { readFileSync, realpathSync } from "node:fs";
-import { loadConfig } from "../lib/config.mjs";
+import { loadConfig, resolveRoot } from "../lib/config.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { isAbsolute, join, relative } from "node:path";
-import { PathError, isSymlink, resolveTarget } from "../lib/paths.mjs";
+import { PathError, isSymlink, resolveEntry, resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, removalTargets, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { interpreterMessage, interpreterReach } from "../lib/guards/interpreter.mjs";
-import { isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
+import { holdsControl, isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
 import { StackError, UNDETECTED, guardsFor, loadStack } from "../lib/stack.mjs";
 
@@ -22,6 +22,8 @@ function readStdin() {
   try {
     return JSON.parse(readFileSync(0, "utf8"));
   } catch {
+    // fail-open: input that is not JSON means the harness is broken, not that a write is
+    // happening; refusing every call then bricks the session and protects nothing.
     return {};
   }
 }
@@ -37,20 +39,40 @@ function block(message) {
  * the promise it exists to keep a paper one (D33).
  */
 function rootAndBranches(cwd) {
+  const found = resolveRoot(cwd);
+  if (!found) return { root: cwd, protectedBranches: FALLBACK_PROTECTED, stackId: null, unreadable: null };
   try {
     const { root, config } = loadConfig(cwd);
-    return { root, protectedBranches: protectedBranchesFor(config), stackId: config.stack.id };
-  } catch {
-    return { root: cwd, protectedBranches: ["main", "master"], stackId: null };
+    return { root, protectedBranches: protectedBranchesFor(config), stackId: config.stack.id, unreadable: null };
+  } catch (error) {
+    // fail-closed: recorded as unreadable, and unreadableConfig blocks every write on it.
+    return { root: found, protectedBranches: FALLBACK_PROTECTED, stackId: null, unreadable: error.message };
   }
+}
+
+const FALLBACK_PROTECTED = ["main", "master"];
+
+/**
+ * A config that is there and cannot be read is not a project without one. Treating the two
+ * alike ran no stack guard — `stackId` came back null — so on a php-ci3 project a corrupted
+ * or half-written config let `DROP COLUMN` into a migration the same guard refuses with the
+ * file intact. Writes stop until the file reads; reading, and `kiln doctor`, carry on.
+ */
+function unreadableConfig(payload, ctx) {
+  if (!ctx.unreadable) return ALLOW;
+  const command = payload.tool_input?.command;
+  const writes = command === undefined || [...writeTargets(command), ...removalTargets(command), ...destructiveTargets(command)].length > 0;
+  return writes ? block(`kiln blocked this write: .kiln/config.json cannot be read, so the guards it configures cannot run.
+${ctx.unreadable}
+Fix the file yourself — \`kiln doctor\` names the problem — and this clears.`) : ALLOW;
 }
 
 function context(payload) {
   const cwd = payload.cwd ?? process.cwd();
-  const { root, protectedBranches, stackId } = rootAndBranches(cwd);
+  const { root, protectedBranches, stackId, unreadable } = rootAndBranches(cwd);
   const state = workForSession(root, payload.session_id) ?? claimUnbound(root, payload.session_id);
   const takenOver = state ? null : displacedFrom(root, payload.session_id);
-  return { cwd, root, protectedBranches, stackId, state, takenOver };
+  return { cwd, root, protectedBranches, stackId, unreadable, state, takenOver };
 }
 
 /**
@@ -60,7 +82,11 @@ function context(payload) {
 async function runStackGuard(guard, payload) {
   try {
     const module = await import(guard.path);
-    return module.check?.(payload) ?? null;
+    // A guard file with no `check` is a guard that never runs, and a promise it returns is a
+    // verdict that arrives after this function has answered. Both are the project's guard
+    // silently not running, which D33 refuses to call an allow.
+    if (typeof module.check !== "function") throw new Error("it exports no check(payload) function");
+    return (await module.check(payload)) ?? null;
   } catch (error) {
     const detail = error instanceof Error ? error.stack ?? error.message : String(error);
     return { blocked: true, reason: `stack guard "${guard.id}" failed.\n${guard.path}\n${detail}\nRun \`kiln doctor\`.` };
@@ -136,7 +162,10 @@ function guardProtectedBranch(payload, ctx) {
   const violation = protectedBranchViolation({
     command,
     protectedBranches: ctx.protectedBranches,
-    repoFor: (part, index) => repoFor(part, { root: ctx.root, cwd: chain[index] ?? ctx.cwd }),
+    // An unknown directory stays unknown. Falling back to the session's cwd turned "cannot
+    // tell which checkout" into "this one", which allowed a push from a submodule standing on
+    // a protected branch and refused a commit in a directory nobody could name.
+    repoFor: (part, index) => repoFor(part, { root: ctx.root, cwd: chain[index] }),
   });
   return violation ? block(protectedBranchMessage(violation)) : ALLOW;
 }
@@ -167,6 +196,7 @@ function pathRefusal(path, cwd) {
   try {
     points = `Write to the file it points at: ${realpathSync(at)}`;
   } catch {
+    // fail-closed: only the wording of a block that is already happening depends on this.
     points = "It points at something that does not exist, so there is nothing to write to.";
   }
   return `kiln blocked a write to ${at}: it is a symlink, and kiln does not follow one — a write through a symlink lands wherever it points, which is how an edit leaves the project.
@@ -202,8 +232,8 @@ function guardSandboxFile(payload, ctx) {
  */
 function guardRemovedControlFiles(command, ctx) {
   const hit = removalTargets(command)
-    .map((path) => resolveTarget(path, ctx.cwd))
-    .find((target) => isJudged(ctx.root, { target, activeId: ctx.state?.id }) || isVerificationFile(target));
+    .map((path) => resolveEntry(path, ctx.cwd))
+    .find((target) => isJudged(ctx.root, { target, activeId: ctx.state?.id }) || isVerificationFile(target) || holdsControl(ctx.root, target));
   return hit ? block(sandboxMessage(ctx.root, { target: hit, activeId: ctx.state?.id, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
 }
 
@@ -254,8 +284,8 @@ function guardGateBash(payload, ctx) {
 }
 
 const CHAINS = {
-  "pre-bash": [guardInterpreter, guardVerification, guardProtectedBranch, guardSandboxBash, guardGateBash],
-  "pre-edit": [guardSandboxFile, guardGateFile],
+  "pre-bash": [unreadableConfig, guardInterpreter, guardVerification, guardProtectedBranch, guardSandboxBash, guardGateBash],
+  "pre-edit": [unreadableConfig, guardSandboxFile, guardGateFile],
   "post-edit": [],
 };
 
