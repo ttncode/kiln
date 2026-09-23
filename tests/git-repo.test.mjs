@@ -43,10 +43,10 @@ test("a push inside a submodule is judged against the submodule's branch", () =>
   const root = superproject();
   const context = { root, cwd: root };
 
-  assert.deepEqual(branchesFor("git push", context), ["main"], "the superproject");
-  assert.deepEqual(branchesFor("git -C AdminPage push", context), ["v3-master"], "the submodule");
+  assert.deepEqual(branchesFor("git push", context).branches, ["main"], "the superproject");
+  assert.deepEqual(branchesFor("git -C AdminPage push", context).branches, ["v3-master"], "the submodule");
 
-  const repoFor = (part) => ({ branches: branchesFor(part, context), resolveRef: () => null });
+  const repoFor = (part) => ({ ...branchesFor(part, context), resolveRef: () => null });
   const hit = protectedBranchViolation({ command: "git -C AdminPage push", protectedBranches: ["v3-master"], repoFor });
   assert.equal(hit?.branch, "v3-master", "the superproject is on main, which is not protected here");
 
@@ -61,8 +61,9 @@ test("an unreadable directory falls back to every checkout here, not to a guess"
   const root = superproject();
   assert.deepEqual(checkoutsUnder(root).sort(), [root, join(root, "AdminPage")].sort());
 
-  const branches = branchesFor("cd $WHEREVER && git push", { root, cwd: root });
-  assert.deepEqual(branches.sort(), ["main", "v3-master"], "blocking too much beats blocking the wrong thing");
+  const found = branchesFor("cd $WHEREVER && git push", { root, cwd: root });
+  assert.deepEqual(found.branches.sort(), ["main", "v3-master"], "blocking too much beats blocking the wrong thing");
+  assert.equal(found.resolved, false, "and the caller is told this is a candidate set, not the branch");
 });
 
 test("dirOf resolves relative to the session's directory", () => {
@@ -92,6 +93,61 @@ test("an uncertain directory is judged against every checkout, and a certain one
   const chain = (command) => cwdChain(command, root);
   const branches = (command, index) => branchesFor(command.split(/&&|\|\||;/)[index].trim(), { root, cwd: chain(command)[index] });
 
-  assert.deepEqual(branches("cd AdminPage && git push", 1), ["v3-master"]);
-  assert.deepEqual(branches("cd AdminPage || git push", 1).sort(), ["main", "v3-master"]);
+  assert.deepEqual(branches("cd AdminPage && git push", 1).branches, ["v3-master"]);
+  assert.deepEqual(branches("cd AdminPage || git push", 1).branches.sort(), ["main", "v3-master"]);
+});
+
+/**
+ * Measured on a real monorepo. A module standing on `feature/v3/#1864` ran
+ *
+ *   git merge origin/v3-master
+ *
+ * and kiln refused it as a write to `v3-master` — which was the merge's **source**. The
+ * superproject was on `v3-master`, the directory was not readable from the command text, and
+ * the fallback judged a one-branch write against every checkout's branch.
+ *
+ * "Every checkout" is a sound over-approximation for a push, whose refspec can name any ref
+ * on the remote. It is not one for `merge`, `commit`, `rebase`, `reset`, `revert` or
+ * `cherry-pick`: each writes to exactly one branch, the one HEAD is on where the command
+ * runs, and a set containing other repositories' branches is a different set, not a wider one.
+ *
+ * The user worked around it by merging the commit SHA instead. That is what a false block
+ * always buys, and it is the reason this is a defect rather than an inconvenience.
+ */
+test("a merge is judged against the branch it writes to, never against every checkout", () => {
+  const root = superproject();
+  const chain = (command) => cwdChain(command, root);
+  const repoFor = (command) => (part, index) => ({ ...branchesFor(part, { root, cwd: chain(command)[index] }), resolveRef: () => null });
+  const verdict = (command) => protectedBranchViolation({ command, protectedBranches: ["v3-master"], repoFor: repoFor(command) });
+
+  const unreadable = "cd $MODULE && git merge origin/v3-master";
+  assert.equal(verdict(unreadable), null, "v3-master is the source; the branch being written to is unknown and is not every branch");
+
+  for (const op of ["commit -m x", "rebase origin/v3-master", "reset --hard HEAD~1", "revert HEAD", "cherry-pick abc123"]) {
+    assert.equal(verdict(`cd $MODULE && git ${op}`), null, `git ${op} writes to one branch`);
+  }
+});
+
+/**
+ * The half that must not move. A push names its own destination, so an unreadable directory
+ * still means every checkout is a candidate — and D7 item 1 is the promise made of that half.
+ */
+test("a push with an unreadable directory is still judged against every checkout", () => {
+  const root = superproject();
+  const chain = (command) => cwdChain(command, root);
+  const repoFor = (command) => (part, index) => ({ ...branchesFor(part, { root, cwd: chain(command)[index] }), resolveRef: () => null });
+
+  const command = "cd $MODULE && git push";
+  const hit = protectedBranchViolation({ command, protectedBranches: ["v3-master"], repoFor: repoFor(command) });
+  assert.equal(hit?.branch, "v3-master");
+});
+
+/** And a HEAD-writing op kiln *can* place is judged exactly as before. */
+test("a merge kiln can place is still blocked when it writes to a protected branch", () => {
+  const root = superproject();
+  const repoFor = (part) => ({ ...branchesFor(part, { root, cwd: root }), resolveRef: () => null });
+
+  const hit = protectedBranchViolation({ command: "git -C AdminPage merge origin/topic", protectedBranches: ["v3-master"], repoFor });
+  assert.equal(hit?.branch, "v3-master", "AdminPage is on v3-master, and the merge lands there");
+  assert.equal(hit?.subcommand, "merge");
 });
