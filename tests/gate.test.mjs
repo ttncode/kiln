@@ -78,3 +78,15 @@ test("a menu label is read as the answer; the number alone is not", () => {
   assert.equal(classifyAnswer("1."), DECISION.notAYes);
   assert.equal(classifyAnswer("2"), DECISION.notAYes);
 });
+
+/**
+ * The menu label grew a `(recommended)` suffix. A format change that quietly stopped a gate
+ * recording approvals would be the most expensive kind, so the label is classified here
+ * rather than assumed — and a bare number still has to say nothing.
+ */
+test("the recommended label still records an approval, and a bare number still does not", () => {
+  assert.equal(classifyAnswer("1. Approve this plan as written (recommended)"), DECISION.approved);
+  assert.equal(classifyAnswer("Approve this plan as written (recommended)"), DECISION.approved);
+  assert.equal(classifyAnswer("1"), DECISION.notAYes, "a click is not a reading");
+  assert.equal(classifyAnswer("3. Stop here, keep the artifacts"), DECISION.rejected);
+});

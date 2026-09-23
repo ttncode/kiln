@@ -205,15 +205,16 @@ sentences was the question. One shape, every time:
 ```
 <what just finished, in one line with its numbers>. What would you like to do?
 
-1. <the recommended next action>
+1. <the next action> (recommended)
 2. <the alternative>
 3. <stop, and what survives if they do>
 
 Which option?
 ```
 
-- **Option 1 is your recommendation.** Put it first and say why in the line above, not in
-  a paragraph after.
+- **Exactly one option carries `(recommended)`**, and the line above says why. Put it first.
+  The mark goes on the option because that is where the choice is made; a paragraph of
+  argument after the menu is read by nobody.
 - **Option 3 always exists.** Stopping is a real choice and it must not be the one the
   user has to invent.
 - **A reply of `1` means option 1.** Expand it to that option's text before acting on it —
@@ -265,10 +266,16 @@ GATE — plan · <id>
 
 <the change preview, or the review summary>
 
-Recommendation: approve. <one sentence saying why>
+Plan complete — <one sentence saying why approving is the right move>
 
 Reply `approve` to record it, or tell me what to change.
 ```
+
+The first line **says what finished**, naming the stage — `Plan complete`, `Review complete`,
+`Spec complete`. It does not ask for a verdict. `Recommendation: approve` put kiln's
+preference above the evidence, where it reads as pressure rather than as a finding; the
+preference belongs on the option the user picks, which is where the decision is made and how
+the harness's own question UI already renders it.
 
 **Number the options, and make every label a full sentence.** kiln reads the sentence, not
 the number: `1. Approve this plan as written` records an approval, and a bare `1` does not —
@@ -276,23 +283,27 @@ it is a click, and a click is not evidence anyone read the artifact. That is why
 has to name what is being approved rather than say "yes".
 
 ```
-1. Approve this plan as written
+1. Approve this plan as written (recommended)
 2. Change something — tell me what
 3. Stop here, keep the artifacts
+
+Which option?
 ```
+
+**`(recommended)` marks exactly one option, and the line above says why.** One mark, or it
+marks nothing. It is a suffix on the label and nothing else changes: the whole sentence still
+goes to `--answer`, and the classifier reads the verdict from its opening clause, so
+`1. Approve this plan as written (recommended)` records an approval exactly as the bare label
+does.
 
 When the user answers `1`, expand it to that line's text and pass the whole sentence to
 `--answer`. Say what you recorded, so the transcript shows the words the gate was given.
 
-A menu is not a substitute for the recommendation above it. The user is choosing between
-actions you have already argued for.
+When a blocking unknown stands in the way, the line above the menu says so instead of arguing
+for approval, and **answering it becomes option 1 and carries the mark** — a gate that
+recommends approval over an unanswered question is asking for a decision nobody can make yet.
 
-When a blocking unknown is what stands in the way, say so in place of the recommendation
-and offer answering it as option 1 — a gate that recommends approval over an unanswered
-question is asking for a decision nobody can make yet.
-
-Recommendation first, numbered options after. Print the artifact's **absolute path** the
-moment it is written, so the user can open it.
+Print the artifact's **absolute path** the moment it is written, so the user can open it.
 
 ### 5b. Auto mode, when the project has turned it on
 
