@@ -493,3 +493,22 @@ test("with a work open the boundary has its whole force", async () => {
   const project = kilnProject();
   assert.equal(await edit("/tmp/somewhere-else/notes.txt", project), BLOCK);
 });
+
+/**
+ * `unknown` is the sentinel `init` writes when detection recognised nothing (D92). Looking
+ * it up as a filename threw, the throw reached the catch-all, and every edit in the project
+ * was refused with "This is a bug in kiln, not in your change" — which any project outside
+ * the two shipped stacks met on its first edit after `init`.
+ */
+test("a stack kiln did not detect contributes no guards, and says nothing about bugs", async () => {
+  const project = kilnProject({ stack: "unknown", gates: { plan: "approved" } });
+  assert.equal(await edit(project.source, project), ALLOW, "the plan gate is approved; nothing else has an opinion");
+});
+
+test("a stack that is named and missing still blocks, and names the config line", async () => {
+  const project = kilnProject({ stack: "rails", gates: { plan: "approved" } });
+  const message = blockMessage("pre-edit", payload({ file: project.source, root: project.root }));
+  assert.match(message, /no stack named "rails"/);
+  assert.match(message, /stack\.id.*config\.json/, "the fix is a line the user owns");
+  assert.ok(!/bug in kiln/.test(message), "a config kiln cannot serve is not kiln failing");
+});
