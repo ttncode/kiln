@@ -200,7 +200,9 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" blast --for <id> <term> <term>
 
 It prints the files that mention them, ranked, and records what it named: at REVIEW, `kiln
 scope` says how much of the real change it covered. Read the files it ranks first before
-widening the search.
+widening the search. With a DNA store it also prints a tier-1 list: files reached through the
+findings and features that name the terms, which a grep cannot see. A row marked `changed since
+the DNA read it` or `gone` is a claim older than the code — open the file before you rely on it.
 
 When the project has a DNA store (`kiln dna` says so), ask it how current it is before you
 trust it:
