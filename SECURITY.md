@@ -43,7 +43,7 @@ in an allow without saying why.
 
 | Situation | Verdict |
 |---|---|
-| no `.kiln/config.json` anywhere above the working directory | allow — kiln is not driving this project |
+| no `.kiln/config.json` above any directory the call touches — where it runs, the file it edits, where it `cd`s or `-C`s to, what it writes or removes | allow — kiln is not driving this project (D148) |
 | a config that is there and cannot be read or parsed | writes blocked; reads, and `kiln doctor`, carry on |
 | no work open in this session | allow, except kiln's own files and the push floor |
 | a work's `state.json`, or its directory, unreadable | block |
