@@ -343,7 +343,7 @@ test("D7 item 7 — verification cannot be switched off from inside the run", as
   }
 });
 
-test("the disarm matcher stays literal: -n is --dry-run for push, and git rejects the abbreviations", async () => {
+test("the disarm matcher reads flags, not words: -n is --dry-run for push, and a message is not a flag", async () => {
   const { root } = kilnProject({ gates: { plan: "approved" } });
   assert.equal(await bash("git push -n origin feat/x", { root }), ALLOW, "-n is --dry-run here, and the hook still runs");
   assert.equal(await bash("git commit -m 'no verify needed'", { root }), ALLOW, "the words are not the flag");
