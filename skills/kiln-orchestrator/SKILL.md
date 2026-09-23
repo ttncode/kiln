@@ -374,6 +374,16 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage review
 A rule appearing here that did not appear at PLAN is the interesting case: the run reached a
 file the plan never named. Check the diff against it before anything else in the review.
 
+If the review settles a convention this project will want again, offer to record it — the
+user decides, and the command is the only way to write one:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules add <file>.md --trigger "<glob>" --text "<the rule>"
+```
+
+It adds only. You cannot rewrite or delete a rule, which is the point: a rule is one of the
+terms this run is judged by.
+
 Write `.kiln/work/<id>/review.md`. Judge behaviour the plan does not mention by what a
 reasonable user would expect, and carry a **Declined to judge** list for what you set aside.
 Grade each finding by severity **and** likelihood. There is no minimum number of findings;
