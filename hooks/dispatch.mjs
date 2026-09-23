@@ -3,9 +3,9 @@ import { readFileSync, realpathSync } from "node:fs";
 import { loadConfig, resolveRoot } from "../lib/config.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { gitOutput } from "../lib/init.mjs";
-import { isAbsolute, join, relative } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { PathError, isSymlink, resolveEntry, resolveTarget } from "../lib/paths.mjs";
-import { destructiveTargets, opensPullRequest, removalTargets, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
+import { destructiveTargets, opensPullRequest, removalTargets, segmentsOf, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
@@ -34,15 +34,48 @@ function block(message) {
 }
 
 /**
- * Config missing or broken falls back to a hardcoded list and still blocks. It never
- * falls back to allow: a guard that opens when it cannot read its own settings makes
- * the promise it exists to keep a paper one (D33).
+ * Every directory this call touches: where it runs, the file it edits, the directories its
+ * command moves into, and the paths it writes or removes. kiln drives a project when one of
+ * them sits under a `.kiln/config.json` — not only when the session happens to stand in one.
  */
-function rootAndBranches(cwd) {
-  const found = resolveRoot(cwd);
-  if (!found) return { root: cwd, protectedBranches: FALLBACK_PROTECTED, stackId: null, unreadable: null };
+function touchedDirs(payload, cwd) {
+  const file = payload.tool_input?.file_path ?? payload.tool_input?.notebook_path;
+  const command = payload.tool_input?.command;
+  const dirs = [cwd, ...(file ? [dirname(resolve(cwd, file))] : [])];
+  if (!command) return dirs;
+  const moved = [...cwdChain(command, cwd), ...segmentsOf(command).map((part) => dirOf(part, cwd))];
+  const paths = [...writeTargets(command), ...removalTargets(command), ...destructiveTargets(command)];
+  return [...dirs, ...moved.filter(Boolean), ...paths.map((path) => dirname(resolve(cwd, path)))];
+}
+
+/**
+ * D148: no project kiln drives is anywhere in this call, so there is nothing to protect —
+ * D33's proven branch. The guard used to fall back to protecting `main` and `master` on
+ * every repository on the machine, so installing the plugin refused `git push origin main`
+ * in projects that had never run `kiln init` — a false block wherever the user worked.
+ *
+ * Asking every directory the call touches, rather than only the session's cwd, is what keeps
+ * this from being a way around: `git -C /proj push --no-verify` from another directory, or a
+ * write to `/proj/.kiln/config.json` from outside it, lands in a kiln project and is judged
+ * by that project's config.
+ */
+function drivenRoot(payload) {
+  const cwd = payload.cwd ?? process.cwd();
+  for (const dir of touchedDirs(payload, cwd)) {
+    const root = resolveRoot(dir);
+    if (root) return root;
+  }
+  return null;
+}
+
+/**
+ * Config broken falls back to a hardcoded list and still blocks. It never falls back to
+ * allow: a guard that opens when it cannot read its own settings makes the promise it exists
+ * to keep a paper one (D33).
+ */
+function rootAndBranches(found) {
   try {
-    const { root, config } = loadConfig(cwd);
+    const { root, config } = loadConfig(found);
     return { root, protectedBranches: protectedBranchesFor(config), stackId: config.stack.id, unreadable: null };
   } catch (error) {
     // fail-closed: recorded as unreadable, and unreadableConfig blocks every write on it.
@@ -67,9 +100,9 @@ ${ctx.unreadable}
 Fix the file yourself — \`kiln doctor\` names the problem — and this clears.`) : ALLOW;
 }
 
-function context(payload) {
+function context(payload, found) {
   const cwd = payload.cwd ?? process.cwd();
-  const { root, protectedBranches, stackId, unreadable } = rootAndBranches(cwd);
+  const { root, protectedBranches, stackId, unreadable } = rootAndBranches(found);
   const state = workForSession(root, payload.session_id) ?? claimUnbound(root, payload.session_id);
   const takenOver = state ? null : displacedFrom(root, payload.session_id);
   return { cwd, root, protectedBranches, stackId, unreadable, state, takenOver };
@@ -294,21 +327,28 @@ const CHAINS = {
  * conversion lives here rather than only in main(), so the decision is the dispatcher's and
  * the same whichever entry point called it.
  */
-function contextOrBlock(payload) {
+function contextOrBlock(payload, found) {
   try {
-    return context(payload);
+    return context(payload, found);
   } catch (error) {
     if (!(error instanceof GuardStateError)) throw error;
     return block(`${error.message}\nDelete that directory or restore the file; \`kiln list\` shows which work it is.`);
   }
 }
 
+/** Nothing to judge: an unknown phase, or a shell call with no command. */
+function nothingToJudge(phase, payload) {
+  if (!CHAINS[phase]) return true;
+  return phase !== "pre-edit" && phase !== "post-edit" && !payload.tool_input?.command;
+}
+
 /** Core guards first, fixed order, hardcoded. Stack guards only after all of them. */
 export async function dispatch(phase, payload) {
-  if (!CHAINS[phase]) return ALLOW;
-  if (phase !== "pre-edit" && phase !== "post-edit" && !payload.tool_input?.command) return ALLOW;
+  if (nothingToJudge(phase, payload)) return ALLOW;
+  const found = drivenRoot(payload);
+  if (!found) return ALLOW;
 
-  const ctx = contextOrBlock(payload);
+  const ctx = contextOrBlock(payload, found);
   if (ctx === BLOCK) return BLOCK;
   for (const guard of CHAINS[phase]) {
     if (guard(payload, ctx) === BLOCK) return BLOCK;
