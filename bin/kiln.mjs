@@ -466,6 +466,29 @@ const STAGE_AFTER = { probe: "IMPLEMENT", spec: "PLAN", plan: "IMPLEMENT", revie
  * where accept is accept-and-ship, and `ship` on full. A spike has none and never reaches it,
  * which is correct: it also claims nothing, because it has no plan gate to claim with.
  */
+/**
+ * Auto mode says what it ruled, at the moment it rules it.
+ *
+ * D16 made the `Auto-ruled` block mandatory and named the reason: *without that block auto
+ * mode is a black box, and a black box is not trusted twice.* B58 makes its absence a test
+ * failure. Both were satisfied on paper — `renderAutoRuled` was correct and two B58 tests
+ * proved it renders — and the only way to reach it was `kiln report`, a command nothing
+ * requires. Measured on the owner's first auto run: two gates recorded `by: "auto"`, and the
+ * closing summary mentioned it in half a sentence the agent wrote itself.
+ *
+ * A renderer nobody calls is the same black box with a test beside it, which is D114's
+ * finding from a third direction. So it prints where it is guaranteed to happen: one line per
+ * ruling as it happens, because a summary at the end is read after the decisions it
+ * describes, and the whole block once at the gate that authorises shipping — the last gate
+ * any path records. stderr, because stdout here is JSON the caller parses.
+ */
+function reportAutoRulings(state, { key, by }) {
+  if (by !== "auto") return;
+  process.stderr.write(`kiln ruled the ${key} gate on your behalf — auto mode is on for ${state.path}, so nobody read this one.\n`);
+  if (SHIP_AUTHORIZING[state.path] !== key) return;
+  process.stderr.write(`${renderAutoRuled(state)}\n`);
+}
+
 function statusAfter(state, { key, decision }) {
   if (decision !== "approved") return state.status;
   return SHIP_AUTHORIZING[state.path] === key ? WORK_STATUS.reviewed : state.status;
@@ -482,6 +505,7 @@ function writeGate(root, { id, key, decision, answer, claimed, rest }) {
   const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;
   writeState(root, next);
   out(JSON.stringify({ recorded: true, gate: key, claimed: next.predicted.length, ...next.gates[key] }, null, 2));
+  reportAutoRulings(next, { key, by });
   // A rejection is evidence and is kept, but it is not a gate that opened. Exit 0 made it
   // indistinguishable from an approval to anything reading the status — and since every
   // menu now ends in "Stop here", this is the common way a user says no.
