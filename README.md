@@ -260,8 +260,11 @@ Three properties, each chosen against a way this fails elsewhere:
 | **A row that does not resolve is named** | A half-filled row, a rule file that is not there, a glob matching nothing in the project — `kiln doctor` fails on each, by its own text. A rule skipped in silence has no symptom to debug |
 | **What was handed over is recorded** | `state.rules[]` holds the rules each stage was given, and the run may not write a rule while it is being judged by one. *This rule applied* is a fact, not a hope |
 
-`rules.budget_lines` caps the total, because a rulebook everything matches is a rulebook
-nothing follows. `kiln doctor` reports the number every time.
+`rules.budget_lines` caps the total, because **every rule line is a token the agent pays on
+every later ticket, and the longer the rules get the lower its compliance with each one** —
+adding a rule to force compliance can backfire. `kiln rules add` asks the three questions
+where you write the rule: what already covers these files, the line count before and after,
+and the routing. `kiln doctor` reports the total every time.
 
 ## Configuration
 
@@ -329,7 +332,7 @@ no stack declares as a guard fails the build.
 
 | | |
 |---|---|
-| Tests | 478, green on every pull request |
+| Tests | 481, green on every pull request |
 | Code | ~2,000 lines of Node, ~2,000 lines of tests, 0 runtime dependencies |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full`. Two more only when kiln will not guess: one if nothing names a default branch, one if no remote names a forge |
 | Harness | Claude Code. The safety claim is harness-dependent, so v1 supports one |
@@ -355,7 +358,7 @@ kiln was designed before it was written, and the design is in the repository.
 
 | File | Holds |
 |---|---|
-| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 108 decisions with their rationale |
+| [`kiln-architecture.md`](docs/design/2026-09-19-kiln-architecture.md) | the durable state — scope, sections A–H, and 109 decisions with their rationale |
 | [`design-audit.md`](docs/design/2026-09-19-design-audit.md) | five review passes and the evidence behind each |
 | [`user-view.md`](docs/design/2026-09-20-user-view.md) | the same design, from the user's chair |
 | [`verification-plan.md`](docs/design/2026-09-20-verification-plan.md) | four test tiers and the scenario matrix |

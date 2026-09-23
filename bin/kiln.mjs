@@ -662,8 +662,9 @@ function stagePaths(root, { state, stage }) {
  */
 function runRulesAdd(argv) {
   const [file, ...rest] = argv;
-  const { root } = loadConfig(process.cwd());
-  for (const line of addRoute(root, { file, trigger: flag(rest, "--trigger"), text: flag(rest, "--text") })) {
+  const { root, config } = loadConfig(process.cwd());
+  const added = addRoute(root, { file, trigger: flag(rest, "--trigger"), text: flag(rest, "--text"), budget: config.rules.budget_lines });
+  for (const line of added) {
     out(`  ${line}`);
   }
   out("");
