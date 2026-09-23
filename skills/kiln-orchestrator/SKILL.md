@@ -215,6 +215,10 @@ Which option?
 - **Exactly one option carries `(recommended)`**, and the line above says why. Put it first.
   The mark goes on the option because that is where the choice is made; a paragraph of
   argument after the menu is read by nobody.
+- **The mark is the bare word and nothing else.** Not `(recommended: it only removes dead
+  code)`, not `I recommend this because …` inside the label. The reason lives on the line
+  above the menu, once, where it is read before any option is. A reason inside the mark makes
+  option 1 longer than the others and turns a scannable list back into prose.
 - **Option 3 always exists.** Stopping is a real choice and it must not be the one the
   user has to invent.
 - **A reply of `1` means option 1.** Expand it to that option's text before acting on it —
