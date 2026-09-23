@@ -151,3 +151,43 @@ test("a merge kiln can place is still blocked when it writes to a protected bran
   assert.equal(hit?.branch, "v3-master", "AdminPage is on v3-master, and the merge lands there");
   assert.equal(hit?.subcommand, "merge");
 });
+
+/**
+ * Measured at the ship step of a real run. The agent wrote
+ *
+ *   git checkout -b feature/v3/<id> && git commit -m "…"
+ *
+ * and kiln refused the commit as a write to `v3-master`, because the guard asks git which
+ * branch HEAD is on **before any of it runs**. The commit lands on the new branch. The agent
+ * split the command in two to get past it — a false block at the last step of every run.
+ *
+ * The operator choice is what makes the fix sound rather than a guess. With `&&` a failed
+ * `checkout -b` stops the chain, so the later command runs only if the branch was created;
+ * with `;` it runs anyway, on the old branch; `||` runs it *because* the checkout failed.
+ */
+test("a branch created earlier in the same chain is the branch the later command writes to", () => {
+  const verdict = (command) => protectedBranchViolation({
+    command,
+    protectedBranches: ["v3-master"],
+    currentBranch: "v3-master",
+  });
+
+  assert.equal(verdict("git checkout -b feature/v3/x && git commit -m y"), null, "the commit lands on feature/v3/x");
+  assert.equal(verdict("git switch -c feature/v3/x && git commit -m y"), null, "switch -c is the same move");
+  assert.equal(verdict("git checkout -b a && git add . && git commit -m y"), null, "it carries down the whole chain");
+
+  assert.equal(verdict("git commit -m y")?.branch, "v3-master", "alone, it is still on the protected branch");
+  assert.equal(verdict("git checkout v3-master && git commit -m y")?.branch, "v3-master", "checkout without -b moves to an existing branch");
+  assert.equal(verdict("git checkout -b a ; git commit -m y")?.branch, "v3-master", "`;` runs the commit even if the checkout failed");
+  assert.equal(verdict("git checkout -b a || git commit -m y")?.branch, "v3-master", "`||` runs it because the checkout failed");
+});
+
+/** Resolving to the created name is not trusting it. */
+test("a chain that creates a protected branch is still refused", () => {
+  const hit = protectedBranchViolation({
+    command: "git checkout -b v3-master && git commit -m y",
+    protectedBranches: ["v3-master"],
+    currentBranch: "feature/x",
+  });
+  assert.equal(hit?.branch, "v3-master");
+});
