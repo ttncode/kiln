@@ -286,3 +286,23 @@ test("a dollar sign in a screen is content, not a replacement pattern", async ()
 
   assert.ok(injectHelper("<p>no body tag</p>", "<script>s</script>").endsWith("<script>s</script>"));
 });
+
+/**
+ * `Recommendation: approve` put kiln's preference above the evidence, where it reads as
+ * pressure rather than as a finding. The preference belongs on the option the user picks —
+ * which is where the decision is made, and how the harness's own question UI already renders
+ * it, so a run stops switching idioms halfway through its own transcript.
+ */
+test("the recommendation rides on the option, and exactly one option carries it", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  const fences = body.split("```").filter((block, at) => at % 2 === 1);
+  assert.deepEqual(fences.filter((block) => /Recommendation: approve/.test(block)), [],
+    "the old shape argued above the menu — prose may recall it, a rendered gate may not");
+  assert.match(body, /Plan complete — /, "the line says what finished, not what kiln wants");
+
+  for (const fence of fences.filter((block) => block.includes("Which option?"))) {
+    const marked = fence.match(/\(recommended\)/g) ?? [];
+    assert.equal(marked.length, 1, `a menu marks one option or it marks nothing:\n${fence}`);
+    assert.match(fence, /^1\..*\(recommended\)/m, "and the marked one comes first");
+  }
+});
