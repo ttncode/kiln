@@ -195,6 +195,11 @@ const BEFORE_THE_GATE = [
   ["bash", "echo x > .kiln/tmp/{id}/scratch.txt", "allow"],
   ["bash", "cat src/app.js && grep -rn a src", "allow"],
   ["bash", "npm test", "allow"],
+  ["bash", "cat .kiln/work/{id}/plan.md 2>/dev/null && git status --short", "allow"],
+  ["bash", "npm test > /dev/null 2>&1", "allow"],
+  ["bash", "npm test 2>&1 | tail -5", "allow"],
+  ["bash", "echo done >&2", "allow"],
+  ["bash", "node x.mjs &> /dev/null", "allow"],
   ["bash", "python3 -c \"open('src/app.js','w').write('x')\"", "ceiling"],
   ["bash", "node scripts/rewrite.mjs src/app.js", "ceiling"],
 ];
