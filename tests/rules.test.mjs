@@ -329,7 +329,25 @@ test("it adds; it never rewrites a rule that is already there", () => {
 
   assert.equal(run.status, 1);
   assert.match(run.stderr, /never rewrites one/);
+  assert.match(run.stderr, /content differs/, "so the refusal cannot be read as spurious");
   assert.match(readFileSync(join(root, ".kiln", "rules", "a.md"), "utf8"), /^first/);
+});
+
+/**
+ * Measured on the owner's second validation run: they asked for the same rule again, and the
+ * agent checked the file itself and skipped the verb rather than calling it — the right move,
+ * because the verb would have refused. An agent routing around a verb is the same failure as
+ * an agent routing around a guard, one layer up.
+ */
+test("asking for the same rule twice is not an error", () => {
+  const root = project("twice-text");
+  const args = ["rules", "add", "a.md", "--trigger", "**/*.php", "--text", "No SQL here."];
+  ok(root, args);
+  const again = ok(root, args);
+
+  assert.match(again.stdout, /already says exactly this/);
+  assert.match(again.stdout, /already routed/);
+  assert.match(again.stdout, /the three questions/, "the questions are the point, and a no-op still asks them");
 });
 
 test("a trigger matching nothing is refused where it is cheap to fix, not reported later", () => {

@@ -425,6 +425,10 @@ and they do not hand-edit a table:
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules add <file>.md --trigger "<glob>" --text "<the rule>"
 ```
 
+Call it even when you think the rule is already there — it is idempotent, and it is what
+prints the questions. Identical text is reported as nothing to write; different text is
+refused, because a rule is one of the terms the run is judged by.
+
 The glob is repo-root relative and must match files that exist — `**/application/controllers/**`,
 `src/auth/**`, `**/*.sql`. The verb refuses one that matches nothing, and prints the three
 questions D20 asks before a rule is kept: what already covers those files, the line count before
