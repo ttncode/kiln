@@ -4,6 +4,7 @@
  */
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanupFixtures, commitAll, writeFile } from "./helpers/fixture.mjs";
 import { SESSION, kiln, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
@@ -123,4 +124,15 @@ test("a state written by a newer kiln is refused with both numbers", () => {
   const run = kiln(root, ["report", "w1"]);
   assert.notEqual(run.status, 0);
   assert.match(run.stderr, /schema_version 99.*\(1\)/);
+});
+
+test("D39: a config from an older kiln is read, said once, and rewritten only on request", () => {
+  const root = nodeProject({ name: "older" });
+  const path = join(root, ".kiln", "config.json");
+  writeFile(path, JSON.stringify({ ...JSON.parse(readFileSync(path, "utf8")), schema_version: 0 }));
+  const listed = ok(root, ["list"]);
+  assert.match(listed.stderr, /older kiln \(schema 0\).*kiln doctor --write/);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).schema_version, 0, "never rewritten behind the user's back");
+  ok(root, ["doctor", "--write"]);
+  assert.equal(JSON.parse(readFileSync(path, "utf8")).schema_version, 1);
 });

@@ -166,6 +166,9 @@ test("D78: the ratchet reports untracked work, because a spike's output is usual
 
   assert.equal(run.status, 0);
   assert.match(run.stdout, /spike-scratch\.js/, "git diff alone would have called this clean");
+  assert.match(run.stdout, /1\. Keep it.*\n2\. Set it aside.*\n3\. Stop here/, "D78: a halt with a numbered menu, not a decision taken by carrying on");
+  assert.equal(readState(root, "42").status, "halted");
+  assert.doesNotMatch(run.stdout, /\.kiln\//, "kiln's own record is not the spike's work");
 });
 
 test("D78: the ratchet leaves the working tree exactly as it found it", () => {
