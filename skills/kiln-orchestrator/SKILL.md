@@ -474,10 +474,10 @@ if an existing rule already covers those files, offer to edit that file instead.
 
 ### Where a temp file goes
 
-`.kiln/tmp/<id>/` — inside the project, gitignored, removed at the end of SHIP, and writable
-before any gate. Not the repository (a temp file in the diff is a temp file somebody reviews),
-and not a directory outside the project, which the sandbox refuses because it cannot tell one
-from another.
+`.kiln/tmp/<id>/` — inside the project, gitignored, writable before any gate, and removed when
+`kiln ship` records the work shipped. Not the repository (a temp file in the diff is a temp file
+somebody reviews), and not a directory outside the project, which the sandbox refuses because it
+cannot tell one from another.
 
 ## When something breaks
 

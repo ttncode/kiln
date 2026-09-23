@@ -1,6 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
 import { branchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
@@ -217,6 +218,31 @@ test("ship without --opened still only prints, and changes nothing", () => {
   ok(root, ["open", "w1", "--session", "s"]);
   ok(root, ["ship", "w1"]);
   assert.equal(state(root, "w1").status, "in_progress", "printing a plan is not evidence anything was opened");
+});
+
+/**
+ * Every sandbox refusal tells the run its temp files are removed when ship records the work
+ * shipped. Nothing removed them — a real run ended with the directory still there, and its
+ * own session could no longer delete it. A promise kiln makes in a message is kiln's to keep.
+ */
+test("shipping removes the scratch tree the sandbox told the run to use", () => {
+  const root = nodeProject({ name: "scratch" });
+  ok(root, ["init"]);
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "tmp", "w1", "steps", "1.log"), "output\n");
+
+  ok(root, ["ship", "w1", "--opened", "https://example.invalid/mr/1"]);
+  assert.equal(existsSync(join(root, ".kiln", "tmp", "w1")), false);
+});
+
+test("a ship that records nothing removes nothing", () => {
+  const root = nodeProject({ name: "scratch-kept" });
+  ok(root, ["init"]);
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "tmp", "w1", "steps", "1.log"), "output\n");
+
+  ok(root, ["ship", "w1"]);
+  assert.equal(existsSync(join(root, ".kiln", "tmp", "w1")), true, "the work is not shipped, so the run is not over");
 });
 
 /**

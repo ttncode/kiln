@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig } from "../lib/config.mjs";
 import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { floorStatus, installFloor } from "../lib/floor.mjs";
@@ -1085,6 +1085,9 @@ function runShip(argv) {
   if (opened.length === 0) return out(renderShipPlan(shipPlan(root, { config, state }), config.vcs.branch_pattern)) ?? 0;
 
   writeState(root, { ...state, status: WORK_STATUS.shipped, opened });
+  // The sandbox tells every run its temp files are "removed when kiln ship records the work
+  // shipped". Nothing removed them, so the promise was a sentence; this is the sentence.
+  rmSync(join(root, ".kiln", "tmp", id), { recursive: true, force: true });
   out(`${id} is shipped: ${opened.join(", ")}`);
   out("It claims no files now, so another work may touch them.");
   return 0;
