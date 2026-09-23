@@ -273,3 +273,74 @@ test("E11: a rule behind a symlinked directory is refused too", () => {
   assert.deepEqual(readRoutes(root).map((row) => row.state), ["escapes"], "refusing only the leaf leaves the directory");
   assert.doesNotMatch(report(root, ["src/a.ts"]).text, /SECRET VALUE/);
 });
+
+/* --- kiln rules add --- */
+
+/**
+ * D48 met this shape and answered it with a verb: config holds terms the run is judged by,
+ * the agent may not write it, so `kiln config set` exists. After D102 a project rule sits in
+ * exactly that position and had nothing on the other side — the user was told to hand-edit a
+ * markdown table, and the table is where every comparable tool breaks. Cursor's
+ * most-reported rules failure is a malformed file skipped in silence, and Cursor answers it
+ * with `New Cursor Rule` and `/Generate Cursor Rules` rather than with documentation.
+ */
+function project(name) {
+  const root = nodeProject({ name });
+  writeFile(join(root, "AdminPage", "application", "controllers", "Agency.php"), "<?php\n");
+  commitAll(root, "a controller");
+  return root;
+}
+
+test("kiln rules add writes the rule and routes it in one step", () => {
+  const root = project("add");
+  const run = ok(root, ["rules", "add", "controllers.md", "--trigger", "**/application/controllers/**", "--text", "No SQL in the controller."]);
+
+  assert.match(run.stdout, /created \.kiln\/rules\/controllers\.md/);
+  assert.match(run.stdout, /routed .* → controllers\.md/);
+  assert.match(run.stdout, /1 route\(s\), all resolved/, "the router's own check runs, so the result is not taken on trust");
+  assert.equal(matchingRules(root, ["AdminPage/application/controllers/Agency.php"]).length, 1);
+});
+
+test("the row lands inside the table, not after the prose below it", () => {
+  const root = project("inside");
+  ok(root, ["rules", "add", "a.md", "--trigger", "**/*.php"]);
+  assert.deepEqual(readRoutes(root).filter((row) => row.state === "route").map((row) => row.file), ["a.md"],
+    "a row written past the table is not in the table, and would read as no route at all");
+});
+
+test("adding the same route twice is not an error and does not duplicate it", () => {
+  const root = project("twice");
+  ok(root, ["rules", "add", "a.md", "--trigger", "**/*.php"]);
+  const again = ok(root, ["rules", "add", "a.md", "--trigger", "**/*.php"]);
+  assert.match(again.stdout, /already routed/);
+  assert.equal(readRoutes(root).filter((row) => row.state === "route").length, 1);
+});
+
+/**
+ * Add-only is what keeps D102 intact while letting a run capture a decision: adding a rule is
+ * visible in the diff and lands in a committed file; weakening one is not reachable at all.
+ */
+test("it adds; it never rewrites a rule that is already there", () => {
+  const root = project("addonly");
+  ok(root, ["rules", "add", "a.md", "--trigger", "**/*.php", "--text", "first"]);
+  const run = kiln(root, ["rules", "add", "a.md", "--trigger", "**/*.js", "--text", "second"]);
+
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /never rewrites one/);
+  assert.match(readFileSync(join(root, ".kiln", "rules", "a.md"), "utf8"), /^first/);
+});
+
+test("a trigger matching nothing is refused where it is cheap to fix, not reported later", () => {
+  const run = kiln(project("dead"), ["rules", "add", "a.md", "--trigger", "app/does/not/exist/**"]);
+  assert.equal(run.status, 1);
+  assert.match(run.stderr, /matches no file git lists here/);
+  assert.match(run.stderr, /repo-root relative/, "and the message shows the shape that works");
+});
+
+test("a rule file is one name ending in .md, inside .kiln/rules/", () => {
+  for (const name of ["../escape.md", "notes.txt", "sub/dir.md", ".hidden.md"]) {
+    const run = kiln(project("name"), ["rules", "add", name, "--trigger", "**/*.php"]);
+    assert.equal(run.status, 1, `${name} was accepted`);
+    assert.match(run.stderr, /cannot be a rule file/);
+  }
+});

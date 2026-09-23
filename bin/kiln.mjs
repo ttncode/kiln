@@ -8,7 +8,7 @@ import { floorStatus, installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
 import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
-import { STAGES, rulesReport } from "../lib/rules.mjs";
+import { STAGES, addRoute, rulesReport } from "../lib/rules.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
@@ -54,6 +54,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
 
   kiln blast <term> [<term> ...]
       Tier-0 blast radius: which files mention these terms.
+
+  kiln rules add <file.md> --trigger "<glob>" [--text "<the rule>"]
+      Write a project rule and route it. Adds only: it never rewrites or
+      removes one, which is why a run may call it.
 
   kiln rules <id> [--stage plan|review]
       Print the project rules routed to the files this stage names, and record
@@ -647,7 +651,30 @@ function stagePaths(root, { state, stage }) {
   return null;
 }
 
+/**
+ * D48 answered "the agent may not write this file" with a verb, and after D102 a project rule
+ * is in the same position. Hand-editing a markdown table is where every comparable tool
+ * breaks — Cursor's most-reported rules failure is a malformed file skipped in silence, and
+ * Cursor answers it with a command rather than with documentation.
+ *
+ * Add-only, which is what keeps D102 intact: an agent can capture a decision as a rule, and
+ * cannot weaken or delete one.
+ */
+function runRulesAdd(argv) {
+  const [file, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  for (const line of addRoute(root, { file, trigger: flag(rest, "--trigger"), text: flag(rest, "--text") })) {
+    out(`  ${line}`);
+  }
+  out("");
+  for (const row of runChecks(root, loadConfig(root)).filter((check) => check.title.startsWith("rules"))) {
+    out(`  [${MARK[row.status]}] ${row.title}: ${row.detail}`);
+  }
+  return 0;
+}
+
 function runRules(argv) {
+  if (argv[0] === "add") return runRulesAdd(argv.slice(1));
   const [id, ...rest] = argv;
   const stage = flag(rest, "--stage") ?? "plan";
   if (!STAGES.includes(stage)) {
@@ -979,7 +1006,7 @@ const COMMANDS = {
  * kiln's own errors are answers to the user, so they print as a sentence. Anything
  * else is a bug in kiln, and a stack trace is the only useful thing to hand over.
  */
-const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError"]);
+const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError", "RulesError"]);
 
 function reportFailure(error) {
   const named = error instanceof Error && EXPECTED.has(error.constructor.name);
