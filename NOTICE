@@ -113,9 +113,11 @@ permission record and this entry is where a stranger can find it.
 
 Scope of the grant as given: full use and copying.
 
-What kiln actually uses under it, as of this entry: nothing yet. Knowledge tier 1
-is specified from that project's DNA store contract, ERD, id schemes and
-update/bootstrap playbooks, and implemented in Node — so the grant covers a
-specification kiln reads, not code kiln ships. If that ever changes, the files
+What kiln uses under it, from v2.18.1 (commit 4a05eec): the DNA store contract
+(`references/dna-store.md`, `dna-erd.md`, `id-schemes.md`) and the gate and
+derivation logic of `scripts/build_dna_store.py` and `scripts/check_gates.py`,
+re-implemented in Node in `lib/dna/` (D153) — the field lists, closed
+vocabularies and the jargon list there are taken from those files verbatim. No
+Python is copied. If that ever changes, the files
 copied are listed here before they are committed, the way the superpowers fork
 above is listed.

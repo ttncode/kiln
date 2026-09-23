@@ -86,18 +86,12 @@ test("B12 / D79: a reserved word resolves ahead of every other branch", () => {
 });
 
 /**
- * B12 asks for more than the classification: `/kiln dna` at tier 0 must *report that DNA is
- * v1.2*. Without the message the orchestrator read `reserved` as "run that command" and ran
- * `kiln dna`, which does not exist — a usage error in place of the answer.
+ * B12 once asked `/kiln dna` at tier 0 to report that DNA was not shipped, and a message rode on
+ * the resolution for it. `kiln dna` is a command now, so every reserved word resolves the same
+ * way: the orchestrator runs it with the rest of the argument.
  */
-test("B12: a word held for a later version says so, and names what exists instead", () => {
-  const { message } = resolveArgument({ arg: "dna", root: tempRoot() });
-  assert.match(message, /does not ship it yet/, "it says what the user is waiting for, without promising a version D107 took back");
-  assert.match(message, /kiln blast/, "and the tier-0 command that works today");
-
-  for (const word of ["init", "doctor"]) {
-    assert.equal(resolveArgument({ arg: word, root: tempRoot() }).message, null, `${word} is a command, not a reservation`);
-  }
+test("B12: every reserved word is a command the orchestrator runs with the rest", () => {
+  assert.deepEqual(resolveArgument({ arg: "dna check", root: tempRoot() }), { kind: "reserved", command: "dna", rest: "check" });
 });
 
 test("B14: a work directory cannot shadow a reserved word, because it cannot be made", () => {

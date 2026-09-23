@@ -102,7 +102,7 @@ Grouped by what a developer is actually doing. Every row is one `node --test` ca
 | B09 | `/kiln 42` when `work/42/` exists | resolves as the work dir — the more specific branch wins |
 | B10 | `/kiln <url>` | treated as a URL, fetched by the agent's own tools |
 | B11 | bare `/kiln` | lists work in progress |
-| B12 | `/kiln dna` at tier 0 | resolved as a **reserved word**, never as a work id; reports that DNA is v1.2 **and names the tier-0 command that works today**. The classification alone was met from the start; the report was not, and the orchestrator ran a command kiln does not ship |
+| B12 | `/kiln dna` | resolved as a **reserved word**, never as a work id, and run as the command `kiln dna` with the rest of the argument. Until D153 it reported that DNA was not shipped and named the tier-0 command; `kiln dna` exists now, so the message was retired |
 | B13 | a work id that collides and is not resumable | prints both and **refuses**; never reuses the directory |
 | B14 | attempting a work id named `init`, `doctor` or `dna` | refused |
 | B15 | `fx-multi` with 2 ticket-owning modules, both holding issue `42` | the id carries the module prefix |

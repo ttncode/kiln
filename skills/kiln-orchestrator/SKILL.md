@@ -140,7 +140,7 @@ Act on `kind`, and on nothing else:
 | `kind` | Do |
 |---|---|
 | `list` | run `node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" list`, print it, stop |
-| `reserved` | a `message` means the word is held for a later version — print it verbatim and stop. No `message` means it is a command: run it with `rest` as its arguments, and stop. A sentence that merely opens with one of these words is refused here rather than minted as work — say so, and offer to rephrase it |
+| `reserved` | a command: run `kiln <command>` with `rest` as its arguments, and stop. A sentence that merely opens with one of these words is refused here rather than minted as work — say so, and offer to rephrase it |
 | `url` | fetch it with your own tools, then treat the text as a description |
 | `ticket` | fetch the ref with `gh`/`glab`/MCP, then treat the text as a description. When it carries `modules`, more than one module owns tickets here and the ref alone does not say which: take the module from the ticket's URL, or ask, and the id is `<module>-<ref>` |
 | `work` | resume — see step 6. A `follow_up` carries a new `id`; the work it `follows` is finished |

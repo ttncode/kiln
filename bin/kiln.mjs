@@ -22,6 +22,7 @@ import { SHIP_AUTHORIZING, STATUS as WORK_STATUS, adoptSession, newWork, readSta
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
+import { DNA_USAGE, runDnaCommand } from "../lib/dna/cli.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
 
@@ -99,6 +100,8 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
 
   kiln list
       Show work in progress.
+
+${DNA_USAGE}
 
 The three commands a user types are /kiln init, /kiln <arg> and /kiln doctor.
 The verbs here are what the orchestrator skill calls to serve them.
@@ -1291,6 +1294,11 @@ function runReport(argv) {
   return 0;
 }
 
+function runDna(argv) {
+  const { root } = loadConfig(process.cwd());
+  return runDnaCommand(root, { argv, out });
+}
+
 const COMMANDS = {
   init: runInit,
   open: runOpen,
@@ -1308,13 +1316,14 @@ const COMMANDS = {
   scope: runScope,
   verify: runVerify,
   doctor: runDoctor,
+  dna: runDna,
 };
 
 /**
  * kiln's own errors are answers to the user, so they print as a sentence. Anything
  * else is a bug in kiln, and a stack trace is the only useful thing to hand over.
  */
-const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError", "RulesError"]);
+const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError", "RulesError", "DnaError"]);
 
 function reportFailure(error) {
   const named = error instanceof Error && EXPECTED.has(error.constructor.name);
