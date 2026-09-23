@@ -90,3 +90,32 @@ test("the recommended label still records an approval, and a bare number still d
   assert.equal(classifyAnswer("1"), DECISION.notAYes, "a click is not a reading");
   assert.equal(classifyAnswer("3. Stop here, keep the artifacts"), DECISION.rejected);
 });
+
+/**
+ * Measured while reproducing a real session's review gate. The verdict word was matched
+ * before any negation around it, so a refusal that *contains* the verb was recorded as an
+ * approval — and an approval authorises source edits. D21's gate exists to refuse soft
+ * yeses; these are hard noes, and they were opening it.
+ */
+test("a refusal that contains the verb is a refusal, never an approval", () => {
+  for (const answer of ["I don't approve this", "Not approved", "I cannot approve this yet", "don't ship it", "No. I won't approve it", "never approve that"]) {
+    assert.notEqual(classifyAnswer(answer), DECISION.approved, answer);
+  }
+});
+
+/**
+ * The orchestrator renders "1. Accept this review and ship the change" at a review gate,
+ * and the user answering `1` was then told it was not a yes. A verb that refuses a
+ * reasonable answer teaches the agent to reword the user (D112).
+ */
+test("accepting is an explicit yes, with the same negation rule", () => {
+  assert.equal(classifyAnswer("1. Accept this review and ship the change (recommended)"), DECISION.approved);
+  assert.equal(classifyAnswer("accepted"), DECISION.approved);
+  assert.notEqual(classifyAnswer("I can't accept this"), DECISION.approved);
+});
+
+test("a word that merely ends in -nt is not a negation", () => {
+  for (const answer of ["Approve the current plan", "yes, what I want", "approved as different from before"]) {
+    assert.equal(classifyAnswer(answer), DECISION.approved, answer);
+  }
+});

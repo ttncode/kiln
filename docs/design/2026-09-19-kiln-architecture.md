@@ -1,7 +1,7 @@
 # kiln — Architecture Design
 
 > **STATUS: BUILD-READY.** kiln's own third path is named `full`, not upstream's `architectural` (D68).
-> Section 1 (v1 scope) and Sections A–H all locked. The decision log runs to **D148**. It reached D89 after five
+> Section 1 (v1 scope) and Sections A–H all locked. The decision log runs to **D149**. It reached D89 after five
 > review passes on 2026-09-20: a pre-build audit (7 blockers, 10 high, 14 medium → D48–D62), the
 > **pre-P0 hook test, which PASSED** — a `PreToolUse` hook does block a real write in Claude Code
 > 2.1.270, and ten further measured answers are in **§1.6** → D63–D64 — a source review of what
@@ -12,7 +12,7 @@
 > D77–D84), plus **D85** from a closing attack on that pass's own fixes. Findings and evidence
 > live in **`2026-09-19-design-audit.md`**, the companion to this file.
 > **Built.** P0–P5 are complete, six acceptance runs are recorded, and the decision log gained
-> **D86–D124** from building it and running it on real projects, and **D125–D148** from the
+> **D86–D124** from building it and running it on real projects, and **D125–D149** from the
 > pre-v1.0 audit that read this file against the product and against mature open-source
 > projects. Tier D is graded (`2026-09-21-acceptance-c6-handover.md`). What remains for a v1.0
 > tag is one validation run on a production repository, on the build that carries D125–D147.
@@ -420,6 +420,7 @@ not a fix.**
 | **D146** | **The visual companion runs in a kiln run (keeps D11)** | Its screens went to `.superpowers/brainstorm/` in the project — source until the plan gate, so every screen was refused — and it was launched by a path relative to the user's project. It now keeps its session under `.kiln/tmp/<id>/`, the one place a run may write before its first gate, and runs from `${CLAUDE_PLUGIN_ROOT}`. The forked brainstorming text is adapted to kiln's gates: a spike's probe and a bounded plan are approved at gates, not by a nod or in chat alone. Owner's ruling: fix, not drop. | 09-23 |
 | **D147** | **`--auto` in the request satisfies `full`'s opt-in (amends D16's wording)** | D16 says `full` is "explicit opt-in only", and the code has treated the flag typed into the request as that opt-in since the flag existed, with the reason in a comment: the harness refuses an agent editing the config that governs its own gates, so the request is the only place a human can opt in during a run. Recorded here so the log says what the product does. | 09-23 |
 | **D148** | **kiln judges only calls that touch a project it drives — found from every directory the call touches, not only the session's (amends D33's fallback row)** | Found by the acceptance run itself: with the plugin installed, a scratch repository that had never run `kiln init` could not `git push origin main`. With no config anywhere, the guard fell back to protecting `main` and `master`, so installing kiln changed the rules of every repository on the machine — the false block D122 names, one layer over. No config in reach is D33's proven branch: kiln is not driving this. The other half is what keeps that from being a way around: the session's cwd is not the only place a call can land. The file an edit names, the directories `cd` and `-C` move to, and the paths a command writes or removes are all asked; the first under a `.kiln/config.json` is the project, judged by its own config. That also closed an older hole — an edit to `/proj/.kiln/config.json` from a session standing elsewhere was compared against the wrong root and allowed. The hardcoded list survives for the case D33 wrote it for: a project whose config is there and cannot be read. | 09-23 |
+| **D149** | **A negation before the verdict word is a refusal; "accept" is a yes** | Found reproducing the acceptance run's review gate. The classifier matched the approving verb first, wherever it stood in the opening clause, so "I don't approve this", "Not approved", "I cannot approve this yet" and "don't ship it" were each recorded as **approved** — a hard no opening the gate D21 exists to keep shut, and an approval authorises source edits. Order is now the verdict: a negation before the verb negates it; one after it is a condition on a yes ("Approve -> no need to run the suite"), which is the case the opening-clause rule was written for. The same run rendered "1. Accept this review and ship the change", and the user's `1` would have been refused as not a yes — D112's shape, a verb refusing a reasonable answer — so `accept` joins the affirmatives under the same negation rule. | 09-23 |
 
 
 ### Superseded
