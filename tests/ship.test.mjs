@@ -203,6 +203,8 @@ test("a work stops claiming its files once the pull requests exist", () => {
   assert.equal(blocked.status, 2, "D72: two works cannot claim one path");
   assert.match(blocked.stderr, /w1/, "and the conflict names the owner");
 
+  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  ok(root, ["gate", "w1", "review", "--answer", "1. Approve this review as written (recommended)"]);
   const shipped = ok(root, ["ship", "w1", "--opened", "https://example.invalid/mr/1"]);
   assert.match(shipped.stdout, /claims no files now/);
   assert.equal(state(root, "w1").status, "shipped");
@@ -230,6 +232,10 @@ test("shipping removes the scratch tree the sandbox told the run to use", () => 
   ok(root, ["init"]);
   ok(root, ["open", "w1", "--session", "s"]);
   writeFile(join(root, ".kiln", "tmp", "w1", "steps", "1.log"), "output\n");
+  for (const key of ["plan", "review"]) {
+    writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
+    ok(root, ["gate", "w1", key, "--answer", "yes, approved"]);
+  }
 
   ok(root, ["ship", "w1", "--opened", "https://example.invalid/mr/1"]);
   assert.equal(existsSync(join(root, ".kiln", "tmp", "w1")), false);

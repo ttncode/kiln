@@ -14,7 +14,7 @@ import { gitOutput } from "../lib/init.mjs";
 import { mintId } from "../lib/resolve.mjs";
 import { protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { isGreen, planSteps, runPhase } from "../lib/steps.mjs";
-import { newWork, openNextPass, readState, recordVerify, writeState } from "../lib/state.mjs";
+import { newWork, readState, recordVerify, writeState } from "../lib/state.mjs";
 import { DEFAULTS } from "../lib/config.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 import { kilnProject, payload } from "./helpers/project.mjs";
@@ -124,14 +124,19 @@ test("D7 item 4 — no source edit without a gate record matching the current ar
   assert.equal(await edit(after.source, after), BLOCK, "the approval was for the document they read");
 });
 
-test("D7 item 4 — a halted work, and a new pass, both block", async () => {
+test("D7 item 4 — a halted work, a reviewed one, and an approval with no document all block", async () => {
   const halted = kilnProject({ gates: { plan: "approved" } });
   writeState(halted.root, { ...readState(halted.root, "42"), status: "halted" });
   assert.equal(await edit(halted.source, halted), BLOCK);
 
-  const next = kilnProject({ gates: { plan: "approved" } });
-  writeState(next.root, openNextPass(readState(next.root, "42"), "bbbb222"));
-  assert.equal(await edit(next.source, next), BLOCK, "an unchanged artifact is the failure here, not the proof");
+  const reviewed = kilnProject({ gates: { plan: "approved", review: "approved" } });
+  writeState(reviewed.root, { ...readState(reviewed.root, "42"), status: "reviewed" });
+  assert.equal(await edit(reviewed.source, reviewed), BLOCK, "a change after review would ship unreviewed");
+
+  const unbound = kilnProject({ gates: { plan: "approved" } });
+  const state = readState(unbound.root, "42");
+  writeState(unbound.root, { ...state, gates: { plan: { ...state.gates.plan, artifact_sha: null } } });
+  assert.equal(await edit(unbound.source, unbound), BLOCK, "an approval bound to nothing authorizes nothing");
 });
 
 test("D7 item 4 — the shell is not a way around the gate", async () => {

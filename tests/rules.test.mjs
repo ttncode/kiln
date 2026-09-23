@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { matchingRules, readRoutes, rulesReport } from "../lib/rules.mjs";
-import { newWork, openNextPass, recordRules } from "../lib/state.mjs";
+import { newWork, recordRules } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 import { loadConfig } from "../lib/config.mjs";
 import { runChecks } from "../lib/doctor.mjs";
@@ -197,9 +197,8 @@ test("E13: a work id with no state is refused by the same error every other verb
   assert.notEqual(run.status, 0);
 });
 
-test("E19: a new pass clears what the previous pass was handed", () => {
-  const shipped = recordRules(newWork({ id: "w1", sessionId: "s", base: "aaa" }), { stage: "plan", files: ["a.md"] });
-  assert.deepEqual(openNextPass(shipped, "bbb").rules, [], "an approval belongs to the pass that earned it, and so does a rule reading");
+test("E19: a follow-up work starts with no rules handed over", () => {
+  assert.deepEqual(newWork({ id: "w1.2", sessionId: "s", base: "aaa", follows: "w1" }).rules, [], "a reading belongs to the work that did it");
 });
 
 /* --- as a person meets it --- */

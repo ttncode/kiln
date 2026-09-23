@@ -156,14 +156,17 @@ test("B52: a halted work re-presents its halt, never continues past it", () => {
   assert.equal(resolved.stage, "PLAN");
 });
 
-test("B53 / D24: a shipped work opens the next pass only after confirmation", () => {
+test("a shipped work is followed, never reopened: the follow-up is a new work that names it", () => {
   const root = tempRoot();
   writeState(root, { ...newWork({ id: "42", sessionId: "s", base: "aaa" }), status: STATUS.shipped });
 
   const resolved = resolveArgument({ arg: "42", root });
-  assert.equal(resolved.action, "next_pass");
-  assert.equal(resolved.confirm, true);
-  assert.equal(resolved.pass, 2);
+  assert.equal(resolved.action, "follow_up");
+  assert.equal(resolved.id, "42.2");
+  assert.equal(resolved.follows, "42");
+
+  writeState(root, { ...newWork({ id: "42.2", sessionId: "s", base: "bbb", follows: "42" }), status: STATUS.shipped });
+  assert.equal(resolveArgument({ arg: "42.2", root }).id, "42.3", "counted from the root id, never 42.2.2");
 });
 
 test("D67d: a resume asks for a preflight rather than trusting the recorded step", () => {

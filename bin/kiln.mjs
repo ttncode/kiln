@@ -7,16 +7,17 @@ import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { floorStatus, installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
-import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict } from "../lib/blast.mjs";
+import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict, worktreeTree } from "../lib/blast.mjs";
 import { STAGES, addRoute, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
-import { recordFullVerified, recordRules, recordVerify } from "../lib/state.mjs";
-import { join } from "node:path";
+import { GATE_KEYS, artifactPath, isStaleVerify, recordFullVerified, recordRules, recordVerify } from "../lib/state.mjs";
+import { shipVerdict } from "../lib/guards/gate.mjs";
+import { join, relative, resolve } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
-import { resolveArgument } from "../lib/resolve.mjs";
+import { followUpId, resolveArgument } from "../lib/resolve.mjs";
 import { SHIP_AUTHORIZING, STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
@@ -38,19 +39,26 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       description - and print the decision as JSON. Writes nothing.
 
   kiln open <id> [--session <session-id>] [--path bounded] [--type fix] [--auto]
+                 [--follows <shipped-id>] [--base <commit-ish>]
       Create the work directory and record the commit it starts from.
+      --follows  name the shipped work this one continues; a shipped work is
+                 never reopened.
+      --base     re-anchor an existing work where its branch actually started.
 
-  kiln gate <id> <key> --answer "<their words>" [--artifact <path>] [--auto]
-      Classify what the user said, hash the artifact, and record what was observed.
+  kiln gate <id> <key> --answer "<their words>" [--predicted <a,b,c>] [--auto]
+      Classify what the user said, hash the document the gate approves
+      (brief, spec, plan or review.md), and record what was observed.
       You supply only --answer; every other field is measured here.
+      --predicted  at the plan gate, the files the approved plan claims.
 
   kiln doctor [--write]
       Check this project's setup and say what would stop a run.
       --write  repair what can be repaired without guessing.
 
-  kiln verify <id> [--phase fast|full]
+  kiln verify <id> [--phase fast|full] [--task <n>/<total>] [--effects <a,b>]
       Run the stack's steps for that phase, record every exit code, and stop at
-      the first failure with the tool's own output.
+      the first failure with the tool's own output. A full run that fails after
+      the review gate sends the work back to implementation.
 
   kiln blast <term> [<term> ...]
       Tier-0 blast radius: which files mention these terms.
@@ -67,7 +75,7 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln scope <id>
       Reconcile what the plan predicted against what the diff actually touched.
 
-  kiln halt <id> --reason "<why>"
+  kiln halt <id> --reason "<why>" [--kind blocking_unknown]
       Stop this work and record why. Source edits block until it is resumed.
 
   kiln resume <id> --answer "<what you decided>"
@@ -80,8 +88,9 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln ship <id> [--opened <url,url>]
       Group this work's diff by repository and print what has to be opened:
       one pull request per repository, all carrying the work id as their topic.
-      --opened  record the pull requests that now exist. The work becomes
-                shipped, which is what lets a second pass open on it.
+      --opened  record the pull requests that now exist. Refused unless the
+                ship-authorising gate is approved. The work becomes shipped;
+                follow-up work opens as a new work with --follows.
 
   kiln report <id>
       Print the run's report, including what auto mode decided on your behalf.
@@ -403,8 +412,30 @@ function runGate(argv) {
   return gateOrRefuse(root, { id, key, decision, answer, rest });
 }
 
-/** Two preconditions, both refusals, both naming the command that clears them. */
+/**
+ * The document is the key's, never the caller's (D71): a gate hashes the artifact it
+ * approves, and a caller who named nothing used to get a record bound to nothing. Naming a
+ * different file is refused rather than trusted, because the guard checks the key's file and
+ * a record hashed from another one would lock the run out for good.
+ */
+function gateArtifact(root, { id, key, rest }) {
+  if (!GATE_KEYS.includes(key)) return { refusal: `"${key}" is not a gate. One of: ${GATE_KEYS.join(", ")}.` };
+  const expected = artifactPath(root, { id, key });
+  const named = flag(rest, "--artifact");
+  const shown = relative(root, expected);
+  if (named && ![resolve(root, named), resolve(process.cwd(), named)].includes(expected)) {
+    return { refusal: `the ${key} gate approves ${shown}, and --artifact named ${named}. Leave --artifact off, or name that file.` };
+  }
+  if (!existsSync(expected)) {
+    return { refusal: `the ${key} gate approves ${shown}, which does not exist yet. Write it, show it to the user, then record the gate.` };
+  }
+  return { path: expected };
+}
+
+/** Three preconditions, all refusals, each naming what clears it. */
 function gateOrRefuse(root, { id, key, decision, answer, rest }) {
+  const artifact = gateArtifact(root, { id, key, rest });
+  if (artifact.refusal) return process.stderr.write(`kiln refused the ${key} gate: ${artifact.refusal}\n`) && 2;
   const unread = unreadRules(root, { id, key });
   if (unread) return process.stderr.write(`${unread}\n`) && 2;
 
@@ -412,7 +443,7 @@ function gateOrRefuse(root, { id, key, decision, answer, rest }) {
   const conflicts = claimConflicts(root, { paths: claimed, forId: id });
   if (conflicts.length > 0) return process.stderr.write(`${describeConflicts(conflicts)}\n`) && 2;
 
-  return writeGate(root, { id, key, decision, answer, claimed, rest });
+  return writeGate(root, { id, key, decision, answer, claimed, rest, artifact: artifact.path });
 }
 
 /**
@@ -494,9 +525,9 @@ function statusAfter(state, { key, decision }) {
   return SHIP_AUTHORIZING[state.path] === key ? WORK_STATUS.reviewed : state.status;
 }
 
-function writeGate(root, { id, key, decision, answer, claimed, rest }) {
+function writeGate(root, { id, key, decision, answer, claimed, rest, artifact }) {
   const by = rest.includes("--auto") ? "auto" : "user";
-  const opened = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
+  const opened = recordGate(readState(root, id), { key, decision, artifactPath: artifact, answer, by });
   const recorded = decision === "approved"
     ? { ...opened, stage: STAGE_AFTER[key] ?? opened.stage, status: statusAfter(opened, { key, decision }) }
     : opened;
@@ -587,7 +618,9 @@ function runVerify(argv) {
     tmpDir: join(root, ".kiln", "tmp", id, "steps"),
     range: `${state.base}..${head}`,
   });
-  return recordRun({ root, state: { ...state, step }, phase, head, result });
+  const tree = worktreeTree(root);
+  const measured = { ...result, entries: result.entries.map((entry) => ({ ...entry, phase, tree })) };
+  return recordRun({ root, state: { ...state, step }, phase, head, result: measured });
 }
 
 /** The refusal still says what comes next: a phase kiln cannot run is not a reason to stop. */
@@ -653,13 +686,39 @@ function effectsInPlay(rest) {
   return (flag(rest, "--effects") ?? "").split(",").map((effect) => effect.trim()).filter(Boolean);
 }
 
+/**
+ * A full run that fails after the review gate sends the work back to implementation, out
+ * loud. The review approved a change VERIFY has now shown to be wrong, so the change is
+ * going to move again — and a moved change is not the one reviewed, so the review is asked
+ * for again. BMAD's code review returns a story to in-progress for the same reason.
+ *
+ * Without this a reviewed work had no way back: source edits were refused because the run
+ * had passed review, and the fix VERIFY asked for could not be made inside the run.
+ */
+function reopenedAfterFailure(state, result) {
+  const { review, ship, ...kept } = state.gates ?? {};
+  return {
+    ...state,
+    status: WORK_STATUS.inProgress,
+    stage: "IMPLEMENT",
+    gates: kept,
+    carry_over: [...state.carry_over, { from_pass: state.pass, kind: "verify_failed", text: `${result.failed.id} exited ${result.failed.exit} after review` }],
+  };
+}
+
+function recordedRun({ state, phase, head, result }) {
+  const stored = result.entries.map(({ output, ...entry }) => entry);
+  const next = stored.reduce((acc, entry) => recordVerify(acc, entry), state);
+  if (isGreen(result, phase)) return recordFullVerified(next, head);
+  if (phase !== "full" || !result.failed || state.status !== WORK_STATUS.reviewed) return next;
+  process.stderr.write(`VERIFY failed after the review gate, so ${state.id} is back in implementation. Fix it, then take it through review again.\n`);
+  return reopenedAfterFailure(next, result);
+}
+
 function recordRun({ root, state, phase, head, result }) {
   // The raw output goes to a log file, never into state: a record you can grep for the
   // word "passed" is a record someone will eventually read for a verdict (D29).
-  const stored = result.entries.map(({ output, ...entry }) => entry);
-  let next = stored.reduce((acc, entry) => recordVerify(acc, entry), state);
-  if (isGreen(result, phase)) next = recordFullVerified(next, head);
-  writeState(root, next);
+  writeState(root, recordedRun({ state, phase, head, result }));
 
   result.entries.forEach(reportStep);
   if (!result.failed && ranSteps(result).length === 0) {
@@ -693,17 +752,24 @@ function runBlast(argv) {
   return 0;
 }
 
+/**
+ * The work's own range, from where it started. Anchoring on `last_verified` instead was one
+ * decision (D67a) solving a problem another already solved (D96's re-anchor), and it cost
+ * the ordinary case: commit a task, run the full suite, and REVIEW saw zero files and halted
+ * on "a commit on another branch". superpowers reviews from the branch point and BMAD from a
+ * baseline that never moves; neither anchors review on the last verification.
+ */
 function runScope(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
-  const anchor = anchorVerdict(root, state.last_verified);
+  const anchor = anchorVerdict(root, state.base);
   if (!anchor.ok) {
-    process.stderr.write(`${offBranchMessage(state.id, { base: state.last_verified, reason: anchor.reason })}\n`);
+    process.stderr.write(`${offBranchMessage(state.id, { base: state.base, reason: anchor.reason })}\n`);
     return 1;
   }
   const result = reconcile({
     predicted: state.predicted,
-    actual: actualChanged(root, state.last_verified),
+    actual: actualChanged(root, state.base),
     dirtyAtOpen: state.dirty_at_open,
   });
   out(reconciliationLine(result));
@@ -741,9 +807,9 @@ function claimedPaths(argv) {
  */
 function stagePaths(root, { state, stage, predicted }) {
   if (stage === "plan") return predicted.length > 0 ? predicted : pathsOf(state.predicted);
-  const anchor = anchorVerdict(root, state.last_verified);
-  if (anchor.ok) return actualChanged(root, state.last_verified);
-  process.stderr.write(`${offBranchMessage(state.id, { base: state.last_verified, reason: anchor.reason })}\n`);
+  const anchor = anchorVerdict(root, state.base);
+  if (anchor.ok) return actualChanged(root, state.base);
+  process.stderr.write(`${offBranchMessage(state.id, { base: state.base, reason: anchor.reason })}\n`);
   return null;
 }
 
@@ -893,7 +959,25 @@ function refuseOpen(reason) {
   return 1;
 }
 
+/**
+ * A shipped work is finished, and its approvals were for the change that shipped. Reopening
+ * it in place is how pass 2 came to run with every guard off: nothing ever cleared pass 1's
+ * gates, and a shipped work is in no set the guards read. superpowers treats follow-up work
+ * as new work with its own approval, and BMAD reads a done story as context for a new spec —
+ * so a follow-up is a new work that names the one it follows.
+ */
+function shippedRefusal(root, { id, rest }) {
+  if (existsSync(statePath(root, id)) && readState(root, id).status === WORK_STATUS.shipped) {
+    return `work ${id} has shipped, and a shipped work is not reopened. Follow-up work is a new work:\n  kiln open ${followUpId(root, id)} --follows ${id}`;
+  }
+  const follows = flag(rest, "--follows");
+  if (follows && !existsSync(statePath(root, follows))) return `--follows names ${follows}, and there is no such work here.`;
+  return null;
+}
+
 function openRefusal(root, { id, rest }) {
+  const shipped = shippedRefusal(root, { id, rest });
+  if (shipped) return shipped;
   const taken = alreadyDriving(root, { id, sessionId: flag(rest, "--session") });
   if (taken) return taken;
   const path = flag(rest, "--path") ?? "bounded";
@@ -952,6 +1036,7 @@ function openedAt(root, { id, rest }) {
     type: flag(rest, "--type") ?? DEFAULT_TYPE,
     auto: rest.includes("--auto"),
     dirtyAtOpen: actualChanged(root, head),
+    follows: flag(rest, "--follows") ?? null,
   };
 }
 
@@ -1082,14 +1167,36 @@ function runShip(argv) {
   const { root, config } = loadConfig(process.cwd());
   const state = readState(root, id);
   const opened = (flag(rest, "--opened") ?? "").split(",").map((url) => url.trim()).filter(Boolean);
-  if (opened.length === 0) return out(renderShipPlan(shipPlan(root, { config, state }), config.vcs.branch_pattern)) ?? 0;
+  if (opened.length === 0) {
+    out(renderShipPlan(shipPlan(root, { config, state }), config.vcs.branch_pattern));
+    return out(verifiedLine(root, state)) ?? 0;
+  }
+  const refusal = shipRefusal(root, state);
+  if (refusal) return process.stderr.write(`kiln will not record ${id} as shipped: ${refusal}\n`) && 2;
+  return recordShipped(root, { state, opened });
+}
 
+/**
+ * `--opened` is a record, and a record of a pull request nothing authorised is the ship gate
+ * walked around through kiln's own verb: on a work with no gate at all it set `shipped`, the
+ * work left every set the guards read, and the next source edit went through. So it asks the
+ * question `gh pr create` is asked — the path's ship-authorising gate, approved and still
+ * bound to its document — and a spike, which never ships, is refused by the same table.
+ */
+function shipRefusal(root, state) {
+  if (state.status === WORK_STATUS.shipped) return "it already is.";
+  const verdict = shipVerdict(root, state);
+  return verdict.blocked ? `${verdict.reason}.` : null;
+}
+
+function recordShipped(root, { state, opened }) {
   writeState(root, { ...state, status: WORK_STATUS.shipped, opened });
   // The sandbox tells every run its temp files are "removed when kiln ship records the work
   // shipped". Nothing removed them, so the promise was a sentence; this is the sentence.
-  rmSync(join(root, ".kiln", "tmp", id), { recursive: true, force: true });
-  out(`${id} is shipped: ${opened.join(", ")}`);
-  out("It claims no files now, so another work may touch them.");
+  rmSync(join(root, ".kiln", "tmp", state.id), { recursive: true, force: true });
+  out(`${state.id} is shipped: ${opened.join(", ")}`);
+  out(verifiedLine(root, state));
+  out("It claims no files now, so another work may touch them. Follow-up work opens as a new work.");
   return 0;
 }
 
@@ -1098,22 +1205,29 @@ function runShip(argv) {
  * the gate records their words, which is their call to make. What is not their call is
  * finding out later. `verify: []` said nothing here, so the only account of it was
  * whatever the agent chose to mention.
+ *
+ * And a green run describes the tree it ran against. Reporting "green" after the code moved
+ * on was D7 item 3 with a timestamp: the record was true, and the sentence it produced was
+ * about a tree that no longer existed.
  */
-function verifiedLine(state) {
+function verifiedLine(root, state) {
   const ran = (state.verify ?? []).filter((entry) => !entry.skipped);
   if (ran.length === 0) return "Verified: never — no step has run for this work.";
-  // Greenness is in the entries. Inferring it from `last_verified !== base` said "not
-  // green" after a run that was green, because the two are equal until something is
-  // committed — and verifying before committing is the ordinary case.
-  const green = ran.every((entry) => entry.exit === 0);
-  return `Verified: ${ran.length} step(s) ran${green ? ` · green at ${String(state.last_verified).slice(0, 9)}` : " · not green"}.`;
+  const last = ran.filter((entry) => entry.phase !== "fast").at(-1);
+  if (!last) return `Verified: ${ran.length} fast step(s) ran and the full phase never did — not green.`;
+  if (last.exit !== 0) return `Verified: not green — ${last.id} exited ${last.exit}.`;
+  const head = gitOutput(root, ["rev-parse", "HEAD"]);
+  const current = { range: `${state.base}..${head}`, tree: worktreeTree(root) };
+  return isStaleVerify(last, current)
+    ? `Verified: was green at ${String(state.last_verified).slice(0, 9)}, and the tree has changed since — not evidence for what ships now. Run \`kiln verify ${state.id}\`.`
+    : `Verified: green, and the run describes the tree as it is now.`;
 }
 
 function runReport(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
-  out(`${state.id} · ${state.path} · ${state.status} · pass ${state.pass}`);
-  out(verifiedLine(state));
+  out(`${state.id} · ${state.path} · ${state.status}${state.follows ? ` · follows ${state.follows}` : ""}`);
+  out(verifiedLine(root, state));
   out(renderAutoRuled(state) ?? "No gate was ruled on your behalf.");
   return 0;
 }
