@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { branchesFor, checkoutsUnder, cwdChain, dirOf, repoAt, workdirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
-import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
+import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
+import { dispatch } from "../hooks/dispatch.mjs";
+import { DEFAULTS } from "../lib/config.mjs";
 
 after(cleanupFixtures);
 
@@ -190,4 +192,20 @@ test("a chain that creates a protected branch is still refused", () => {
     currentBranch: "feature/x",
   });
   assert.equal(hit?.branch, "v3-master");
+});
+
+/**
+ * Found by an independent review of this branch: `git checkout <path>` restores a file and
+ * leaves HEAD where it is, and reading it as a move to a branch named after the path let
+ * `git checkout src/app.ts && git commit` land a commit on main.
+ */
+test("a checkout that may be restoring a file does not move the branch a commit is judged against", async () => {
+  const root = initRepo(tempRoot("kiln-checkout-path-"));
+  writeFile(join(root, "src", "app.ts"), "a\n");
+  commitAll(root, "first");
+  writeConfig(root, DEFAULTS);
+  const judge = (command) => dispatch("pre-bash", { tool_input: { command }, cwd: root, session_id: "s" });
+  assert.equal(await judge("git checkout src/app.ts && git commit --allow-empty -m x"), 2, "HEAD is still main");
+  assert.equal(await judge("git checkout . && git commit --allow-empty -m x"), 2);
+  assert.equal(await judge("git switch -c feature/x && git commit --allow-empty -m x"), 0, "a created branch is still the branch");
 });

@@ -154,6 +154,18 @@ test("D148: a call that reaches into a kiln project from outside it is judged by
   assert.equal(await dispatch("pre-edit", { tool_input: { file_path: join(project, ".kiln", "config.json") }, cwd: outside }), 2);
 });
 
+/** Found by an independent review: spellings the structured readings did not know. */
+test("D148: a call that names a kiln project in any spelling is judged by that project", async () => {
+  const project = kilnRoot();
+  const outside = tempRoot();
+  const from = (command) => dispatch("pre-bash", { tool_input: { command }, cwd: outside });
+  assert.equal(await from(`git --git-dir=${project}/.git --work-tree=${project} commit -n -m x`), 2);
+  assert.equal(await from(`GIT_DIR=${project}/.git git commit -n -m x`), 2);
+  assert.equal(await from(`(cd ${project} && git commit -n -m x)`), 2);
+  assert.equal(await from(`pushd ${project} && git commit -n -m x`), 2);
+  assert.equal(await from(`python3 -c "open('${project}/.kiln/config.json','w')"`), 2);
+});
+
 test("an unknown phase allows rather than inventing a chain", async () => {
   assert.equal(await dispatch("pre-nothing", {}), 0);
 });

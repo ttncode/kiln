@@ -13,4 +13,6 @@ test("the audit counts writes to the integration branch since the work opened, n
   const moved = writesSince(`bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222 commit: agent wrote here\n${base} commit (initial): first`, base);
   assert.equal(moved.length, 1);
   assert.equal(writesSince("cccc commit: x", null).length, 1, "with no base known, every write counts");
+  const undone = `${base} reset: moving to ${base}\nbbbb2222bbbb2222bbbb2222bbbb2222bbbb2222 commit: agent wrote here\n${base} commit (initial): first`;
+  assert.equal(writesSince(undone, base).length, 2, "a write reset away is still a write that happened");
 });

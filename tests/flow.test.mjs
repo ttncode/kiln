@@ -173,3 +173,28 @@ test("committing exactly what was verified keeps the run as evidence", () => {
   commitAll(root, "the change, as verified");
   assert.match(ok(root, ["report", "w1"]).stdout, /Verified: green, and the run describes the tree as it is now/, "SHIP commits after VERIFY by design");
 });
+
+test("on the full path too, the review gate closes source and a failed VERIFY reopens it", async () => {
+  const root = nodeProject({ name: "full-reopen", cmd: { test: "exit 1" } });
+  ok(root, ["open", "w1", "--path", "full", "--session", SESSION]);
+  for (const key of ["spec", "plan"]) {
+    writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
+    ok(root, ["gate", "w1", key, "--answer", APPROVE, ...(key === "plan" ? ["--predicted", "src/app.js"] : [])]);
+  }
+  reviewed(root, "w1");
+  assert.equal(state(root, "w1").status, "reviewed");
+  assert.equal((await edit(root, "src/app.js")).status, DENY);
+  assert.equal(kiln(root, ["verify", "w1"]).status, 1);
+  assert.equal(state(root, "w1").status, "in_progress");
+  assert.equal(state(root, "w1").gates.review, undefined);
+});
+
+test("an uncommitted edit inside a submodule makes an earlier run stale", () => {
+  const root = monorepo({ modules: [["admin", "AdminPage", "feature/x"]] });
+  writeConfig(root, { ...DEFAULTS, stack: { id: "node", cmd: { test: "true" }, steps: [{ id: "unit", run: "${cmd.test}" }] } });
+  throughPlanGate(root, "w1", { predicted: "AdminPage/src/User.php" });
+  ok(root, ["verify", "w1"]);
+  assert.match(ok(root, ["report", "w1"]).stdout, /describes the tree as it is now/);
+  writeFile(join(root, "AdminPage", "src", "User.php"), "<?php // changed\n");
+  assert.match(ok(root, ["report", "w1"]).stdout, /tree has changed since/);
+});

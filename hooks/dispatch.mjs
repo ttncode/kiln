@@ -4,13 +4,13 @@ import { loadConfig, resolveRoot } from "../lib/config.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { PathError, isSymlink, resolveEntry, resolveTarget } from "../lib/paths.mjs";
-import { destructiveTargets, opensPullRequest, removalTargets, segmentsOf, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
+import { PathError, isInside, isSymlink, resolveEntry, resolveTarget } from "../lib/paths.mjs";
+import { destructiveTargets, opensPullRequest, permissionTargets, removalTargets, segmentsOf, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
 import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
-import { interpreterMessage, interpreterReach } from "../lib/guards/interpreter.mjs";
+import { interpreterMessage, interpreterReach, shellPrograms } from "../lib/guards/interpreter.mjs";
 import { holdsControl, isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
 import { disarmAttempt, disarmMessage, isVerificationFile } from "../lib/guards/verification.mjs";
 import { StackError, UNDETECTED, guardsFor, loadStack } from "../lib/stack.mjs";
@@ -45,7 +45,21 @@ function touchedDirs(payload, cwd) {
   if (!command) return dirs;
   const moved = [...cwdChain(command, cwd), ...segmentsOf(command).map((part) => dirOf(part, cwd))];
   const paths = [...writeTargets(command), ...removalTargets(command), ...destructiveTargets(command)];
-  return [...dirs, ...moved.filter(Boolean), ...paths.map((path) => dirname(resolve(cwd, path)))];
+  return [...dirs, ...moved.filter(Boolean), ...paths.map((path) => dirname(resolve(cwd, path))), ...namedDirs(command)];
+}
+
+const MAX_NAMED = 20;
+
+/**
+ * Every absolute path the command text names, wherever it sits: a git-dir option, a GIT_DIR
+ * assignment, `pushd /proj`, `(cd /proj && …)`, or a path inside an inline program. The
+ * structured readings above know the common spellings; this is what keeps a spelling they do
+ * not know from carrying a call into a kiln project unjudged. Bounded, because each one is a
+ * walk up the filesystem on the hook's hot path.
+ */
+function namedDirs(command) {
+  const found = String(command).match(/\/[^\s'"`()<>;|&=]+/g) ?? [];
+  return found.slice(0, MAX_NAMED).flatMap((path) => [path, dirname(path)]);
 }
 
 /**
@@ -263,10 +277,35 @@ function guardSandboxFile(payload, ctx) {
  * sandbox would re-open the shell parsing D34 refuses; a control file is one resolved
  * path compared by segment, which is what the sandbox already does.
  */
+/**
+ * A permission change is judged narrower than a removal. `chmod -R u+w .` touches the project
+ * root, which holds `.kiln/`, and refusing it as if the root were a control file was a false
+ * block; `chmod 000 .kiln/work/<id>` is the one that hides a gate record, and it is inside.
+ */
+function isControlled(ctx, target) {
+  return isJudged(ctx.root, { target, activeId: ctx.state?.id }) || isVerificationFile(target);
+}
+
+function lockedAway(ctx, target) {
+  const kiln = join(ctx.root, ".kiln");
+  return isControlled(ctx, target) || (isInside(kiln, target) && !isInside(join(kiln, "tmp"), target));
+}
+
+/**
+ * A glob reaches whatever it matches, which the text does not say: `rm .kiln/work/<id>/*` names
+ * no control file and removes one. It is judged by the directory it expands in.
+ */
+function removedEntry(path, cwd) {
+  const glob = path.search(/[*?[]/);
+  if (glob === -1) return resolveEntry(path, cwd);
+  const stem = path.slice(0, glob);
+  return resolveEntry(stem.endsWith("/") || stem === "" ? stem || "." : dirname(stem), cwd);
+}
+
 function guardRemovedControlFiles(command, ctx) {
-  const hit = removalTargets(command)
-    .map((path) => resolveEntry(path, ctx.cwd))
-    .find((target) => isJudged(ctx.root, { target, activeId: ctx.state?.id }) || isVerificationFile(target) || holdsControl(ctx.root, target));
+  const removed = removalTargets(command).map((path) => removedEntry(path, ctx.cwd));
+  const locked = permissionTargets(command).map((path) => resolveEntry(path, ctx.cwd));
+  const hit = removed.find((target) => isControlled(ctx, target) || holdsControl(ctx.root, target)) ?? locked.find((target) => lockedAway(ctx, target));
   return hit ? block(sandboxMessage(ctx.root, { target: hit, activeId: ctx.state?.id, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
 }
 
@@ -336,6 +375,24 @@ function contextOrBlock(payload, found) {
   }
 }
 
+const NESTING_LIMIT = 3;
+
+/**
+ * A shell program inside the command — `bash -c "…"`, a heredoc fed to `sh` — is judged by
+ * the same chain as the command around it. Bounded, because a guard that recursed without
+ * limit on crafted input would run past the hook's timeout, and a timed-out hook allows.
+ */
+function guardNestedPrograms(payload, ctx) {
+  const depth = ctx.depth ?? 0;
+  if (depth >= NESTING_LIMIT) return ALLOW;
+  for (const program of shellPrograms(payload.tool_input.command)) {
+    const nested = { ...payload, tool_input: { command: program } };
+    if (CHAINS["pre-bash"].some((guard) => guard(nested, ctx) === BLOCK)) return BLOCK;
+    if (guardNestedPrograms(nested, { ...ctx, depth: depth + 1 }) === BLOCK) return BLOCK;
+  }
+  return ALLOW;
+}
+
 /** Nothing to judge: an unknown phase, or a shell call with no command. */
 function nothingToJudge(phase, payload) {
   if (!CHAINS[phase]) return true;
@@ -353,6 +410,7 @@ export async function dispatch(phase, payload) {
   for (const guard of CHAINS[phase]) {
     if (guard(payload, ctx) === BLOCK) return BLOCK;
   }
+  if (phase === "pre-bash" && guardNestedPrograms(payload, ctx) === BLOCK) return BLOCK;
   if (phase === "pre-bash") return stackGuardsOnBashWrites(payload, ctx);
   return runStackGuards(payload, { phase, stackId: ctx.stackId });
 }
