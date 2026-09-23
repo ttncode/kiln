@@ -479,3 +479,42 @@ test("the position is read from the caller and the next move is printed, not nar
   assert.match(nextMove({ task: 8, of: 8 }), /Every task is done; next is the review gate\./);
   assert.equal(nextMove(null), null);
 });
+
+/**
+ * The two B58 tests above prove the block renders. Neither proved anyone ever sees it, and
+ * that is exactly the gap that survived to production: `renderAutoRuled` was reachable only
+ * through `kiln report`, a command nothing requires. Measured on the owner's first auto run —
+ * two gates ruled `by: "auto"`, and the closing summary mentioned it in half a sentence.
+ *
+ * D16's reason for the block is that *without it auto mode is a black box, and a black box is
+ * not trusted twice*. A renderer nobody calls is the same black box with a test beside it.
+ */
+function autoRun() {
+  const root = autoProject({ bounded: true });
+  writeFile(join(root, ".kiln", "work", "42", "review.md"), "# review\n");
+  return root;
+}
+
+const ruleGate = (root, key) =>
+  kiln(root, ["gate", "42", key, "--artifact", `.kiln/work/42/${key}.md`, "--auto"]);
+
+test("B58: every auto ruling says so as it happens, and the last gate prints the whole block", () => {
+  const root = autoRun();
+
+  const plan = ruleGate(root, "plan");
+  assert.equal(plan.status, 0, plan.stderr);
+  assert.match(plan.stderr, /ruled the plan gate on your behalf/);
+  assert.doesNotMatch(plan.stderr, /Auto-ruled/, "the summary belongs at the end, not at every gate");
+
+  const review = ruleGate(root, "review");
+  assert.match(review.stderr, /ruled the review gate on your behalf/);
+  assert.match(review.stderr, /Auto-ruled 2 gates:/, "review is the gate that authorises shipping on bounded");
+  assert.match(review.stderr, /Your gate is now the PR\./);
+});
+
+test("B58: a gate the user gave prints nothing about auto mode", () => {
+  const root = autoProject({ bounded: false });
+  const run = kiln(root, ["gate", "42", "plan", "--artifact", ".kiln/work/42/plan.md", "--answer", "1. Approve this plan as written (recommended)"]);
+  assert.equal(run.status, 0, run.stderr);
+  assert.doesNotMatch(run.stderr, /on your behalf/);
+});

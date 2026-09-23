@@ -311,6 +311,11 @@ Print the artifact's **absolute path** the moment it is written, so the user can
 
 ### 5b. Auto mode, when the project has turned it on
 
+Every auto ruling prints a line to stderr as it happens, and the gate that authorises
+shipping prints the whole `Auto-ruled` block. **Pass both through to the user verbatim.** They
+did not read those gates; the block is the only account they get of what was decided for them,
+and a summary that omits it is a black box.
+
 `kiln open` prints one of these, and it is the whole answer:
 
 ```
