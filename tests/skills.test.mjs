@@ -301,8 +301,9 @@ test("the recommendation rides on the option, and exactly one option carries it"
   assert.match(body, /Plan complete — /, "the line says what finished, not what kiln wants");
 
   for (const fence of fences.filter((block) => block.includes("Which option?"))) {
-    const marked = fence.match(/\(recommended\)/g) ?? [];
-    assert.equal(marked.length, 1, `a menu marks one option or it marks nothing:\n${fence}`);
+    const marked = fence.match(/\(recommended[^)]*\)/g) ?? [];
+    assert.deepEqual(marked, ["(recommended)"], `a menu marks one option, with the bare word:\n${fence}`);
     assert.match(fence, /^1\..*\(recommended\)/m, "and the marked one comes first");
   }
+  assert.match(body, /bare word and nothing else/, "a reason inside the mark turns a scannable list back into prose");
 });
