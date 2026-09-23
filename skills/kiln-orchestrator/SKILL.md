@@ -405,6 +405,13 @@ Say the two things kiln cannot do, in your own words, before the user goes to me
   half-merged. Gerrit says this about its own topics; kiln is not better placed to promise.
 - **The order is yours.** Nothing in the repositories says which depends on which.
 
+### Where a temp file goes
+
+`.kiln/tmp/<id>/` — inside the project, gitignored, removed at the end of SHIP, and writable
+before any gate. Not the repository (a temp file in the diff is a temp file somebody reviews),
+and not a directory outside the project, which the sandbox refuses because it cannot tell one
+from another.
+
 ## When something breaks
 
 | Shape | What you do |

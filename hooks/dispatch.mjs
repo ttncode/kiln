@@ -161,11 +161,11 @@ function checkPath(path, ctx) {
     return block(pathRefusal(path, ctx.cwd));
   }
   if (isVerificationFile(target)) {
-    return block(sandboxMessage(ctx.root, { target, reason: "this file is part of what enforces the run; the run does not get to edit it" }));
+    return block(sandboxMessage(ctx.root, { target, activeId: ctx.state?.id, reason: "this file is part of what enforces the run; the run does not get to edit it" }));
   }
   const verdict = sandboxVerdict(ctx.root, { target, activeId: ctx.state?.id });
   const reason = verdict.blocked ? verdict.reason : claimVerdict(target, ctx);
-  return reason ? block(sandboxMessage(ctx.root, { target, reason })) : ALLOW;
+  return reason ? block(sandboxMessage(ctx.root, { target, reason, activeId: ctx.state?.id })) : ALLOW;
 }
 
 function guardSandboxFile(payload, ctx) {
@@ -182,7 +182,7 @@ function guardRemovedControlFiles(command, ctx) {
   const hit = removalTargets(command)
     .map((path) => resolveTarget(path, ctx.cwd))
     .find((target) => isJudged(ctx.root, { target, activeId: ctx.state?.id }) || isVerificationFile(target));
-  return hit ? block(sandboxMessage(ctx.root, { target: hit, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
+  return hit ? block(sandboxMessage(ctx.root, { target: hit, activeId: ctx.state?.id, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
 }
 
 /**
