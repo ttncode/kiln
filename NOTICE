@@ -123,6 +123,13 @@ Python is copied.
 Copied verbatim into skills/kiln-dna/, each with a three-line kiln note added at
 the top and nothing else changed (D157): references/glossary.md, id-schemes.md,
 quality-gates.md, agent-orchestration.md, bootstrap-playbook.md,
-update-playbook.md, dna-store.md, dna-erd.md and bpm-alignment.md. If that ever changes, the files
+update-playbook.md, dna-store.md, dna-erd.md and bpm-alignment.md.
+
+Copied verbatim into vendor/dna-explorer/ and served by `kiln dna serve` (D84, D160),
+unchanged, from assets/ at the same commit:
+  explorer.html  sha256 9d1725f1375f34c8303a5269fc55177c5d1587557ec8c52293fd126d5299c664
+  laneflow.js    sha256 ab6c1e996669c13b67be65f877d8313ca7fba061d63e73acd578d201f166d2a7
+and, as a test helper, the Node harness from scripts/check_explorer_compat.py
+(tests/helpers/explorer-harness.mjs). If that ever changes, the files
 copied are listed here before they are committed, the way the superpowers fork
 above is listed.

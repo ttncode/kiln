@@ -1,0 +1,2001 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DNA Store Explorer v2 — dual-axis</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --line:#e3e6ea; --ink:#1d2227; --muted:#6b7480;
+  --sel:#2b5fb8; --selbg:#e3ecfb;
+  --own:#a3721c; --ownbg:#fbf0dd;
+  --link:#238053; --linkbg:#e4f5ea;
+  --good:#238053; --goodbg:#e4f5ea;
+  --warn:#a3721c; --warnbg:#fbf0dd;
+  --crit:#c9434c; --critbg:#fbe6e7;
+  --sidew:290px; --rail:34px;
+}
+*{box-sizing:border-box}
+body{margin:0;font:13px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:var(--panel);border-bottom:1px solid var(--line);padding:8px 14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+h1{font-size:15px;margin:0;font-weight:600}
+.grow{flex:1}
+input[type=search]{border:1px solid var(--line);border-radius:6px;padding:5px 9px;width:220px;font:inherit}
+select{border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit;background:#fff}
+label.sw{display:flex;gap:5px;align-items:center;color:var(--muted);font-size:12px}
+.hint{color:var(--muted);font-size:11px}
+
+/* Sidebars hold only "id + name" so they are capped; every extra pixel on a wide monitor
+   goes to the CENTRE work area instead of padding two columns of trailing whitespace. */
+main{display:grid;gap:10px;padding:10px;height:calc(100vh - 47px);
+     grid-template-columns:var(--lw,var(--sidew)) minmax(360px,1fr) var(--rw,var(--sidew))}
+body.cl{--lw:var(--rail)}
+body.cr{--rw:var(--rail)}
+
+.pane{background:var(--panel);border:1px solid var(--line);border-radius:8px;display:flex;flex-direction:column;min-height:0;position:relative;overflow:hidden}
+.ph{padding:6px 8px 6px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px;flex:none}
+.ph b{font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.ph .sub{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tgl{border:1px solid var(--line);background:#fff;border-radius:5px;cursor:pointer;color:var(--muted);
+     font-size:11px;line-height:1;padding:4px 6px;flex:none}
+.tgl:hover{background:#eef1f5;color:var(--ink)}
+.body{overflow:auto;padding:5px 4px 12px;flex:1;min-height:0}
+.legend{padding:6px 10px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;display:flex;gap:11px;flex-wrap:wrap;flex:none}
+.dot{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:3px;vertical-align:-1px}
+
+/* collapsed rail */
+.rail{display:none}
+body.cl #paneL .ph, body.cl #paneL .body, body.cl #paneL .legend,
+body.cr #paneR .ph, body.cr #paneR .body, body.cr #paneR .legend{display:none}
+body.cl #paneL .rail, body.cr #paneR .rail{display:flex}
+.rail{position:absolute;inset:0;flex-direction:column;align-items:center;gap:10px;padding:7px 0;cursor:pointer}
+.rail:hover{background:#eef1f5}
+.rail .v{writing-mode:vertical-rl;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.rail .n{writing-mode:vertical-rl;font-size:10px;color:var(--muted)}
+
+.node{display:flex;align-items:center;gap:5px;padding:2px 7px;border-radius:5px;cursor:pointer;
+      white-space:nowrap;border:1px solid transparent}
+.node:hover{background:#eef1f5}
+.tw{width:12px;text-align:center;color:var(--muted);flex:none;font-size:10px}
+.tw.leaf{opacity:.3}
+.nid{font-family:ui-monospace,Consolas,monospace;font-size:11px;color:var(--muted);flex:none}
+.nm{overflow:hidden;text-overflow:ellipsis}
+.sp{flex:1}
+.chip{font-size:10px;padding:0 5px;border-radius:9px;flex:none;font-weight:600;line-height:16px;border:1px solid transparent}
+.chip.avg{background:transparent;border-style:dashed;font-weight:500;opacity:.85}
+.cnt{font-size:10px;color:var(--muted);flex:none}
+.kindtag{font-size:9px;padding:0 4px;border-radius:3px;background:#eef1f5;color:var(--muted);flex:none}
+
+.node.sel{background:var(--selbg);border-color:var(--sel)}
+.node.sel .nm{font-weight:600}
+.node.own{background:var(--ownbg);border-color:#e6d3ae}
+.node.link{background:var(--linkbg);border-color:#c2e3d0}
+body.focus .node:not(.sel):not(.own):not(.link){opacity:.32}
+
+/* centre work area */
+.d-body{padding:12px 15px;overflow:auto;flex:1;min-height:0}
+.sect{margin-bottom:15px}
+.sect h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 5px;
+         display:flex;align-items:center;gap:6px}
+svg.ico{width:13px;height:13px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;
+        stroke-linecap:round;stroke-linejoin:round;opacity:.92}
+.sect h3 svg.ico{width:14px;height:14px}
+table.kv td:first-child svg.ico{margin-right:5px;vertical-align:-2px}
+table.kv{width:100%;border-collapse:collapse}
+table.kv td{padding:3px 6px;border-bottom:1px solid #f0f2f4;vertical-align:top;font-size:12px}
+table.kv td:first-child{color:var(--muted);width:30%;white-space:nowrap}
+table.kv.kvn{margin:1px 0}table.kv.kvn td{padding:1px 5px;font-size:11.5px;border-bottom:1px dotted #eceef2}
+.kvi{border-left:2px solid var(--line);padding-left:6px;margin:3px 0}
+table.childlist td{padding:4px 6px}
+table.childlist td:first-child{width:1%;font-family:ui-monospace,Consolas,monospace;font-size:11px}
+table.childlist tr:hover td{background:#f4f6f9}
+ul.rl{margin:0;padding-left:17px}
+ul.rl li{margin-bottom:3px;font-size:12px}
+.dims{display:flex;gap:5px;flex-wrap:wrap}
+.dim{border:1px solid var(--line);border-radius:5px;padding:2px 6px;font-size:11px}
+.dim b{font-family:ui-monospace,monospace}
+.xlink{color:var(--sel);cursor:pointer;text-decoration:none}
+.xlink:hover{text-decoration:underline}
+.empty{color:var(--muted);padding:26px 15px;max-width:520px}
+.note{background:#fbf0dd;border:1px solid #e6d3ae;border-radius:6px;padding:7px 9px;font-size:12px;color:#6b5416}
+.title{font-size:16px;font-weight:600}
+/* The flowchart is the point of a process card — give it real height (and let the user drag it
+   taller). laneflow.js injects its own `.lf-widget{height:220px}` at runtime, which ties on
+   specificity and wins by source order, so this has to be id-qualified to stick. */
+/* two class levels so this beats laneflow's runtime `.lf-widget{height:220px}` (equal specificity
+   would lose on source order); per-diagram height comes from an inline style */
+.d-body .dgwrap{border:1px solid var(--line);border-radius:6px;background:#fcfcfd;
+        min-height:300px;overflow:auto;resize:vertical}
+.d-body .dgwrap:fullscreen{height:100vh !important;min-height:0;background:var(--panel);border:0;resize:none}
+.d-body .dgwrap .lf-tb{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.srf-dlg{border:1px solid var(--line);border-radius:8px;padding:12px 14px;max-width:min(720px,92vw);
+        max-height:85vh;overflow:auto;font:inherit;color:var(--ink);background:var(--panel)}
+.srf-dlg::backdrop{background:rgba(0,0,0,.25)}
+.srf-dlg .srf-hd{display:flex;align-items:center;gap:8px;margin:-12px -14px 2px;padding:10px 14px 6px;
+        position:sticky;top:-12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.srf-dlg .srf-hd b{font-family:ui-monospace,Consolas,monospace}
+.srf-dlg .srf-sp{flex:1}
+.srf-dlg button{font-size:11px;padding:2px 8px}
+.srf-dlg .srf-nm{margin-bottom:8px}
+.srf-dlg table.srf-kv td{vertical-align:top;padding:3px 6px}
+.srf-dlg table.srf-kv td:first-child{width:1%;white-space:nowrap;color:var(--muted);font-size:11px}
+.srf-dlg pre{margin:0;white-space:pre-wrap;word-break:break-all;font-size:11.5px;user-select:text}
+details.fold > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px}
+details.fold > summary::-webkit-details-marker{display:none}
+details.fold > summary::before{content:'▶';font-size:9px;color:var(--muted)}
+details.fold[open] > summary::before{content:'▼'}
+details.fold > summary h3{margin:0}
+details.fold > summary:hover h3{color:var(--ink)}
+nav.tabs{display:flex;gap:2px;border-left:1px solid var(--line);padding-left:12px}
+.tab{border:1px solid transparent;background:none;border-radius:6px;cursor:pointer;font:inherit;
+     font-size:12px;color:var(--muted);padding:4px 9px}
+.tab:hover{background:#eef1f5;color:var(--ink)}
+.tab.on{background:var(--selbg);border-color:var(--sel);color:var(--sel);font-weight:600}
+table.mx{border-collapse:collapse;font-size:11px}
+table.mx th,table.mx td{border:1px solid var(--line);padding:2px 6px;text-align:center;white-space:nowrap}
+table.mx th{background:#f4f6f9;font-weight:600;position:sticky;top:0}
+table.mx td.row-h{text-align:left;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+table.mx td.hit{background:var(--selbg);color:var(--sel);font-weight:600;cursor:pointer}
+table.mx td.hit:hover{background:#cfe0f7}
+table.mx td.zero{color:#cfd4da}
+.scrollx{overflow-x:auto;max-width:100%}
+.twocol{display:grid;grid-template-columns:1fr 1fr;gap:0 22px;align-items:start}
+@media (max-width:900px){.twocol{grid-template-columns:1fr}}
+.statcard{display:inline-block;border:1px solid var(--line);border-radius:7px;padding:6px 11px;margin:0 7px 7px 0;min-width:88px}
+.statcard b{display:block;font-size:18px;line-height:1.2}
+.statcard span{font-size:11px;color:var(--muted)}
+
+/* Very wide: flow the centre's sections into two readable columns rather than one
+   1000px-long line of prose — uses the space without stretching the text. */
+@media (min-width:1500px){
+  .d-body{display:grid;grid-template-columns:1fr 1fr;gap:0 26px;align-content:start}
+  .d-body > .sect{break-inside:avoid}
+  .d-body > .sect.wide{grid-column:1 / -1}
+  .d-body > .empty{grid-column:1 / -1}
+}
+/* Laptop / narrow: sidebars share the top band, work area takes the full width underneath.
+   Collapsing still works here — one side away widens the other, both away shrink the whole
+   top band to a strip so the centre gets nearly the entire screen. */
+@media (max-width:1180px){
+  main{grid-template-columns:var(--lw,1fr) var(--rw,1fr);
+       grid-template-rows:minmax(170px,34vh) minmax(0,1fr)}
+  #paneC{grid-column:1 / -1;grid-row:2}
+  #paneL{grid-row:1} #paneR{grid-row:1}
+  body.cl.cr main{grid-template-columns:1fr 1fr;grid-template-rows:38px minmax(0,1fr)}
+  body.cl.cr .rail{flex-direction:row;justify-content:center;gap:8px}
+  body.cl.cr .rail .v, body.cl.cr .rail .n{writing-mode:horizontal-tb}
+}
+</style>
+
+<header>
+  <h1>DNA Store Explorer</h1>
+  <nav class="tabs">
+    <button class="tab on" data-tab="detail">Detail</button>
+    <button class="tab" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="matrix">Matrix</button>
+    <button class="tab" data-tab="history">History</button>
+    <button class="tab" data-tab="infra">Infra</button>
+  </nav>
+  <span class="hint" id="crumb"></span>
+  <span class="grow"></span>
+  <span class="hint" id="counts"></span>
+  <label class="sw"><input type="checkbox" id="focus" checked> Focus</label>
+  <label class="sw"><input type="checkbox" id="pending"> Only unreviewed</label>
+  <button class="tab" id="exportMd" title="Download every Flow and Domain as Markdown, zipped — the same content this page shows, for text/LLM consumption (views.md: MD renditions)">Export MD</button>
+  <button class="tab" id="exportHtml" title="Download this whole explorer as ONE self-contained HTML file — data and diagram library embedded, opens with a double-click, no server">Export HTML</button>
+  <input type="search" id="q" placeholder="Filter both axes…">
+</header>
+
+<main>
+  <section class="pane" id="paneL">
+    <div class="ph">
+      <b>Capability</b><span class="sub" id="capsub"></span>
+      <span class="grow"></span>
+      <button class="tgl" data-side="l" title="Collapse">◀</button>
+    </div>
+    <div class="body" id="capTree"></div>
+    <!-- A legend belongs to the pane whose chips it explains. Both axes' legends used to sit in
+         #paneR, so the catalog scale read as a third band of the process scale and vanished
+         outright whenever the process pane was collapsed. -->
+    <div class="legend" id="catLegend"></div>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--selbg);border:1px solid var(--sel)"></i>selected</span>
+      <span><i class="dot" style="background:var(--ownbg);border:1px solid #e6d3ae"></i>owns</span>
+      <span><i class="dot" style="background:var(--linkbg);border:1px solid #c2e3d0"></i>linked</span>
+    </div>
+    <div class="rail" data-side="l"><span class="v">▶ Capability axis</span><span class="n" id="railL"></span></div>
+  </section>
+
+  <section class="pane" id="paneC">
+    <div id="detail" class="d-body">
+      <div class="empty">Select a node in either side menu.<br><br>
+        Selecting on one axis highlights the branches that <b>own</b> it and the objects it
+        <b>links to</b> on the other axis — so the two trees stay in sync around whatever is
+        open here in the centre.</div>
+    </div>
+  </section>
+
+  <section class="pane" id="paneR">
+    <div class="ph">
+      <button class="tgl" data-side="r" title="Collapse">▶</button>
+      <b>Process</b><span class="sub" id="procsub"></span>
+      <span class="grow"></span>
+    </div>
+    <div class="body" id="procTree"></div>
+    <div class="legend" id="statusLegend"></div>
+    <div class="rail" data-side="r"><span class="v">◀ Process axis</span><span class="n" id="railR"></span></div>
+  </section>
+</main>
+
+<script>window.LaneFlowNoAutoInit = true;</script>
+<script src="laneflow.js"></script>
+<script>
+const S = {coll:{}, byId:{}, sel:null, open:new Set(), q:'', tab:'detail', pending:false, mxMode:'domain'};
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- data source: embedded first, then the store on disk -------------------------------
+   `scripts/export_static_explorer.py` produces a single self-contained file by injecting
+   `window.__DNA_EMBED` ahead of this script and changing NOTHING else. That is the whole point:
+   the exported page and the served page are the SAME UI, so a change made here shows up in the
+   next export without anyone porting it. Never fork a "static version" of this file.
+
+   Both paths are defensive, because this viewer must open an OLD store without throwing: a
+   collection that does not exist yet yields [], and one malformed line is skipped rather than
+   taking the whole page down with it. A viewer that dies on a missing field is useless exactly
+   when you most need to look at an old snapshot. */
+function parseJsonl(text, name){
+  const out = [];
+  for(const line of String(text || '').split('\n')){
+    const s = line.trim();
+    if(!s) continue;
+    try{ out.push(JSON.parse(s)); }
+    catch(e){ console.warn(`skipped an unparseable line in ${name}.jsonl`, e.message); }
+  }
+  return out;
+}
+async function jsonl(name){
+  const emb = (typeof window !== 'undefined' && window.__DNA_EMBED) || null;
+  if(emb) return parseJsonl(emb.store && emb.store[name], name);
+  try{
+    const r = await fetch('_dna_store/'+name+'.jsonl', {cache:'no-store'});
+    if(!r.ok) return [];
+    return parseJsonl(await r.text(), name);
+  }catch(e){ console.warn(`could not load ${name}.jsonl`, e.message); return []; }
+}
+async function load(){
+  const names = ['domains','capabilities','features','flows','stages','processes','edges',
+                 'updates','excluded','services','surfaces','intakes','releases','debts',
+                 'components'];   // v2.16.0 collection; absent in older stores -> []
+  const res = await Promise.all(names.map(jsonl));
+  // Normalise the id key before anything reads it. A Flow minted by one round's split path
+  // carries its id under `flow_id` while its siblings use `id`; a consumer that reads only `id`
+  // then skips that Flow in silence — no error, just one node missing from the axis.
+  names.forEach((n,i)=>{
+    S.coll[n] = res[i];
+    res[i].forEach(r=>{
+      if(!r.id && r.flow_id && n === 'flows') r.id = r.flow_id;
+      if(r.id) S.byId[r.id] = r;
+    });
+  });
+  // findings are counted for the Overview but their bodies stay lazy (1.3k rows)
+  const EMB = (typeof window !== 'undefined' && window.__DNA_EMBED) || null;
+  if(EMB){
+    S.coll.findingsCount = parseJsonl(EMB.store && EMB.store.findings, 'findings').length;
+  } else {
+    fetch('_dna_store/findings.jsonl', {cache:'no-store'}).then(r=>r.ok?r.text():'').then(t=>{
+      S.coll.findingsCount = t ? t.split('\n').filter(l=>l.trim()).length : 0;
+      if(S.tab === 'overview') renderCentre();
+    }).catch(()=>{});
+  }
+  // NOTE: judged quality scores are deliberately NOT loaded here — they belong to the
+  // tps-quality-benchmark report. This viewer shows review/sign-off state only.
+  if(EMB){ S.manifest = EMB.manifest || null; }
+  else {
+    try{
+      const m = await fetch('_dna_store/manifest.json', {cache:'no-store'});
+      if(m.ok) S.manifest = await m.json();
+    }catch(e){ S.manifest = null; }
+  }
+  index(); render();
+  // Restore whatever the url asks for, AFTER the store is in memory — a deep link names an id
+  // that does not exist until now. If the url carries nothing, seed one so the very first Back
+  // press returns to this page instead of leaving it.
+  if(!(await applyUrl())) writeUrl(false);
+}
+
+const IX = {procByCap:{}, procByDom:{}, featOfProc:{}, procOfFeat:{}, capTypedOfProc:{},
+            stagesOfFlow:{}, procOfStage:{}, capsOfDom:{}, featsOfCap:{}};
+function push(o,k,v){ (o[k]=o[k]||[]).push(v); }
+function index(){
+  for(const c of S.coll.capabilities) push(IX.capsOfDom, c.domain_id, c.id);
+  for(const f of S.coll.features)     push(IX.featsOfCap, f.capability_id, f.id);
+  for(const s of S.coll.stages)       push(IX.stagesOfFlow, s.flow_id, s.id);
+  for(const p of S.coll.processes){
+    push(IX.procOfStage, p.stage_id, p.id);
+    if(p.primary_capability_id) push(IX.procByCap, p.primary_capability_id, p.id);
+    if(p.primary_domain_id)     push(IX.procByDom, p.primary_domain_id, p.id);
+  }
+  for(const e of S.coll.edges){
+    if(e.kind === 'FEATURE_PROCESS'){ push(IX.featOfProc, e.from, e.to); push(IX.procOfFeat, e.to, e.from); }
+    else if(e.kind === 'TYPED_REL')   push(IX.capTypedOfProc, e.from, {id:e.to, type:e.type});
+  }
+}
+
+/* ---------- BPM review status (bpm-alignment.md §3) ----------
+   Judged QUALITY SCORES deliberately live in the benchmark skill's own report, not here. This
+   viewer answers a different question: which information objects are still waiting for a human?
+   Order is severity, worst first — VERIFIED is a human signature, so anything short of it is a
+   queue item. */
+const BPM_ORDER = ['MISSING','AI_SUGGESTED','DOC_CONFIRMED','VERIFIED'];
+const BPM_COLOR = {
+  MISSING:       {bg:'#fbe6e7', fg:'#c9434c', short:'missing'},
+  AI_SUGGESTED:  {bg:'#fbf0dd', fg:'#a3721c', short:'AI draft'},
+  DOC_CONFIRMED: {bg:'#e3ecfb', fg:'#2b5fb8', short:'doc'},
+  VERIFIED:      {bg:'#e4f5ea', fg:'#238053', short:'verified'},
+};
+/* ---------- Catalog-axis review state (its OWN, not the process axis's) ----------
+   CORRECTED: this viewer used to let a Domain/Capability borrow the bpm_review counts of the
+   processes it owns, on the premise that "the capability axis carries no review state of its
+   own". That premise is false. `classification_confidence` (HIGH/MEDIUM/LOW) IS the catalog
+   axis's review-priority signal — glossary.md keeps it "honest so reviews can prioritize
+   LOW/MEDIUM". Borrowing put a number from a different axis on a catalog row, so a reader
+   auditing the taxonomy was shown a queue measured on business processes. */
+const CAT_ORDER = ['LOW','MEDIUM','HIGH'];
+const CAT_COLOR = {
+  LOW:    {bg:'#fbe6e7', fg:'#c9434c', short:'low confidence'},
+  MEDIUM: {bg:'#fbf0dd', fg:'#a3721c', short:'medium'},
+  HIGH:   {bg:'#e4f5ea', fg:'#238053', short:'high'},
+};
+function isCatalog(r){ return !!r && ['domain','capability','feature'].includes(r.entity); }
+function featsUnder(id){
+  const r = S.byId[id]; if(!r) return [];
+  if(r.entity === 'feature')    return [r];
+  if(r.entity === 'capability') return (IX.featsOfCap[id]||[]).map(f=>S.byId[f]).filter(Boolean);
+  if(r.entity === 'domain')     return (IX.capsOfDom[id]||[]).flatMap(c=>featsUnder(c));
+  return [];
+}
+function catalogStats(id){
+  let worst = null, pending = 0, total = 0;
+  for(const f of featsUnder(id)){
+    const c = f.classification_confidence;
+    if(!CAT_COLOR[c]) continue;
+    total++;
+    if(c !== 'HIGH') pending++;
+    if(worst === null || CAT_ORDER.indexOf(c) < CAT_ORDER.indexOf(worst)) worst = c;
+  }
+  return {worst, pending, total};
+}
+/* Which records carry the review state for a PROCESS-AXIS node: it answers for itself and for
+   everything under it. Catalog nodes never reach here. */
+function reviewRecords(id){
+  const r = S.byId[id]; if(!r) return [];
+  if(r.entity === 'flow')  return [r, ...(IX.stagesOfFlow[id]||[]).flatMap(s => reviewRecords(s))];
+  if(r.entity === 'stage') return [r, ...(IX.procOfStage[id]||[]).map(p => S.byId[p]).filter(Boolean)];
+  if(r.entity === 'process') return [r];
+  return [];
+}
+function reviewStats(id){
+  let worst = null, pending = 0, total = 0;
+  for(const rec of reviewRecords(id)){
+    const m = rec.bpm_review;
+    if(!m || typeof m !== 'object') continue;
+    for(const v of Object.values(m)){
+      const st = v && v.status;
+      if(!BPM_COLOR[st]) continue;
+      total++;
+      if(st !== 'VERIFIED') pending++;
+      if(worst === null || BPM_ORDER.indexOf(st) < BPM_ORDER.indexOf(worst)) worst = st;
+    }
+  }
+  return {worst, pending, total};
+}
+function statusChip(id){
+  const r = S.byId[id] || {};
+  // Each axis reports ITS OWN review signal. A catalog node never shows a process-axis number:
+  // they answer different questions and a borrowed count is simply a wrong number on that row.
+  if(isCatalog(r)){
+    const {worst, pending, total} = catalogStats(id);
+    if(!worst) return '';
+    const c = CAT_COLOR[worst];
+    const tip = `Catalog review priority — ${worst} is the least-confident classification here · ` +
+                `${pending} of ${total} features are MEDIUM or LOW confidence and are the ones a ` +
+                `taxonomy review should look at first (glossary.md: classification_confidence). ` +
+                `This is the catalog axis's own signal; the BF/BP sign-off queue is reported on ` +
+                `the Process side only.`;
+    return `<span class="chip" style="background:${c.bg};color:${c.fg}" title="${esc(tip)}">`+
+           `${pending || '✓'}</span>`;
+  }
+  const {worst, pending, total} = reviewStats(id);
+  if(!worst) return '';
+  const c = BPM_COLOR[worst];
+  const tip = `BPM sign-off — ${worst} is the least-reviewed state here · ${pending} of ${total} ` +
+              `information objects still awaiting a human signature`;
+  // number = how many objects are still queued; colour = the worst state among them. Putting
+  // the status WORD next to the count read as "96 are MISSING", which is not what it means.
+  return `<span class="chip" style="background:${c.bg};color:${c.fg}" title="${esc(tip)}">`+
+         `${pending || '✓'}</span>`;
+}
+/* Each axis counts in ITS OWN unit — a capability reports features, not business processes
+   (mixing the two made the catalog side read as if it were a process container). */
+function ownCount(id){
+  const r = S.byId[id]; if(!r) return null;
+  switch(r.entity){
+    case 'domain':     return [(IX.capsOfDom[id]||[]).length,   'cap'];
+    case 'capability': return [(IX.featsOfCap[id]||[]).length,  'feat'];
+    case 'flow':       return [(IX.stagesOfFlow[id]||[]).length,'stg'];
+    case 'stage':      return [(IX.procOfStage[id]||[]).length, 'proc'];
+  }
+  return null;
+}
+function procsUnder(id){
+  const r = S.byId[id]; if(!r) return [];
+  switch(r.entity){
+    case 'domain':     return (IX.capsOfDom[id]||[]).flatMap(c => IX.procByCap[c]||[]);
+    case 'capability': return IX.procByCap[id]||[];
+    case 'feature':    return IX.procOfFeat[id]||[];
+    case 'flow':       return (IX.stagesOfFlow[id]||[]).flatMap(s => IX.procOfStage[s]||[]);
+    case 'stage':      return IX.procOfStage[id]||[];
+    case 'process':    return [id];
+  }
+  return [];
+}
+
+function highlight(){
+  const own = new Set(), link = new Set();
+  const id = S.sel; if(!id) return {own, link};
+  const r = S.byId[id]; if(!r) return {own, link};
+  if(r.entity === 'process'){
+    own.add(r.stage_id); own.add(r.flow_id);
+    own.add(r.primary_capability_id); own.add(r.primary_domain_id);
+    (IX.featOfProc[id]||[]).forEach(f => link.add(f));
+    (IX.capTypedOfProc[id]||[]).forEach(o => link.add(o.id));
+  } else if(r.entity === 'stage' || r.entity === 'flow'){
+    if(r.entity === 'stage') own.add(r.flow_id);
+    else (IX.stagesOfFlow[id]||[]).forEach(s => own.add(s));
+    procsUnder(id).forEach(p => { link.add(p);
+      const pr = S.byId[p]; if(pr){ own.add(pr.primary_capability_id); own.add(pr.primary_domain_id); } });
+  } else {
+    if(r.entity === 'capability') own.add(r.domain_id);
+    if(r.entity === 'feature'){ own.add(r.capability_id); own.add(r.domain_id); }
+    procsUnder(id).forEach(p => { link.add(p);
+      const pr = S.byId[p]; if(pr){ own.add(pr.stage_id); own.add(pr.flow_id); } });
+  }
+  own.delete(undefined); link.delete(undefined); own.delete(id); link.delete(id);
+  return {own, link};
+}
+
+function match(r){
+  if(S.q && !(r.id+' '+(r.name||'')).toLowerCase().includes(S.q)) return false;
+  if(S.pending && reviewStats(r.id).pending === 0) return false;   // review-queue filter
+  return true;
+}
+function subtreeMatches(id){
+  const r = S.byId[id];
+  return (r && match(r)) || kids(id).some(subtreeMatches);
+}
+function filtering(){ return !!S.q || S.pending; }
+function kids(id){
+  const r = S.byId[id]; if(!r) return [];
+  switch(r.entity){
+    case 'domain':     return IX.capsOfDom[id]||[];
+    case 'capability': return IX.featsOfCap[id]||[];
+    case 'flow':       return IX.stagesOfFlow[id]||[];
+    case 'stage':      return IX.procOfStage[id]||[];
+  }
+  return [];
+}
+/* Ids repeat their parent verbatim (DOM-MAIL / DOM-MAIL-01 / DOM-MAIL-01-01), which eats the
+   width the NAME needs. Show only the segment this level adds — indentation already carries the
+   hierarchy — and keep the full id in the hover tooltip. */
+function shortId(id, parentId){
+  if(!parentId || !id.startsWith(parentId)) return id;
+  return id.slice(parentId.length).replace(/^[-.]/, '') || id;
+}
+function nodeHTML(id, depth, hl, parentId){
+  const r = S.byId[id]; if(!r) return '';
+  const ch = kids(id), isOpen = S.open.has(id);
+  const cls = ['node'];
+  if(S.sel === id) cls.push('sel');
+  else if(hl.own.has(id)) cls.push('own');
+  else if(hl.link.has(id)) cls.push('link');
+  const under = procsUnder(id);
+  const kind = r.entity === 'process' && r.process_kind === 'CONTROL' ? '<span class="kindtag">CTRL</span>' : '';
+  const tip = `${id}${r.name?' — '+r.name:''}`;
+  let h = `<div class="${cls.join(' ')}" data-id="${esc(id)}" style="padding-left:${7+depth*13}px" title="${esc(tip)}">
+      <span class="tw ${ch.length?'':'leaf'}" data-tw="${esc(id)}">${ch.length?(isOpen?'▼':'▶'):'·'}</span>
+      <span class="nid">${esc(shortId(id, parentId))}</span>
+      <span class="nm">${esc(r.name||'')}</span>${kind}
+      <span class="sp"></span>
+      ${(oc => oc && oc[0] ? `<span class="cnt">${oc[0]} ${oc[1]}</span>` : '')(ownCount(id))}
+      ${statusChip(id)}</div>`;
+  if(isOpen) for(const c of ch) if(!filtering() || subtreeMatches(c)) h += nodeHTML(c, depth+1, hl, id);
+  return h;
+}
+function render(){
+  const hl = highlight();
+  document.body.classList.toggle('focus', $('focus').checked && !!S.sel);
+  const doms  = S.coll.domains.map(d=>d.id).filter(i=>!filtering()||subtreeMatches(i));
+  const flows = S.coll.flows.map(f=>f.id).filter(i=>!filtering()||subtreeMatches(i));
+  $('capTree').innerHTML  = doms.map(i=>nodeHTML(i,0,hl)).join('')  || '<div class="empty">no match</div>';
+  $('procTree').innerHTML = flows.map(i=>nodeHTML(i,0,hl)).join('') || '<div class="empty">no match</div>';
+  $('capsub').textContent  = `${S.coll.domains.length} dom · ${S.coll.capabilities.length} cap · ${S.coll.features.length} feat`;
+  $('procsub').textContent = `${S.coll.flows.length} flow · ${S.coll.stages.length} stage · ${S.coll.processes.length} proc`;
+  $('railL').textContent = `${S.coll.domains.length} domains`;
+  $('railR').textContent = `${S.coll.flows.length} flows`;
+  // Two axes, two review signals, two legends — the chip on a catalog row and the chip on a
+  // process row are not the same measurement and must not read as one scale. Each legend renders
+  // into its OWN pane; side by side in one strip they read as a single five-step scale, which is
+  // how "high / medium / low confidence" ended up looking like part of the process axis.
+  const dots = (order, color) => order.map(s =>
+    `<span><i class="dot" style="background:${color[s].bg};border:1px solid ${color[s].fg}"></i>${color[s].short}</span>`
+  ).join('');
+  $('statusLegend').innerHTML =
+    '<span class="cnt">Number on a row = objects awaiting sign-off:</span>' +
+    dots(BPM_ORDER, BPM_COLOR);
+  $('catLegend').innerHTML =
+    '<span class="cnt">Number on a row = features below HIGH confidence:</span>' +
+    dots(CAT_ORDER.slice().reverse(), CAT_COLOR);
+  // whole-store review queue, so the header answers "how much is left" without any drilling
+  let pend = 0, tot = 0;
+  for(const rec of [...S.coll.flows, ...S.coll.stages, ...S.coll.processes]){
+    const m = rec.bpm_review; if(!m) continue;
+    for(const v of Object.values(m)){
+      if(!BPM_COLOR[(v||{}).status]) continue;
+      tot++; if(v.status !== 'VERIFIED') pend++;
+    }
+  }
+  $('counts').textContent = tot ? `review queue: ${pend} of ${tot} objects awaiting sign-off` : '';
+  renderCentre();
+}
+
+const BUCKETS = ['business_rules','validation_rules','state_rules','defaulting_rules',
+                 'integration_rules','ui_behaviors','exception_flow','status_transition'];
+const nameOf = id => (S.byId[id]||{}).name || '';
+
+/* ---------- iconography ----------
+   Monochrome 1.6px-stroke line icons (Feather geometry) drawn in currentColor — deliberately
+   NOT emoji: the same recognisability without the toy register. They are decorative repeats of
+   the adjacent text, so they carry aria-hidden and never become the only label. */
+const ICON = {
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.4"/>',
+  users:'<path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  trend:'<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+  crop:'<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/>',
+  login:'<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>',
+  logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  cpu:'<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>',
+  zap:'<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  book:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+  check:'<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  activity:'<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  sliders:'<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  link:'<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  monitor:'<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+  alert:'<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  branch:'<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  list:'<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  merge:'<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  clipboard:'<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><polyline points="9 14 11 16 15 12"/>',
+  layers:'<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+  server:'<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+  expand:'<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>',
+};
+/* Colour is SEMANTIC, not decoration: the same hue always means the same kind of thing, so the
+   eye learns the page (entry=blue, result=green, machinery=indigo, risk=red, time=amber…).
+   Muted 600-ish tones only — bright primaries would undo the professional register. */
+const HUE = {blue:'#2b5fb8', green:'#238053', amber:'#a3721c', red:'#c9434c',
+             teal:'#0d7d76', purple:'#6b4fa8', indigo:'#4356a8', cyan:'#17708f', slate:'#5a6472'};
+const ICON_HUE = {
+  target:'blue', users:'amber', trend:'green', crop:'slate',
+  login:'blue', cpu:'indigo', logout:'green', zap:'amber',
+  book:'indigo', check:'green', activity:'teal', sliders:'purple',
+  link:'cyan', monitor:'blue', alert:'red', branch:'purple',
+  list:'slate', file:'slate', merge:'purple', clipboard:'blue',
+  layers:'teal', grid:'slate', clock:'amber', server:'slate', expand:'slate',
+};
+function ico(name, cls){
+  const p = ICON[name]; if(!p) return '';
+  const c = HUE[ICON_HUE[name]] || 'currentColor';
+  return `<svg class="ico ${cls||''}" style="color:${c}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${p}</svg>`;
+}
+// label text -> icon, used for both bucket headings and business-description row labels
+const LABEL_ICON = {
+  'what it does':'target', 'what you can do':'target', 'who uses it':'users',
+  'business outcome':'trend', 'boundary':'crop', 'input':'login', 'process':'cpu',
+  'output':'logout', 'trigger':'zap', 'when':'clock', 'want':'target', 'so that':'trend',
+  'business rules':'book', 'validation rules':'check', 'state rules':'activity',
+  'defaulting rules':'sliders', 'integration rules':'link', 'ui behaviors':'monitor',
+  'exception flow':'alert', 'status transition':'branch', 'technical notes':'cpu',
+};
+const labelIco = k => ico(LABEL_ICON[String(k).replace(/_/g,' ').toLowerCase()] || '');
+const H3 = (label, icon) => `<h3>${ico(icon)}${esc(label)}</h3>`;
+/* Any id token anywhere in the prose becomes clickable — the RD-#### citations inside rule
+   sentences are the whole point: a reader can jump straight from a claim to its evidence.
+   Only resolvable ids are linked (RD/PRD resolve lazily once findings.jsonl loads), so a
+   stray token never turns into a dead link. Input MUST already be html-escaped. */
+const ID_RE = /\b(?:RD|PRD)-\d{3,5}\b|\bBF-\d+(?:\.S\d+(?:\.P\d+)?)?\b|\bDOM-[A-Z]+(?:-\d+){0,2}\b|\bEXC-[A-Z0-9-]+\b|\bUPD-[0-9A-Z-]+\b/g;
+function linkify(escaped){
+  return String(escaped).replace(ID_RE, m =>
+    (S.byId[m] || /^(?:RD|PRD)-/.test(m)) ? `<a class="xlink" href="#/detail/${encodeURIComponent(m)}" data-go="${m}">${m}</a>` : m);
+}
+const escL = v => linkify(esc(v));
+/* Direct children for the centre pane's drill-down list. Mirrors kids() for the tree, but a
+   FEATURE has no tree children while it does have a meaningful drill-down (the processes that
+   implement it), so the two are deliberately not the same function. */
+function childList(id){
+  const r = S.byId[id]; if(!r) return {label:'', items:[]};
+  switch(r.entity){
+    case 'domain':     return {label:'Capabilities',  items: IX.capsOfDom[id]||[]};
+    case 'capability': return {label:'Features',      items: IX.featsOfCap[id]||[]};
+    case 'feature':    return {label:'Processes implementing this', items: IX.procOfFeat[id]||[]};
+    case 'flow':       return {label:'Stages',        items: IX.stagesOfFlow[id]||[]};
+    case 'stage':      return {label:'Processes',     items: IX.procOfStage[id]||[]};
+  }
+  return {label:'', items:[]};
+}
+function link(id){ return `<a class="xlink" href="#/detail/${encodeURIComponent(id)}" data-go="${esc(id)}">${esc(id)}</a>`; }
+/* Service detail — a service is a hub, so its card answers the questions the generic field dump
+   cannot: who calls it / whom it calls (TOPOLOGY, with provenance and the cited call site),
+   which BUSINESS PROCESSES depend on it (EXTERNAL_HOP grouped by flow — the cross-axis link the
+   generic "processes on the other axis" count never saw, since it follows process edges only),
+   and how big its footprint is (surfaces by kind, components, findings). Identity fields
+   (kind, tech_stack, repo, root_paths, module_keywords) fall through to the generic tail. */
+function renderServiceDetail(id){
+  const edges = S.coll.edges || [];
+  const n1 = (n, w) => `${n} ${w}${n === 1 ? '' : (w.endsWith('s') ? 'es' : 's')}`;
+  const prov = e => e.derivation === 'hop-lift'
+    ? `<span class="kindtag">hop-lift</span> ${n1(e.support || 1, 'call site')}`
+    : `<span class="kindtag">authored</span>${e.hop_support ? ' + ' + n1(e.hop_support, 'call site') : ''}`;
+  const row = (other, e) => `<tr><td>${link(other)}</td><td>${esc(nameOf(other))}<div class="cnt">` +
+    `${esc(e.type || '')} · ${prov(e)}${e.evidence ? ' · ' + esc(String(e.evidence)) : ''}` +
+    `${(e.rd_ids || []).length ? ' · ' + e.rd_ids.map(link).join(' ') : ''}</div></td></tr>`;
+  const inn = edges.filter(e => e.kind === 'TOPOLOGY' && e.to === id);
+  const out = edges.filter(e => e.kind === 'TOPOLOGY' && e.from === id);
+  const tbl = rows => `<table class="kv childlist">${rows.join('') || '<tr><td class="cnt">none</td></tr>'}</table>`;
+  let h = `<div class="sect wide">${H3('Topology', 'link')}<div class="twocol">` +
+    `<div><div class="cnt" style="margin-bottom:4px">called by (${inn.length})</div>${tbl(inn.map(e => row(e.from, e)))}</div>` +
+    `<div><div class="cnt" style="margin-bottom:4px">calls (${out.length})</div>${tbl(out.map(e => row(e.to, e)))}</div>` +
+    `</div></div>`;
+
+  const hops = edges.filter(e => e.kind === 'EXTERNAL_HOP' && e.to === id);
+  if(hops.length){
+    const byProc = {};
+    for(const hp of hops){
+      const p = (byProc[hp.from] = byProc[hp.from] || {n: 0, ch: new Set()});
+      p.n++; if(hp.channel) p.ch.add(hp.channel);
+    }
+    const byFlow = {};
+    for(const pid of Object.keys(byProc)){
+      const fl = (S.byId[pid] || {}).flow_id || '(no flow)';
+      (byFlow[fl] = byFlow[fl] || []).push(pid);
+    }
+    const flows = Object.keys(byFlow).sort((a, b) => byFlow[b].length - byFlow[a].length);
+    h += `<div class="sect wide">${H3(`Business processes depending on this service (${n1(Object.keys(byProc).length, 'process')} in ${n1(flows.length, 'flow')})`, 'branch')}` +
+      `<div class="cnt" style="margin-bottom:6px">From EXTERNAL_HOP call sites — if this service is down, these are the processes that stop.</div>` +
+      `<table class="kv childlist">` + flows.map(fl =>
+        `<tr><td style="padding-left:6px">${fl === '(no flow)' ? '<span class="cnt">(no flow)</span>' : link(fl)}</td>` +
+        `<td>${esc(nameOf(fl))} <span class="cnt">${n1(byFlow[fl].length, 'process')}</span></td></tr>` +
+        byFlow[fl].map(pid => `<tr><td style="padding-left:22px">${link(pid)}</td><td>${esc(nameOf(pid))} ` +
+          `<span class="cnt">${n1(byProc[pid].n, 'call site')}${byProc[pid].ch.size ? ' · ' + [...byProc[pid].ch].join(', ') : ''}</span></td></tr>`).join('')
+      ).join('') + `</table></div>`;
+  }
+
+  const srf = (S.coll.surfaces || []).filter(s => s.service_id === id);
+  const byKind = {}; srf.forEach(s => byKind[s.kind || '?'] = (byKind[s.kind || '?'] || 0) + 1);
+  const cmps = (S.coll.components || []).filter(c => c.service_id === id);
+  const custom = cmps.filter(c => c.origin === 'CUSTOM');
+  h += `<div class="sect wide">${H3('Footprint', 'layers')}<table class="kv">` +
+    `<tr><td>surfaces</td><td>${srf.length
+      ? Object.keys(byKind).sort((a, b) => byKind[b] - byKind[a]).map(k => `${esc(k)} <b>${byKind[k]}</b>`).join(' &nbsp;·&nbsp; ') +
+        ` <a class="xlink dim" href="#/infra">open Infra tab</a>`
+      : '<span class="cnt">none</span>'}</td></tr>` +
+    `<tr><td>components</td><td>${cmps.length
+      ? `<b>${cmps.length}</b>${custom.length ? ` · ${custom.length} CUSTOM: ${custom.map(c => link(c.id)).join(' ')}` : ''}`
+      : '<span class="cnt">none (or no components.jsonl in this store)</span>'}</td></tr>` +
+    `<tr><td>findings</td><td id="svcfind"><span class="cnt">counting…</span></td></tr></table></div>`;
+  countServiceFindings(id);
+  return h;
+}
+// findings.jsonl is the one collection loaded lazily (same cache showEvidence fills), so the
+// count arrives a beat after the card — into the placeholder cell, if the card is still up.
+async function countServiceFindings(id){
+  if(!S.findings){
+    S.findings = {};
+    (await jsonl('findings')).forEach(f => { S.findings[f.id] = f; S.byId[f.id] = f; });
+  }
+  const el = document.getElementById('svcfind'); if(!el) return;
+  const mine = Object.values(S.findings).filter(f => f.service_id === id);
+  const cmp = {};
+  for(const f of mine) if(f.component_id) cmp[f.component_id] = (cmp[f.component_id] || 0) + 1;
+  const top = Object.keys(cmp).sort((a, b) => cmp[b] - cmp[a]).slice(0, 5);
+  el.innerHTML = `<b>${mine.length}</b>` +
+    (top.length ? ` <span class="cnt">· largest components: ${top.map(c => `${link(c)} ${cmp[c]}`).join(', ')}</span>` : '');
+}
+function renderDetail(id){
+  const r = S.byId[id]; if(!r) return;
+  const rs = reviewStats(id);
+  let h = `<div class="sect wide"><div class="title">${esc(r.name || r.proposition || id)}</div>
+      <div class="nid" style="font-size:11px">${esc(id)} · ${esc(r.entity)}${r.process_kind?' · '+esc(r.process_kind):''}
+      ${rs.total?` · <b style="color:${BPM_COLOR[rs.worst].fg}">${rs.pending} of ${rs.total} awaiting review</b>`:''}</div></div>`;
+
+  if(r.entity === 'service') h += renderServiceDetail(id);
+
+  const cross = [];
+  if(r.entity === 'process'){
+    if(r.primary_domain_id)     cross.push(['owned by domain', link(r.primary_domain_id)+' '+esc(nameOf(r.primary_domain_id))]);
+    if(r.primary_capability_id) cross.push(['owned by capability', link(r.primary_capability_id)+' '+esc(nameOf(r.primary_capability_id))]);
+    if(r.stage_id) cross.push(['in stage', link(r.stage_id)+' '+esc(nameOf(r.stage_id))]);
+    if(r.flow_id)  cross.push(['in flow',  link(r.flow_id)+' '+esc(nameOf(r.flow_id))]);
+    const fs = IX.featOfProc[id]||[];
+    if(fs.length) cross.push([`implements ${fs.length} feature(s)`, fs.map(f=>link(f)+' '+esc(nameOf(f))).join('<br>')]);
+    const ts = IX.capTypedOfProc[id]||[];
+    if(ts.length) cross.push(['typed relations', ts.map(t=>`${esc(t.type||'REL')} → `+link(t.id)).join('<br>')]);
+  } else {
+    const under = procsUnder(id);
+    // a service's process link is EXTERNAL_HOP, rendered by renderServiceDetail — the generic
+    // count here follows process edges only and would always say 0 for it
+    if(!['flow','stage','service'].includes(r.entity))
+      cross.push(['processes on the other axis', String(under.length)]);
+    if(r.entity === 'capability' || r.entity === 'feature'){
+      if(r.domain_id) cross.push(['in domain', link(r.domain_id)+' '+esc(nameOf(r.domain_id))]);
+      if(r.capability_id) cross.push(['in capability', link(r.capability_id)+' '+esc(nameOf(r.capability_id))]);
+    }
+    if(r.entity === 'stage' && r.flow_id) cross.push(['in flow', link(r.flow_id)+' '+esc(nameOf(r.flow_id))]);
+  }
+  if(cross.length) h += `<div class="sect">${H3('Cross-axis','merge')}<table class="kv">` +
+      cross.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join('') + `</table></div>`;
+
+  /* Drill-down: the selected item's OWN info sits above, its DIRECT children below as a
+     clickable list — so the centre pane can be navigated on its own without the side trees. */
+  const kidsOf = childList(id);
+  if(kidsOf.items.length){
+    h += `<div class="sect wide">${H3(kidsOf.label+' ('+kidsOf.items.length+')','layers')}
+      <table class="kv childlist">` + kidsOf.items.map(cid => {
+        const c = S.byId[cid] || {};
+        const oc = ownCount(cid);
+        return `<tr><td>${link(cid)}</td><td>${esc(c.name||'')}` +
+               `${c.process_kind==='CONTROL'?' <span class="kindtag">CTRL</span>':''}</td>` +
+               `<td style="width:1%;white-space:nowrap;text-align:right">` +
+               `${oc&&oc[0]?`<span class="cnt">${oc[0]} ${oc[1]}</span> `:''}${statusChip(cid)}</td></tr>`;
+      }).join('') + `</table></div>`;
+  }
+
+  // narrative prose first (capability axis lives almost entirely in these two objects)
+  if(r.business_description && typeof r.business_description === 'object')
+    h += `<div class="sect wide">${H3('Business description','file')}<table class="kv">` +
+      Object.entries(r.business_description).map(([k,v]) =>
+        `<tr><td>${labelIco(k)}${esc(k.replace(/_/g,' '))}</td><td>${escL(v)}</td></tr>`).join('') + `</table></div>`;
+
+  if(r.jtbd) h += `<div class="sect">${H3('Job to be done','target')}<table class="kv">` +
+      Object.entries(r.jtbd).map(([k,v])=>
+        `<tr><td>${labelIco(k)}${esc(k.replace(/_/g,' '))}</td><td>${escL(v)}</td></tr>`).join('')+`</table></div>`;
+  if(r.actors && r.actors.length)
+    h += `<div class="sect">${H3('Actors','users')}${r.actors.map(a=>`<span class="dim">${esc(a)}</span>`).join(' ')}</div>`;
+  for(const b of BUCKETS){
+    const v = r[b];
+    if(Array.isArray(v) && v.length)
+      h += `<div class="sect">${H3(b.replace(/_/g,' '), LABEL_ICON[b.replace(/_/g,' ')]||'list')}` +
+           `<ul class="rl">`+v.map(x=>`<li>${escL(x)}</li>`).join('')+`</ul></div>`;
+  }
+
+  // GENERIC tail: render every remaining field rather than a hand-picked allow-list, so a
+  // populated field can never silently vanish from the page (the capability axis looked empty
+  // for exactly that reason: its content is in `ext` / `description` / long prose fields).
+  const SKIP = new Set(['entity','id','name','jtbd','actors','bpm_review','business_description',
+    'domain_id','capability_id','flow_id','stage_id','primary_domain_id','primary_capability_id',
+    'rd_ids', ...BUCKETS]);
+  const rows = [], blocks = [];
+  for(const [k,v] of Object.entries(r)){
+    if(SKIP.has(k) || v == null || v === '') continue;
+    if(typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'){
+      rows.push([k, escL(v)]);
+    } else if(Array.isArray(v)){
+      if(v.every(x => typeof x === 'string')) rows.push([k, v.map(escL).join('<br>')]);
+    } else if(typeof v === 'object'){
+      // evidence ids are pulled out of `ext` and shown in the collapsible Evidence section
+      // below, so they don't also appear here as a raw id dump
+      const entries = Object.entries(v).filter(([k2]) => k2 !== 'evidence_rd_ids');
+      if(!entries.length) continue;
+      blocks.push(`<div class="sect wide">${H3(k.replace(/_/g,' '), LABEL_ICON[k.replace(/_/g,' ')]||'list')}<table class="kv">` +
+        entries.map(([k2,v2]) => `<tr><td>${esc(k2.replace(/_/g,' '))}</td><td>` +
+          extVal(v2) + `</td></tr>`).join('') +
+        `</table></div>`);
+    }
+  }
+  if(rows.length) h += `<div class="sect wide">${H3('Fields','list')}<table class="kv">` +
+      rows.map(([k,v])=>`<tr><td>${esc(k.replace(/_/g,' '))}</td><td>${v}</td></tr>`).join('') + `</table></div>`;
+  h += blocks.join('');
+
+  if(r.bpm_review) h += `<div class="sect wide">${H3('BPM review — sign-off state','clipboard')}<table class="kv">` +
+      Object.entries(r.bpm_review).map(([k,o])=>{ o=o||{};
+        const c = BPM_COLOR[o.status] || {bg:'#eee', fg:'#555'};
+        const val = Array.isArray(o.value)? o.value.join(', ') : (o.value||'');
+        const who = o.reviewer ? ` <span class="cnt">${esc(o.reviewer)}${o.at?' · '+esc(o.at):''}</span>` : '';
+        return `<tr><td>${esc(k.replace(/_/g,' '))}</td><td>` +
+          `<span class="chip" style="background:${c.bg};color:${c.fg}">${esc(o.status||'?')}</span>` +
+          `${val?' '+esc(val):''}${who}${o.note?`<div class="cnt">${esc(o.note)}</div>`:''}</td></tr>`;
+      }).join('') +
+      `</table><div class="cnt" style="margin-top:4px">VERIFIED is a human signature — the
+       pipeline's ceiling is DOC_CONFIRMED (bpm-alignment.md §3).</div></div>`;
+
+  // Evidence is long and rarely the reason you opened the card — collapsed by default, with the
+  // ids themselves clickable so a single citation can be chased without expanding the whole list.
+  // Both axes cite evidence, just under different keys: features use top-level `rd_ids`, while
+  // processes carry `ext.evidence_rd_ids` — same section either way.
+  const evIds = (Array.isArray(r.rd_ids) && r.rd_ids.length ? r.rd_ids
+                 : ((r.ext||{}).evidence_rd_ids || []));
+  if(evIds.length)
+    h += `<details class="sect wide fold"><summary>${H3('Evidence findings ('+evIds.length+')','file')}</summary>
+          <div id="ev">${evIds.map(x=>`<a class="xlink dim" href="#/detail/${encodeURIComponent(x)}" data-go="${esc(x)}">${esc(x)}</a>`).join(' ')}</div></details>`;
+
+  // a big flow emits several diagrams (stage overview + one per stage), so the host is a set
+  const HAS_DIAG = ['process','flow','stage'].includes(r.entity);
+  if(HAS_DIAG) h += `<div id="dgset" class="sect wide"></div>`;
+
+  $('detail').innerHTML = h;
+  $('crumb').textContent = id;
+  const fold = $('detail').querySelector('details.fold');
+  if(fold) fold.addEventListener('toggle', () => {
+    if(fold.open) showEvidence(evIds);           // findings load only when actually opened
+  }, {once:true});
+  if(HAS_DIAG) mountDiagram(r);
+}
+
+/* ---------- diagrams ----------
+   A process's internal flowchart is READ from `_bp_process_diagrams.json` — the agent-authored,
+   BPM-aligned activity flow (lanes = actors, nodes = verb+object activities) that
+   diagramming.md/v2.10.0 defines and that gen_reader_dossiers.py already feeds to the judges.
+   It is deliberately NOT rebuilt from rule buckets: that retired recipe rendered rule sentences
+   as steps, which is exactly what the P6 quality bar fails. If a process has no authored
+   diagram we say so rather than silently falling back to the retired shape.
+   Flow-level diagrams stay mechanically generated from the store (no authored source exists). */
+function laneOf(p, cfg){
+  if(!cfg) return p.process_kind === 'CONTROL' ? 'control' : 'main';
+  const cats = new Set();
+  for(const a of p.actors || []){
+    let lane = (cfg.actor_overrides||{})[a];
+    if(!lane){
+      const al = a.toLowerCase();
+      for(const [ln, kws] of Object.entries(cfg.actor_keywords||{}))
+        if(kws.some(k => al.includes(k))){ lane = ln; break; }
+    }
+    cats.add(lane || cfg.default_lane);
+  }
+  for(const pref of cfg.lane_priority || []) if(cats.has(pref)) return pref;
+  return cfg.default_lane || (cfg.lanes[0]||{}).id;
+}
+/* diagramming.md's flow/diagram splitting rule: a big flow renders as a STAGE-LEVEL OVERVIEW
+   (one node per stage, showing the stage sequence and which stages branch) plus a per-stage
+   detail diagram — instead of one monolithic chain. Pass stageId to scope the recipe to one stage.
+
+   THRESHOLD CORRECTED (v2.12.0): the old "~20-25 processes per flow" was a home-grown number that
+   both over- and under-fires, and the guideline has no such rule. The real thresholds are per
+   STAGE and per ROW — §2.5's 1-5 Business Processes per Stage, and §5.3's ~7 nodes per row. So
+   the decision to split a rendering is driven by the widest STAGE, not by the flow's total. */
+const STAGE_MAX = 5;   // guideline §2.5
+const ROW_MAX   = 7;   // guideline §5.3
+function buildStageOverviewDsl(flowId){
+  const fl = S.byId[flowId];
+  const stages = IX.stagesOfFlow[flowId] || [];
+  const q = s => String(s).replace(/"/g, "'");
+  const L = [`title ${flowId} -- ${q(fl.name)} (stage overview)`, '',
+             'lane stages "Business Stages" #2563eb', '',
+             'node start stages "Start" shape=circle icon=play'];
+  for(const s of stages)
+    L.push(`node ${s} stages "${q(s.split('.').pop())}: ${q(nameOf(s))} (${(IX.procOfStage[s]||[]).length} proc)" icon=doc`);
+  L.push('node end stages "End" shape=circle icon=check', '');
+  if(stages.length){
+    L.push(`start -> ${stages[0]}`);
+    for(let i=0;i<stages.length-1;i++) L.push(`${stages[i]} -> ${stages[i+1]}`);
+    L.push(`${stages[stages.length-1]} -> end`);
+  }
+  // which stages branch into which — the part a flat chain hides
+  const seen = new Set();
+  for(const p of S.coll.processes.filter(p => p.flow_id === flowId)){
+    for(const db of (p.decision_branches || [])){
+      const t = (db.target_process_id || '').toString().trim();
+      const tgt = S.byId[t];
+      if(!tgt || tgt.stage_id === p.stage_id) continue;
+      const key = p.stage_id + '>' + tgt.stage_id;
+      if(seen.has(key)) continue; seen.add(key);
+      L.push(`${p.stage_id} -.-> ${tgt.stage_id} : ${q(db.outcome_label || 'branch')}`);
+    }
+  }
+  return L.join('\n');
+}
+function buildFlowDsl(flowId, stageId){
+  const cfg = (S.manifest||{}).diagram;
+  const fl = S.byId[flowId];
+  const procs = S.coll.processes.filter(p => p.flow_id === flowId && (!stageId || p.stage_id === stageId));
+  const seqOv = (cfg && cfg.sequence_overrides) || {};
+  const laneDefs = cfg ? cfg.lanes :
+      [{id:'main',label:'Processes',color:'#475569'},{id:'control',label:'Controls',color:'#d97706'}];
+  const pl = {}; procs.forEach(p => pl[p.id] = laneOf(p, cfg));
+  const used = laneDefs.filter(l => Object.values(pl).includes(l.id));
+  const isDecisionNode = p => p.process_kind === 'CONTROL' && Array.isArray(p.decision_branches) && p.decision_branches.length;
+  const chain = procs.filter(p => (p.process_kind !== 'CONTROL' || isDecisionNode(p)) && !seqOv[p.id]).map(p => p.id);
+  const q = s => String(s).replace(/"/g, "'");
+  const lines = [`title ${stageId ? stageId+' -- '+q(nameOf(stageId))+' (stage detail)'
+                                  : flowId+' -- '+q(fl.name)}`, ''];
+  for(const l of used) lines.push(`lane ${l.id} "${q(l.label)}" ${l.color}`);
+  lines.push('');
+  const startLane = chain.length ? pl[chain[0]] : (used[0]||{}).id;
+  const endLane = chain.length ? pl[chain[chain.length-1]] : (used[0]||{}).id;
+  lines.push(`node start ${startLane} "Start" shape=circle icon=play`);
+  const idPattern = /^[A-Za-z]+-\d+\.S\d+\.P\d+$/;
+  for(const p of procs){
+    if(isDecisionNode(p)) lines.push(`node ${p.id} ${pl[p.id]} "${p.id}: ${q(p.name)}" shape=diamond icon=warn`);
+    else lines.push(`node ${p.id} ${pl[p.id]} "${p.id}: ${q(p.name)}" icon=${p.process_kind === 'CONTROL' ? 'warn':'doc'}`);
+  }
+  for(const p of procs){
+    if(!isDecisionNode(p)) continue;
+    p.decision_branches.forEach((db, i) => {
+      const t = (db.terminal_outcome || db.target_process_id || '').toString().trim();
+      if(!t || (idPattern.test(t) && pl[t])) return;
+      lines.push(`node ${p.id}__term${i} ${pl[p.id]} "${q(t.length > 60 ? t.slice(0,57)+'...' : t)}" shape=rect icon=doc`);
+    });
+  }
+  lines.push(`node end ${endLane} "End" shape=circle icon=check`, '');
+  if(chain.length){
+    lines.push(`start -> ${chain[0]}`);
+    for(let i=0;i<chain.length-1;i++) lines.push(`${chain[i]} -> ${chain[i+1]}`);
+    lines.push(`${chain[chain.length-1]} -> end`);
+  }
+  lines.push('');
+  for(const p of procs){
+    if(isDecisionNode(p)){
+      p.decision_branches.forEach((db, i) => {
+        const label = q(db.outcome_label || db.condition || 'branch');
+        const t = (db.terminal_outcome || db.target_process_id || '').toString().trim();
+        if(idPattern.test(t) && pl[t]) lines.push(`${p.id} -.-> ${t} : ${label}`);
+        else if(t) lines.push(`${p.id} -.-> ${p.id}__term${i} : ${label}`);
+      });
+    } else if(p.process_kind === 'CONTROL' && p.controls_process_id && pl[p.controls_process_id]){
+      lines.push(`${p.controls_process_id} -.-> ${p.id} : controls`);
+    }
+    const ov = seqOv[p.id];
+    if(ov && pl[ov[1]]) lines.push(`${ov[1]} -.-> ${p.id} : ${ov[0] === 'parallel' ? 'parallel channel' : 'alternate'}`);
+  }
+  return lines.join('\n');
+}
+/* Vertical stage bands on a flow diagram. The guideline treats a Business Stage as a VISUAL
+   CONTAINER, never an executable node (bpm-alignment.md §1), and LaneFlow's DSL has no grouping
+   primitive — so the bands are drawn purely presentationally from the geometry the renderer
+   already produced: measure each stage's own process nodes, then paint a band behind them.
+   Nothing about the model or the DSL changes. */
+function addStageBands(wrap, flowId, capEl){
+  // NOT wrap.querySelector('svg') — the toolbar's own Full-screen icon is an <svg> too and
+  // sits earlier in the DOM; pick the one that actually holds diagram nodes.
+  const svg = [...wrap.querySelectorAll('svg')].find(s => s.querySelector('g.nd'));
+  if(!svg) return;
+  const nds = [...svg.querySelectorAll('g.nd')]; if(!nds.length) return;
+  const parent = nds[0].parentNode;
+  parent.querySelectorAll('g.lf-stagebands').forEach(g => g.remove());
+
+  const esc2 = id => (window.CSS && CSS.escape) ? CSS.escape(id) : id;
+  const boxOf = id => { const el = svg.querySelector(`g.nd[data-id="${esc2(id)}"]`);
+                        try{ return el ? el.getBBox() : null; }catch(e){ return null; } };
+  let top = Infinity, bot = -Infinity;
+  for(const n of nds){ try{ const b = n.getBBox();
+    top = Math.min(top, b.y); bot = Math.max(bot, b.y + b.height); }catch(e){} }
+  if(!isFinite(top)) return;
+
+  /* A vertical band only EXISTS if a stage occupies one contiguous horizontal run. Read the real
+     left-to-right order of the process nodes and compress it into runs: a stage appearing in more
+     than one run is interleaved with its neighbours, and no vertical partition can be truthful —
+     an earlier centre-midpoint version drew bands anyway and they visibly failed to line up with
+     the nodes. In that case draw nothing and explain, rather than draw something wrong. */
+  const seq = nds.map(n => { const id = n.getAttribute('data-id');
+                             try{ return {id, x:n.getBBox().x}; }catch(e){ return null; } })
+    .filter(o => o && (S.byId[o.id]||{}).stage_id)
+    .sort((a,b) => a.x - b.x)
+    .map(o => S.byId[o.id].stage_id);
+  const runs = seq.filter((s,i) => s !== seq[i-1]);
+  const splitStages = [...new Set(runs.filter((s,i) => runs.indexOf(s) !== i))];
+
+  const cap0 = capEl || null;
+  if(cap0) cap0.querySelectorAll('.stage-order-warn').forEach(n => n.remove());
+  if(splitStages.length){
+    if(cap0) cap0.insertAdjacentHTML('beforeend',
+      `<div class="note stage-order-warn" style="margin-top:6px">${ico('alert')} No stage bands drawn:
+       ${esc(splitStages.map(s=>s.split('.').pop()).join(', '))} ${splitStages.length>1?'are':'is'}
+       interleaved with other stages along the flow, so no vertical partition would line up with
+       the diagram. Left-to-right stage order here is
+       <b>${esc(runs.map(s=>s.split('.').pop()).join(' → '))}</b>.</div>`);
+    return;
+  }
+
+  const PAD = 14, LBL = 17;
+  const bands = [];
+  for(const s of runs){                        // runs are already in true left-to-right order
+    const bs = (IX.procOfStage[s]||[]).map(boxOf).filter(Boolean);
+    if(!bs.length) continue;
+    bands.push({id:s, x0:Math.min(...bs.map(b=>b.x)), x1:Math.max(...bs.map(b=>b.x+b.width))});
+  }
+  if(bands.length < 2) return;                 // one band would just be a box round everything
+  // contiguous runs -> spans are ordered; meet each pair halfway so bands touch without overlap
+  for(let i=0;i<bands.length-1;i++){
+    const mid = (bands[i].x1 + bands[i+1].x0) / 2;
+    bands[i].x1 = mid; bands[i+1].x0 = mid;
+  }
+  bands[0].x0 -= PAD/2;
+  bands[bands.length-1].x1 += PAD/2;
+  /* Dashed vertical rules on the boundaries + a bold coloured caption per stage. A per-stage hue
+     (cycled from the shared palette) makes adjacent stages tell apart at a glance; the tint stays
+     at 6% so it never competes with the node boxes it sits behind. */
+  const STAGE_HUES = [HUE.blue, HUE.teal, HUE.purple, HUE.amber, HUE.green, HUE.indigo, HUE.cyan];
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('class','lf-stagebands');
+  g.setAttribute('pointer-events','none');
+  const y = top - PAD - LBL - 6, h = (bot - top) + PAD*2 + LBL + 6;
+  bands.forEach((b, i) => {
+    const x = b.x0, w = Math.max(8, b.x1 - b.x0);
+    const hue = STAGE_HUES[i % STAGE_HUES.length];
+    g.insertAdjacentHTML('beforeend',
+      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${hue}" fill-opacity="0.06"/>` +
+      // boundary rule — drawn on every edge except the outermost left
+      (i ? `<line x1="${x}" y1="${y}" x2="${x}" y2="${y+h}" stroke="${hue}" stroke-opacity=".55"
+              stroke-width="1.4" stroke-dasharray="6 5"/>` : '') +
+      // coloured tick + bold caption
+      `<rect x="${x+8}" y="${y+6}" width="3" height="11" rx="1.5" fill="${hue}"/>` +
+      `<text x="${x+16}" y="${y+15}" font-size="11" font-weight="700" fill="${hue}"
+         letter-spacing=".3">${esc(b.id.split('.').pop())}</text>` +
+      `<text x="${x+16+((b.id.split('.').pop().length)*7.4)+6}" y="${y+15}" font-size="10.5"
+         font-weight="500" fill="${hue}" fill-opacity=".78"
+         >${esc((nameOf(b.id)||'').slice(0,32))}</text>`);
+  });
+  // closing rule on the far right so the last stage reads as a bounded region too
+  const last = bands[bands.length-1];
+  g.insertAdjacentHTML('beforeend',
+    `<line x1="${last.x1}" y1="${y}" x2="${last.x1}" y2="${y+h}"
+       stroke="${STAGE_HUES[(bands.length-1) % STAGE_HUES.length]}" stroke-opacity=".55"
+       stroke-width="1.4" stroke-dasharray="6 5"/>`);
+  parent.insertBefore(g, parent.firstChild);   // behind lanes, nodes and edges
+
+  /* Bands drew cleanly, so each stage is contiguous — but they can still be in the wrong ORDER
+     (the renderer follows the store's process order faithfully). Report that separately: it is a
+     real lifecycle-order defect in the data, the kind the F1 checklist asks about. */
+  const visual = bands.map(b => b.id);
+  const logical = [...visual].sort();
+  if(cap0 && JSON.stringify(visual) !== JSON.stringify(logical))
+    cap0.insertAdjacentHTML('beforeend',
+      `<div class="note stage-order-warn" style="margin-top:6px">${ico('alert')} Stage bands are in the
+       order the store lists their processes — <b>${esc(visual.map(v=>v.split('.').pop()).join(' → '))}</b>,
+       not lifecycle order.</div>`);
+}
+
+/* Full screen is a property of the diagram widget, not of each page that happens to embed one:
+   the button is injected into laneflow's own toolbar right after mount, so every diagram
+   everywhere gets it without its host having to add anything. */
+function addFullscreen(wrap, fit){
+  const bar = wrap.querySelector('.lf-tb');
+  if(!bar || bar.querySelector('[data-fs]')) return;
+  const b = document.createElement('button');
+  b.dataset.fs = '1';
+  b.type = 'button';
+  b.title = 'Full screen (Esc to exit)';
+  b.innerHTML = ico('expand') + '<span>Full screen</span>';
+  b.style.cssText = 'display:inline-flex;align-items:center;gap:4px;margin-left:auto';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    if(document.fullscreenElement) document.exitFullscreen();
+    else wrap.requestFullscreen ? wrap.requestFullscreen().catch(()=>{}) : null;
+  });
+  bar.appendChild(b);
+  // the widget's box changes size on both entering and leaving, so refit either way
+  document.addEventListener('fullscreenchange', () => setTimeout(fit, 60));
+}
+/* What the splitting rule actually asks for, read literally: above the threshold render the
+   stage overview "PLUS one per-Stage detail diagram ... INSTEAD OF one monolithic Flow diagram".
+   So a big flow emits 1 + N diagrams and the monolithic chain is not offered at all (an earlier
+   version kept a toggle back to it, which is the very thing the rule replaces). */
+function diagramsFor(r){
+  if(r.entity === 'process')
+    return [{title:'Internal flowchart', dsl:(S.pdsl||{})[r.id], h:'62vh',
+             src:'authored activity flow — _bp_process_diagrams.json'}];
+  if(r.entity === 'stage')
+    return [{title:'Stage detail diagram', dsl:buildFlowDsl(r.flow_id, r.id), h:'52vh',
+             src:"per-stage detail — this stage's processes only"}];
+  if(r.entity !== 'flow') return [];
+  const n = S.coll.processes.filter(p => p.flow_id === r.id).length;
+  const stages = IX.stagesOfFlow[r.id] || [];
+  // Split on the WIDEST STAGE, not on the flow total: §2.5 caps a Stage at 5 Processes and §5.3
+  // caps a rendered row at ~7 nodes, so what makes a single chain unreadable is one fat stage,
+  // not the sum. A 30-process flow of 3-process stages reads fine as one chain; a 12-process
+  // flow with one 9-process stage does not.
+  const widest = Math.max(0, ...stages.map(s => (IX.procOfStage[s]||[]).length));
+  if(widest <= ROW_MAX && n <= ROW_MAX * 3)
+    return [{title:'Flow diagram', dsl:buildFlowDsl(r.id), h:'62vh', bands:r.id,
+             src:'generated from the store (process chain + decision branches)'}];
+  return [{title:`Stage overview — ${stages.length} stages, ${n} processes`,
+           dsl:buildStageOverviewDsl(r.id), h:'46vh',
+           src:`widest stage holds ${widest} processes (guideline §2.5 wants 1-5 per stage, §5.3 `
+             + `~${ROW_MAX} nodes per row), so this flow renders as one node per stage plus a `
+             + `detail diagram per stage below — not as a single chain`},
+    ...stages.map(s => ({title:`${s.split('.').pop()} · ${nameOf(s)}`,
+           dsl:buildFlowDsl(r.id, s), h:'40vh',
+           src:`stage detail — ${(IX.procOfStage[s]||[]).length} processes`}))];
+}
+async function mountDiagram(r){
+  const host = $('dgset'); if(!host) return;
+  if(r.entity === 'process' && !S.pdsl){
+    const emb = (typeof window !== 'undefined' && window.__DNA_EMBED) || null;
+    if(emb){ S.pdsl = emb.diagrams || {}; }
+    else {
+      try{ const q = await fetch('_bp_process_diagrams.json', {cache:'no-store'});
+           S.pdsl = q.ok ? await q.json() : {}; }catch(e){ S.pdsl = {}; }
+    }
+  }
+  if(!window.LaneFlow){
+    host.innerHTML = '<div class="cnt">laneflow.js not served — open via scripts/serve_store.py.</div>';
+    return;
+  }
+  const items = diagramsFor(r);
+  host.innerHTML = items.map((it,i) =>
+    `<div class="sect wide">${H3(it.title,'branch')}` +
+    (it.dsl ? `<div class="dgwrap" id="dg${i}" style="height:${it.h}"></div>` +
+              `<div class="cnt dgcap" id="dgcap${i}" style="margin-top:4px">${esc(it.src)}</div>`
+            : `<div class="cnt">No authored internal flowchart for this process yet.</div>`) +
+    `</div>`).join('');
+
+  items.forEach((it,i) => {
+    if(!it.dsl) return;
+    const wrap = document.getElementById('dg'+i), cap = document.getElementById('dgcap'+i);
+    try{
+      window.LaneFlow.mount(wrap, it.dsl, {editable:false});
+      const bands = () => { if(it.bands) try{ addStageBands(wrap, it.bands, cap); }catch(e){} };
+      const fit = () => { try{ wrap.__laneflow && wrap.__laneflow.fit && wrap.__laneflow.fit(); }catch(e){}
+                          bands(); };
+      // one rAF is not enough: the renderer is still laying out, so getBBox() would measure a
+      // half-built diagram. Re-draw the bands once the geometry has settled (idempotent).
+      requestAnimationFrame(fit);
+      setTimeout(bands, 160);
+      setTimeout(bands, 500);
+      if(window.ResizeObserver) new ResizeObserver(fit).observe(wrap);
+      addFullscreen(wrap, fit);
+    }catch(e){ wrap.innerHTML = `<div class="cnt">diagram failed: ${esc(e.message)}</div>`; }
+  });
+}
+
+/* findings.jsonl is the biggest collection (1.3k rows) — load it only when a node that cites
+   evidence is actually opened, then render the propositions instead of bare RD ids. */
+async function showEvidence(ids){
+  if(!S.findings){
+    S.findings = {};
+    (await jsonl('findings')).forEach(f => { S.findings[f.id] = f; S.byId[f.id] = f; });
+  }
+  const el = $('ev'); if(!el) return;
+  el.innerHTML = `<table class="kv">` + ids.map(rid => {
+    const f = S.findings[rid];
+    return `<tr><td>${esc(rid)}${f?`<div class="cnt">${esc(f.category||'')}</div>`:''}</td><td>` +
+      (f ? `${esc(f.proposition||'')}<div class="cnt" style="margin-top:2px">${esc(f.module||'')}</div>`
+         : '<i>not found</i>') + `</td></tr>`;
+  }).join('') + `</table>`;
+}
+
+/* ---------- centre tabs ported from the old single-column explorer ----------
+   Everything that is NOT about one selected object (store overview, coverage matrix, update
+   history, infra axis) lives here in the work area, so the two side menus stay pure navigation. */
+function renderCentre(){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === S.tab));
+  if(S.tab === 'detail'){
+    if(S.sel) renderDetail(S.sel);
+    else $('detail').innerHTML = `<div class="empty">Select a node in either side menu.<br><br>
+      Selecting on one axis highlights the branches that <b>own</b> it and the objects it
+      <b>links to</b> on the other axis.</div>`;
+    return;
+  }
+  ({overview:renderOverview, matrix:renderMatrix, history:renderHistory, infra:renderInfra}[S.tab]||renderOverview)();
+}
+function card(n, label){ return `<div class="statcard"><b>${n}</b><span>${esc(label)}</span></div>`; }
+function renderOverview(){
+  const c = S.coll;
+  let h = `<div class="sect wide">${H3('Store contents','grid')}` +
+    card(c.domains.length,'domains') + card(c.capabilities.length,'capabilities') +
+    card(c.features.length,'features') + card((c.excluded||[]).length,'excluded') +
+    card(c.findingsCount!=null?c.findingsCount:'—','findings') +
+    card(c.flows.length,'flows') + card(c.stages.length,'stages') + card(c.processes.length,'processes') +
+    card((c.updates||[]).length,'updates') + card((c.services||[]).length,'services') +
+    card((c.surfaces||[]).length,'surfaces') + card(c.edges.length,'edges') + `</div>`;
+
+  const byStatus = {}, byKey = {};
+  for(const rec of [...c.flows, ...c.stages, ...c.processes]){
+    const m = rec.bpm_review; if(!m) continue;
+    for(const [k,v] of Object.entries(m)){
+      const st = (v||{}).status; if(!BPM_COLOR[st]) continue;
+      byStatus[st] = (byStatus[st]||0)+1;
+      (byKey[k] = byKey[k] || {})[st] = (byKey[k][st]||0)+1;
+    }
+  }
+  h += `<div class="sect wide">${H3('BPM review queue','clipboard')}` +
+    BPM_ORDER.filter(s=>byStatus[s]).map(s =>
+      `<div class="statcard" style="border-color:${BPM_COLOR[s].fg}"><b style="color:${BPM_COLOR[s].fg}">${byStatus[s]}</b><span>${s}</span></div>`
+    ).join('') +
+    `<table class="kv" style="margin-top:8px">` + Object.entries(byKey).map(([k,m]) =>
+      `<tr><td>${esc(k.replace(/_/g,' '))}</td><td>` + BPM_ORDER.filter(s=>m[s]).map(s =>
+        `<span class="chip" style="background:${BPM_COLOR[s].bg};color:${BPM_COLOR[s].fg}">${m[s]} ${BPM_COLOR[s].short}</span>`
+      ).join(' ') + `</td></tr>`).join('') + `</table></div>`;
+
+  if((c.excluded||[]).length)
+    h += `<div class="sect wide">${H3('Excluded ('+c.excluded.length+')','alert')}<table class="kv">` +
+      c.excluded.map(x=>`<tr><td>${esc(x.id)}</td><td>${esc(x.name||'')}<div class="cnt">${esc((x.description||'').slice(0,180))}</div></td></tr>`).join('') +
+      `</table></div>`;
+  $('detail').innerHTML = h;
+  $('crumb').textContent = '';
+}
+function renderMatrix(){
+  const rowsBy = S.mxMode || 'domain';
+  const flows = S.coll.flows;
+  const cells = {};
+  for(const p of S.coll.processes){
+    const row = rowsBy === 'domain' ? p.primary_domain_id : p.primary_capability_id;
+    if(!row || !p.flow_id) continue;
+    ((cells[row] = cells[row]||{})[p.flow_id] = cells[row][p.flow_id]||[]).push(p.id);
+  }
+  const rows = (rowsBy === 'domain' ? S.coll.domains : S.coll.capabilities).filter(r => cells[r.id]);
+  let h = `<div class="sect wide"><h3>Coverage matrix — processes per
+      <select id="mxMode" style="font-size:11px">
+        <option value="domain"${rowsBy==='domain'?' selected':''}>domain</option>
+        <option value="capability"${rowsBy==='capability'?' selected':''}>capability</option>
+      </select> × flow</h3>
+      <div class="cnt">Where the two axes actually meet — a blank row/column is a gap. Click a cell to list its processes.</div>
+      <div class="scrollx"><table class="mx"><tr><th></th>` +
+      flows.map(f=>`<th title="${esc(f.name)}">${esc(f.id)}</th>`).join('') + `<th>Σ</th></tr>`;
+  for(const r of rows){
+    const rc = cells[r.id]||{};
+    const total = Object.values(rc).reduce((a,b)=>a+b.length,0);
+    h += `<tr><td class="row-h" title="${esc(r.name)}">${esc(r.id)} <span class="cnt">${esc((r.name||'').slice(0,26))}</span></td>`;
+    for(const f of flows){
+      const n = (rc[f.id]||[]).length;
+      h += n ? `<td class="hit" data-mx="${esc(r.id)}|${esc(f.id)}">${n}</td>` : `<td class="zero">·</td>`;
+    }
+    h += `<td><b>${total}</b></td></tr>`;
+  }
+  h += `</table></div><div id="mxDrill"></div></div>`;
+  $('detail').innerHTML = h;
+  $('crumb').textContent = '';
+  $('mxMode').addEventListener('change', e => { S.mxMode = e.target.value; renderMatrix(); });
+}
+/* A matrix cell is an INTERSECTION, so the drill shows what sits on each side of it, side by
+   side: the business processes from the process axis in one column, and the capability-axis
+   objects those same processes belong to / implement in the other. */
+function mxDrill(rowId, flowId){
+  const rowKey = S.mxMode === 'capability' ? 'primary_capability_id' : 'primary_domain_id';
+  const ps = S.coll.processes.filter(p => p.flow_id === flowId && p[rowKey] === rowId);
+
+  // catalog side of the same intersection: capabilities these processes are assigned to, and
+  // the features they implement (FEATURE_PROCESS edges) — nested under their capability
+  const caps = [...new Set(ps.map(p => p.primary_capability_id).filter(Boolean))];
+  const featsByCap = {};
+  const orphanFeats = [];
+  for(const p of ps) for(const f of (IX.featOfProc[p.id]||[])){
+    const fr = S.byId[f]; if(!fr) continue;
+    const c = fr.capability_id;
+    if(c) { (featsByCap[c] = featsByCap[c] || new Set()).add(f); if(!caps.includes(c)) caps.push(c); }
+    else if(!orphanFeats.includes(f)) orphanFeats.push(f);
+  }
+  const nFeat = Object.values(featsByCap).reduce((a,s)=>a+s.size,0) + orphanFeats.length;
+
+  // Process side, layered to MATCH the catalog side. It used to render a flat process list
+  // beside a nested capability→feature tree, so the two halves of one intersection read as
+  // different kinds of thing — and Stage, the level that says WHERE in the journey this
+  // intersection happens, was invisible. Both sides are now parent → child.
+  const psByStage = {}, stageOrder = [];
+  for(const sid of (IX.stagesOfFlow[flowId] || [])){
+    const inStage = ps.filter(p => p.stage_id === sid);
+    if(inStage.length){ psByStage[sid] = inStage; stageOrder.push(sid); }
+  }
+  // a process whose stage is missing from the index still has to appear — never drop a row
+  const placed = new Set(stageOrder.flatMap(s => psByStage[s].map(p => p.id)));
+  const loose = ps.filter(p => !placed.has(p.id));
+  if(loose.length){ psByStage['(unplaced)'] = loose; stageOrder.push('(unplaced)'); }
+  const nStage = stageOrder.filter(s => s !== '(unplaced)').length;
+  const row = (id, indent) =>
+    `<tr><td style="padding-left:${indent}px">${link(id)}</td><td>${esc(nameOf(id))}</td>` +
+    `<td style="width:1%">${statusChip(id)}</td></tr>`;
+
+  $('mxDrill').innerHTML = `<div class="sect wide">
+    <h3>${esc(rowId)} <span class="cnt">${esc(nameOf(rowId))}</span> × ${esc(flowId)}
+        <span class="cnt">${esc(nameOf(flowId))}</span></h3>
+    <div class="cnt">Both sides of the intersection — the processes on the left, the catalog
+      objects they belong to on the right.</div>
+    <div class="twocol">
+      <div>${H3('Business processes ('+nStage+' + '+ps.length+')','branch')}<table class="kv childlist">` +
+        stageOrder.map(sid => (sid === '(unplaced)'
+            ? `<tr><td style="padding-left:6px" colspan="3"><span class="cnt">not in any indexed `
+              + `stage of this flow</span></td></tr>`
+            : row(sid, 6)) +
+          psByStage[sid].map(p => `<tr><td style="padding-left:22px">${link(p.id)}</td>` +
+            `<td>${esc(p.name||'')}` +
+            `${p.process_kind==='CONTROL'?' <span class="kindtag">CTRL</span>':''}</td>` +
+            `<td style="width:1%">${statusChip(p.id)}</td></tr>`).join('')).join('') +
+      `</table></div>
+      <div>${H3('Capabilities & features ('+caps.length+' + '+nFeat+')','layers')}<table class="kv childlist">` +
+        caps.map(c => row(c, 6) + [...(featsByCap[c]||[])].map(f => row(f, 22)).join('')).join('') +
+        orphanFeats.map(f => row(f, 22)).join('') +
+      `</table></div>
+    </div></div>`;
+}
+/* Update history. The builder keeps only id/date/kind as core and folds every other round field
+   under `ext`, so the old renderer showed one "ext" row of JSON.stringify'd blobs — unreadable
+   the moment a round carried a scope list or a nested result. Now: one fold per round (latest
+   open), scope as prose, scalar-only objects as chip lines (corpus totals), lists as bullets,
+   nested objects as nested tables, source pins as one line each. Nothing is hidden: unknown
+   keys still render, just structurally instead of as JSON. */
+const HIST_ORDER = ['scope', 'corpus_totals', 'mechanical_result', 'topology', 'service_id_delta',
+                    'skill_fixes', 'audit_sample', 'notes', 'source_pins'];
+function histVal(v, depth){
+  if(v == null || v === '') return '<span class="cnt">—</span>';
+  if(typeof v !== 'object') return escL(String(v));
+  if(Array.isArray(v)){
+    if(!v.length) return '<span class="cnt">none</span>';
+    if(v.every(x => typeof x !== 'object' || x === null))
+      return v.length === 1 ? escL(String(v[0])) : `<ul class="rl">${v.map(x => `<li>${escL(String(x))}</li>`).join('')}</ul>`;
+    // list of records: one compact line each (an edge, a pin, a pair)
+    return `<ul class="rl">${v.map(x => `<li>${typeof x === 'object' && x !== null
+      ? Object.entries(x).map(([k, y]) => `<span class="cnt">${esc(k)}</span> ${escL(Array.isArray(y) ? y.join(', ') : String(y))}`).join(' · ')
+      : escL(String(x))}</li>`).join('')}</ul>`;
+  }
+  const ents = Object.entries(v).filter(([, y]) => y != null && y !== '');
+  if(!ents.length) return '<span class="cnt">empty</span>';
+  // all-scalar object -> one chip line ("findings 26533 · services 14 · …")
+  if(ents.every(([, y]) => typeof y !== 'object'))
+    return ents.map(([k, y]) => `${esc(k.replace(/_/g, ' '))} <b>${escL(String(y))}</b>`).join(' &nbsp;·&nbsp; ');
+  if(depth >= 3) return `<pre style="margin:0;white-space:pre-wrap;font-size:11px">${esc(JSON.stringify(v, null, 1))}</pre>`;
+  return `<table class="kv" style="margin:2px 0">${ents.map(([k, y]) =>
+    `<tr><td style="white-space:nowrap">${esc(k.replace(/_/g, ' '))}</td><td>${histVal(y, depth + 1)}</td></tr>`).join('')}</table>`;
+}
+function histPins(pins){
+  if(!Array.isArray(pins) || !pins.length) return '<span class="cnt">none</span>';
+  return pins.map(p => `<div>${esc(p.repo || '')}${p.branch ? ' · ' + esc(p.branch) : ''}` +
+    `${p.commit ? ' @ <span style="font-family:ui-monospace,Consolas,monospace">' + esc(String(p.commit).slice(0, 9)) + '</span>' : ''}` +
+    `${p.commit_date ? ' (' + esc(String(p.commit_date).slice(0, 10)) + ')' : ''}` +
+    `${p.note ? `<div class="cnt">${esc(p.note)}</div>` : ''}</div>`).join('');
+}
+/* Nested `ext` values. A document-seeded store (Info eye, 2026-09-07) keeps its L4 activities,
+   baseline cross-references and BPMN facts as lists of objects under `ext`; the generic tail
+   used to print every such item as "[object Object]". Objects become a nested key/value table,
+   lists of objects one block per item, scalars and string lists exactly as before. */
+function extVal(v){
+  if(v == null || v === '') return '';
+  if(Array.isArray(v)){
+    if(v.every(x => typeof x !== 'object' || x === null)) return v.map(escL).join('<br>');
+    return v.map(x => `<div class="kvi">${extVal(x)}</div>`).join('');
+  }
+  if(typeof v === 'object'){
+    const es = Object.entries(v).filter(([,u]) => u != null && u !== '' && !(Array.isArray(u) && !u.length));
+    if(!es.length) return '';
+    return `<table class="kv kvn">` + es.map(([k,u]) =>
+      `<tr><td>${esc(String(k).replace(/_/g,' '))}</td><td>${extVal(u)}</td></tr>`).join('') + `</table>`;
+  }
+  return escL(v);
+}
+function renderHistory(){
+  const ups = (S.coll.updates||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))
+                                                          || String(b.id||'').localeCompare(String(a.id||'')));
+  let h = `<div class="sect wide">${H3('Update history ('+ups.length+')','clock')}`;
+  if(!ups.length) h += `<div class="cnt">No update rounds recorded.</div>`;
+  ups.forEach((u, i) => {
+    const f = Object.assign({}, u.ext || {}, u);       // core fields win; ext supplies the rest
+    delete f.ext; delete f.entity;
+    const scope = f.scope;
+    const teaser = String(Array.isArray(scope) ? scope[0] : (scope || f.notes || '')).slice(0, 140);
+    const keys = Object.keys(f).filter(k => !['id', 'date', 'kind', 'methodology_version'].includes(k))
+      .sort((a, b) => (HIST_ORDER.indexOf(a) + 1 || 99) - (HIST_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b));
+    h += `<details class="fold" style="border-left:3px solid var(--line);padding-left:9px;margin:6px 0"${i === 0 ? ' open' : ''}>
+      <summary><b>${esc(f.date||'')}</b> <span class="chip" style="background:#eef1f5;color:var(--muted)">${esc(f.kind||'')}</span>
+        <span class="cnt">${esc(f.id||'')}${f.methodology_version ? ' · v' + esc(f.methodology_version) : ''}</span>
+        ${teaser ? `<span class="cnt" style="font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60ch">— ${esc(teaser)}</span>` : ''}</summary>
+      <table class="kv" style="margin-top:4px">` +
+      keys.map(k => `<tr><td style="white-space:nowrap;vertical-align:top">${esc(k.replace(/_/g, ' '))}</td><td>` +
+        (k === 'source_pins' ? histPins(f[k]) : histVal(f[k], 0)) + `</td></tr>`).join('') +
+      `</table></details>`;
+  });
+  $('detail').innerHTML = h + `</div>`;
+  $('crumb').textContent = '';
+}
+/* Service kind -> a LaneFlow icon name (laneflow.js ships its own fixed ICONS set — no new
+   asset, just a mapping). Surfaces are excluded from the graph on purpose: it is a khái quát /
+   high-level read of the topology, not a rendering of every endpoint — the folded-by-kind
+   Surfaces tables below do that. */
+const SVC_LF_ICON = {FRONTEND:'cursor', BACKEND:'gear', DATABASE:'db', SEARCH:'chart',
+  QUEUE:'inbox', CACHE:'save', GATEWAY:'arrow', EXTERNAL:'arrow'};
+const SRF_KIND_ICON = {SCREEN:'monitor', API:'link', BATCH:'clock', ENTITY:'layers'};
+
+/* The Services graph is a LaneFlow diagram (assets/laneflow.js — the same Sugiyama family as the
+   dagre engine behind Mermaid, but dependency-free and file://-safe, which is why the process
+   diagrams already use it and Export HTML already inlines it). ONE lane, so rank runs left →
+   right exactly like Mermaid's `graph LR`: frontend → backend → the fan-out to data stores and
+   third parties. Kind is carried by the node icon, not by a lane: a lane-per-kind variant was
+   tried first and every edge became a cross-lane vertical rail bundled through the middle lane —
+   LaneFlow's lanes are for swimlane process flows, and a topology isn't one. A hand-rolled
+   layered layout lived here briefly too and was strictly a worse subset of what LaneFlow does
+   (no crossing minimisation, no edge routing).
+
+   Edges: solid = authored TOPOLOGY. Dashed = TOPOLOGY edges the BUILDER derived (v2.18.0
+   hop-lift: `derivation: "hop-lift"`, `support` = number of EXTERNAL_HOP call sites behind it).
+   The store is the single source of truth here — this view draws what build_dna_store.py
+   emitted and never re-derives relationships itself; a pre-v2.18.0 store simply shows no
+   dashed edges. */
+function serviceGraphModel(svcs, topoEdges){
+  const idSet = new Set(svcs.map(s => s.id));
+  const pairTypes = {}, pairHops = {};             // "a>b" -> Set(type) authored / {n, channels} lifted
+  for(const e of topoEdges){
+    if(!idSet.has(e.from) || !idSet.has(e.to) || e.from === e.to) continue;
+    const k = e.from + '>' + e.to;
+    if(e.derivation === 'hop-lift'){
+      const h = (pairHops[k] = pairHops[k] || {n: 0, channels: new Set()});
+      h.n += e.support || 1; (e.channels || []).forEach(c => h.channels.add(c));
+    } else {
+      (pairTypes[k] = pairTypes[k] || new Set()).add(e.type || '');
+      if(e.hop_support){                         // authored pair that hop-lift also confirmed
+        const h = (pairHops[k] = pairHops[k] || {n: 0, channels: new Set()}); h.n += e.hop_support;
+      }
+    }
+  }
+  const keys = [...new Set([...Object.keys(pairTypes), ...Object.keys(pairHops)])];
+  const touched = new Set(keys.flatMap(k => k.split('>')));
+
+  const q = s => String(s||'').replace(/"/g, "'");
+  const dsl = [`lane ALL "Services" ${HUE.indigo}`];
+  for(const s of svcs){
+    const icon = SVC_LF_ICON[s.kind] ? ` icon=${SVC_LF_ICON[s.kind]}` : '';
+    dsl.push(`node ${s.id} ALL "${q(s.id)} · ${q(s.name)}"${icon}`);
+  }
+  const tips = {};
+  for(const k of keys){
+    const [a,b] = k.split('>');
+    const t = pairTypes[k] ? [...pairTypes[k]].filter(Boolean).join('/') : '';
+    const h = pairHops[k];
+    const hopTxt = h ? `${h.n} hop${h.n > 1 ? 's' : ''}` : '';
+    const lbl = t || hopTxt;
+    dsl.push(`${a} ${t ? '-->' : '-.->'} ${b}${lbl ? ` : "${q(lbl)}"` : ''}`);
+    tips[k] = [t && `${a} → ${b}: ${t} (authored TOPOLOGY)`,
+               h && `${a} → ${b}: derived from ${hopTxt}` +
+                    (h.channels.size ? ` (${[...h.channels].join(', ')})` : '')]
+              .filter(Boolean).join('\n');
+  }
+  return {dsl: dsl.join('\n'), tips, isolated: svcs.filter(s => !touched.has(s.id)).map(s => s.id)};
+}
+function renderServiceGraph(svcs, topoEdges){
+  if(!svcs.length) return '';
+  const m = serviceGraphModel(svcs, topoEdges);
+  S.svcGraph = m;                                   // picked up by mountServiceGraph() once in the DOM
+  // a fan-out stacks its targets vertically, so the canvas grows with the service count; the
+  // wrap is resize:vertical and Fit re-scales, so this only sets a sensible starting height
+  const h = Math.max(320, Math.min(720, 80 + svcs.length * 40));
+  return `<div class="sect wide">${H3('Services graph','link')}
+    <div class="dgwrap" id="svcgraph" style="height:${h}px"></div>
+    <div class="cnt" style="margin-top:4px">icon = kind (cursor frontend · gear backend · cylinder
+      database · arrow external) · solid = authored TOPOLOGY edge · dashed = hop-lift edge the
+      builder derived from EXTERNAL_HOP call sites (v2.18.0) · hover an edge for detail, click a
+      node to open it` +
+    (m.isolated.length ? ` · <b>${m.isolated.length}</b> without any edge: ${m.isolated.map(esc).join(', ')}` : '') +
+    `</div></div>`;
+}
+/* Mount after the HTML is in the DOM — same rAF / ResizeObserver dance the process diagrams use,
+   because LaneFlow measures text with a canvas and lays out asynchronously. */
+function mountServiceGraph(){
+  const wrap = document.getElementById('svcgraph'), m = S.svcGraph;
+  if(!wrap || !m) return;
+  if(!window.LaneFlow){
+    wrap.innerHTML = '<div class="cnt">laneflow.js not served — open via scripts/serve_store.py.</div>';
+    return;
+  }
+  try{
+    window.LaneFlow.mount(wrap, m.dsl, {editable: false});
+    // native tooltips on edges (LaneFlow tags each edge group with data-f / data-t); idempotent
+    const decorate = () => {
+      wrap.querySelectorAll('g.edge').forEach(g => {
+        if(g.querySelector('title')) return;
+        const tip = m.tips[g.dataset.f + '>' + g.dataset.t]; if(!tip) return;
+        const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        t.textContent = tip; g.appendChild(t);
+      });
+      wrap.querySelectorAll('g.nd').forEach(g => { g.style.cursor = 'pointer'; });
+    };
+    const fit = () => { try{ wrap.__laneflow && wrap.__laneflow.fit && wrap.__laneflow.fit(); }catch(e){} decorate(); };
+    requestAnimationFrame(fit);
+    setTimeout(decorate, 160); setTimeout(decorate, 500);
+    if(window.ResizeObserver) new ResizeObserver(fit).observe(wrap);
+    addFullscreen(wrap, fit);
+    wrap.addEventListener('click', e => {
+      const n = e.target.closest('g.nd');
+      if(n && n.dataset.id && S.byId[n.dataset.id]) select(n.dataset.id);
+    });
+  }catch(e){ wrap.innerHTML = `<div class="cnt">diagram failed: ${esc(e.message)}</div>`; }
+}
+function renderInfra(){
+  const svcs = S.coll.services||[], srfs = S.coll.surfaces||[];
+  const topo = (S.coll.edges||[]).filter(e => e.kind === 'TOPOLOGY');
+  const hops = (S.coll.edges||[]).filter(e => e.kind === 'EXTERNAL_HOP');
+  let h = `<div class="sect wide">${H3('Infra axis','server')}` +
+    card(svcs.length,'services') + card(srfs.length,'surfaces') + card(topo.length,'topology edges') +
+    card(hops.length,'external hops') + `</div>`;
+  if(!svcs.length && !srfs.length)
+    h += `<div class="sect wide"><div class="cnt">This project has no Infra axis yet — it is an
+      optional pass (bootstrap_infra_map.py). Zero is a valid state, not a missing load.</div></div>`;
+  if(svcs.length) h += renderServiceGraph(svcs, topo);
+  if(svcs.length) h += `<div class="sect wide">${H3('Services','server')}<table class="kv childlist">` +
+    svcs.map(s=>`<tr><td>${link(s.id)}</td><td>${esc(s.name||'')} <span class="cnt">${esc(s.kind||'')}</span></td></tr>`).join('') + `</table></div>`;
+  if(srfs.length) h += renderByKind(srfs, 'Surfaces', 'monitor');
+  $('detail').innerHTML = h;
+  $('crumb').textContent = '';
+  mountServiceGraph();
+}
+/* A surface row does not open a detail page: at 2,600+ rows the reader is scanning, not
+   drilling, and the detail card for a surface is only its fields anyway. Everything the card
+   would show rides on the row instead — a one-line subtitle for the glance, a native tooltip
+   (hover) for the rest. Fields live on the record top-level or under ext, depending on which
+   round promoted them, so both are read. */
+function surfaceTip(s){
+  const x = s.ext || {};
+  const g = k => s[k] != null ? s[k] : x[k];
+  const list = v => Array.isArray(v) ? v : (v ? [v] : []);
+  const paths = list(g('primary_paths')).concat(list((g('match')||{}).module_prefixes));
+  return [
+    `${s.id} · ${s.kind||''}${g('service_id') ? ' · ' + g('service_id') : ''}`,
+    s.name || '',
+    g('action_xml_id') ? `action: ${g('action_xml_id')}` : '',
+    g('menu_path') ? `menu: ${g('menu_path')}` : '',
+    g('res_model') ? `model: ${g('res_model')}${list(g('view_mode')).length ? ' · views: ' + list(g('view_mode')).join('/') : ''}` : '',
+    g('merged_into') ? `merged into: ${g('merged_into')}` : '',
+    paths.length ? `paths: ${paths.slice(0,3).join(', ')}${paths.length > 3 ? ` (+${paths.length-3})` : ''}` : '',
+    g('evidence') ? `evidence: ${String(g('evidence')).slice(0,120)}` : '',
+  ].filter(Boolean).join('\n');
+}
+/* Click → a small native <dialog> with the same facts as selectable text (a title tooltip cannot
+   be selected or copied, which is what a reader actually wants from an id/path). No navigation. */
+function showSurfaceDialog(s){
+  let d = document.getElementById('srfdlg');
+  if(!d){
+    d = document.createElement('dialog'); d.id = 'srfdlg'; d.className = 'srf-dlg';
+    d.addEventListener('click', e => { if(e.target === d) d.close(); });
+    document.body.appendChild(d);
+  }
+  const x = s.ext || {};
+  const rows = [];
+  const seen = new Set();
+  for(const [k, v] of [...Object.entries(s).filter(([k]) => k !== 'ext'), ...Object.entries(x)]){
+    if(v == null || v === '' || (Array.isArray(v) && !v.length) || seen.has(k)) continue;
+    seen.add(k);
+    const one = u => typeof u === 'object' && u !== null ? JSON.stringify(u) : String(u);
+    const txt = k === 'menu_path' && Array.isArray(v) ? v.join(' › ')
+              : Array.isArray(v) ? v.map(one).join('\n')
+              : (typeof v === 'object' ? JSON.stringify(v, null, 1) : String(v));
+    rows.push(`<tr><td>${esc(k)}</td><td><pre>${esc(txt)}</pre></td></tr>`);
+  }
+  const text = surfaceTip(s);
+  d.innerHTML = `<div class="srf-hd"><b>${esc(s.id)}</b> <span class="cnt">${esc(s.kind||'')}</span>
+      <span class="srf-sp"></span>
+      <button type="button" data-a="copy">Copy</button>
+      <button type="button" data-a="close">Close</button></div>
+    <div class="srf-nm">${esc(s.name||'')}</div>
+    <table class="kv srf-kv">${rows.join('')}</table>`;
+  d.querySelector('[data-a="close"]').onclick = () => d.close();
+  d.querySelector('[data-a="copy"]').onclick = async ev => {
+    const b = ev.currentTarget;
+    try{ await navigator.clipboard.writeText(text); b.textContent = 'Copied'; }
+    catch(_){ // clipboard blocked (file://, permissions): select the text so Ctrl+C works
+      const r = document.createRange(); r.selectNodeContents(d.querySelector('.srf-kv'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Selected — Ctrl+C'; }
+    setTimeout(() => b.textContent = 'Copy', 1500);
+  };
+  d.showModal();
+}
+function surfaceSub(s){
+  const x = s.ext || {}, g = k => s[k] != null ? s[k] : x[k];
+  const bits = [g('service_id'), g('menu_path') || g('res_model'), g('merged_into') ? 'merged → ' + g('merged_into') : ''].filter(Boolean);
+  return bits.length ? `<div class="cnt">${esc(bits.join(' · ').slice(0, 110))}</div>` : '';
+}
+/* Surfaces can run into the hundreds+ once a real project's API/BATCH/ENTITY endpoints are all
+   mapped, so a single flat table stops being scannable. Split by kind instead — one folded
+   section per kind, biggest first, collapsed by default like the evidence-findings pattern. */
+function renderByKind(recs, label, icon){
+  const byKind = {};
+  for(const r of recs) (byKind[r.kind||'(none)'] = byKind[r.kind||'(none)'] || []).push(r);
+  const kinds = Object.keys(byKind).sort((a,b) => byKind[b].length - byKind[a].length);
+  return `<div class="sect wide">${H3(label+' ('+recs.length+')', icon)}` +
+    `<div class="cnt" style="margin-bottom:6px">` +
+      kinds.map(k => `${esc(k)} <b>${byKind[k].length}</b>`).join(' &nbsp;·&nbsp; ') +
+    `</div>` +
+    kinds.map(k => `<details class="fold" style="margin:4px 0">
+        <summary>${ico(SRF_KIND_ICON[k])}<b>${esc(k)}</b> <span class="cnt">${byKind[k].length}</span></summary>
+        <table class="kv childlist">` +
+          byKind[k].map(s=>`<tr data-srf="${esc(s.id)}" style="cursor:pointer" title="click for details">` +
+            `<td>${esc(s.id)}</td><td>${esc(s.name||'')}${surfaceSub(s)}</td></tr>`).join('') +
+        `</table></details>`).join('') +
+    `</div>`;
+}
+
+function openAncestors(id){
+  const r = S.byId[id]; if(!r) return;
+  [r.stage_id, r.flow_id, r.capability_id, r.domain_id,
+   r.primary_capability_id, r.primary_domain_id].filter(Boolean).forEach(a => {
+     if(!S.open.has(a)){ S.open.add(a); openAncestors(a); } });
+}
+/* ================= URL state: deep links, Back/Forward, F5 ====================================
+   views.md's "deep-link everything" rule: the hash tracks on-page navigation so F5 and a shared
+   link land on the same node. The page had no URL state at all — every reload dropped the reader
+   back at the root and Back left the page entirely, which for a store this size means re-finding
+   a process by hand every time.
+
+   Shape:  #/<tab>[/<id>][?q=<filter>]     e.g. #/detail/BF-07.S3.P2   #/matrix?q=booking
+   The id is the single source of truth for what is selected; open ancestors are DERIVED from it
+   on load, never stored, so a link stays valid when the tree shape changes under it. */
+let urlApplying = false;             // set while restoring, so restore does not push new entries
+function writeUrl(push){
+  if(urlApplying) return;
+  let h = `#/${S.tab || 'detail'}`;
+  if(S.sel) h += `/${S.sel}`;
+  if(S.q) h += `?q=${encodeURIComponent(S.q)}`;
+  if(h === location.hash) return;
+  try{ history[push ? 'pushState' : 'replaceState'](null, '', h); }
+  catch(_){ location.hash = h; }    // file:// or a sandbox that blocks pushState
+}
+function readUrl(){
+  const m = /^#\/([a-z]+)(?:\/([^?]+))?(?:\?q=(.*))?$/.exec(location.hash || '');
+  if(!m) return null;
+  return {tab: m[1], id: m[2] ? decodeURIComponent(m[2]) : null,
+          q: m[3] ? decodeURIComponent(m[3]) : ''};
+}
+async function applyUrl(){
+  const st = readUrl(); if(!st) return false;
+  urlApplying = true;
+  try{
+    S.q = st.q; $('q').value = st.q;
+    if(st.id){ await select(st.id, {fromUrl: true}); }
+    S.tab = ['detail','overview','matrix','history','infra'].includes(st.tab) ? st.tab : 'detail';
+    render(); renderCentre();
+    document.querySelector('.node.sel')?.scrollIntoView({block:'nearest'});
+  } finally { urlApplying = false; }
+  return true;
+}
+window.addEventListener('popstate', applyUrl);
+window.addEventListener('hashchange', () => { if(!urlApplying) applyUrl(); });
+
+document.addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if(tab && tab.dataset.tab){ S.tab = tab.dataset.tab; writeUrl(true); renderCentre(); return; }
+  const mx = e.target.closest('[data-mx]');
+  if(mx){ const [a,b] = mx.dataset.mx.split('|'); mxDrill(a,b); return; }
+  const t = e.target.closest('.tgl,[data-side]');
+  if(t && t.dataset.side){
+    document.body.classList.toggle(t.dataset.side === 'l' ? 'cl' : 'cr');
+    e.stopPropagation(); return;
+  }
+  const tw = e.target.closest('[data-tw]');
+  if(tw){ const id = tw.dataset.tw;
+    S.open.has(id) ? S.open.delete(id) : S.open.add(id); render(); e.stopPropagation(); return; }
+  const srf = e.target.closest('tr[data-srf]');
+  if(srf){ const s = S.byId[srf.dataset.srf]; if(s){ showSurfaceDialog(s); e.stopPropagation(); return; } }
+  const go = e.target.closest('[data-go]');
+  // A real href makes the badge copy-able and openable in a new tab; a plain left-click is still
+  // handled in-page (preventDefault) so we control history and avoid a double navigation from
+  // the hashchange listener. Modified clicks fall through to the browser on purpose.
+  if(go && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0){
+    e.preventDefault(); select(go.dataset.go); return; }
+  const n = e.target.closest('.node');
+  if(n) select(n.dataset.id);
+});
+async function select(id, opt){
+  // an RD/PRD citation resolves only once findings.jsonl is in memory — fetch on demand so a
+  // clicked citation still opens, instead of silently doing nothing
+  if(!S.byId[id] && /^(?:RD|PRD)-/.test(id)){
+    if(!S.findings){
+      S.findings = {};
+      (await jsonl('findings')).forEach(f => { S.findings[f.id] = f; S.byId[f.id] = f; });
+    }
+    if(!S.byId[id]) return;
+  }
+  if(!S.byId[id]) return;
+  S.sel = id;
+  S.tab = 'detail';           // picking an object always means "show me this object"
+  openAncestors(id);
+  const {own, link} = highlight();
+  [...own, ...link].forEach(o => { if(S.byId[o]){ S.open.add(o); openAncestors(o); } });
+  // when restoring FROM the url, applyUrl owns rendering and must not push a second entry
+  if(!(opt && opt.fromUrl)){ writeUrl(true); render(); }
+  document.querySelector('.node.sel')?.scrollIntoView({block:'nearest'});
+}
+// Typing a filter is not a navigation step — replace the entry so Back does not walk keystrokes,
+// but keep it in the url so a filtered view is still shareable and survives F5.
+let qT = null;
+$('q').addEventListener('input', e => { S.q = e.target.value.trim().toLowerCase();
+  if(S.q) [...S.coll.domains,...S.coll.flows,...S.coll.capabilities,...S.coll.stages].forEach(r=>S.open.add(r.id));
+  clearTimeout(qT); qT = setTimeout(() => writeUrl(false), 300);
+  render(); });
+$('focus').addEventListener('change', render);
+$('pending').addEventListener('change', e => {
+  S.pending = e.target.checked;
+  if(S.pending) [...S.coll.domains,...S.coll.flows,...S.coll.capabilities,...S.coll.stages].forEach(r=>S.open.add(r.id));
+  render();
+});
+/* ================= MD export ==================================================================
+   views.md's "MD renditions" view: the same content this page shows, as text, for LLM/text
+   consumption. It renders from THIS PAGE'S loaded store — never by re-reading the raw JSON — so
+   an MD file can never claim something the HTML does not show.
+
+   Written against the CURRENT DNA structure, which the v2.14.0 round changed in ways an older
+   template would silently drop:
+     * stages carry `gap` / `gap_note` — a phase the journey needs that nothing implements. An MD
+       that renders an empty stage without saying it is a recorded gap turns a finding into what
+       reads as an omission (this exact defect was caught scoring the reader-view dossiers).
+     * decision branches carry `terminal_outcome` as well as `target_process_id`.
+     * nodes carry `id_history` / `legacy_*` / `merged_from` / `split_from` provenance.
+     * `bpm_review` notes hold real content (e.g. the alternative Flow name two naming panels
+       proposed) — the status alone is not the whole record.
+     * the catalog axis reports `classification_confidence`, not the BPM sign-off queue. */
+function mdEsc(s){ return String(s == null ? '' : s).replace(/\r?\n/g, ' ').trim(); }
+function mdReview(rec, indent){
+  const m = rec.bpm_review; if(!m) return [];
+  const out = [`${indent}- review:`];
+  for(const [k, v] of Object.entries(m)){
+    if(!v || !v.status) continue;
+    let line = `${indent}  - ${k}: ${v.status}`;
+    if(v.value) line += ` — ${mdEsc(Array.isArray(v.value) ? v.value.join(', ') : v.value)}`;
+    out.push(line);
+    if(v.note) out.push(`${indent}    - note: ${mdEsc(v.note)}`);
+  }
+  return out.length > 1 ? out : [];
+}
+function mdProvenance(rec, indent){
+  const bits = [];
+  if(rec.id_history && rec.id_history.length) bits.push(`previously ${rec.id_history.join(' → ')}`);
+  if(rec.merged_from) bits.push(`absorbed ${rec.merged_from.join(', ')}`);
+  if(rec.split_from)  bits.push(`split from ${[].concat(rec.split_from).join(', ')}`);
+  if(rec.legacy_name) bits.push(`was named "${mdEsc(rec.legacy_name)}"`);
+  return bits.length ? [`${indent}- provenance: ${bits.join(' · ')}`] : [];
+}
+function mdFlow(fid){
+  const f = S.byId[fid]; const L = [];
+  const stages = IX.stagesOfFlow[fid] || [];
+  const nproc = stages.reduce((a, s) => a + (IX.procOfStage[s] || []).length, 0);
+  L.push(`# ${fid} — ${f.name}`, '');
+  L.push(`- type: ${f.flow_type}`, `- trigger: ${mdEsc(f.trigger)}`,
+         `- outcome: ${mdEsc(f.outcome)}`,
+         `- ${stages.length} stages · ${nproc} processes`);
+  L.push(...mdProvenance(f, ''), ...mdReview(f, ''), '');
+  for(const sid of stages){
+    const s = S.byId[sid]; const procs = IX.procOfStage[sid] || [];
+    L.push(`## ${sid} — ${s.name}${s.gap ? '  **[RECORDED GAP]**' : ''}`);
+    if(s.gap) L.push('', `> **No process implements this phase.** ${mdEsc(s.gap_note)}`, '');
+    L.push(`- entry: ${mdEsc(s.entry_criteria)}`, `- exit: ${mdEsc(s.exit_criteria)}`);
+    L.push(...mdProvenance(s, ''), ...mdReview(s, ''), '');
+    for(const pid of procs){
+      const p = S.byId[pid];
+      L.push(`### ${pid} — ${p.name}${p.process_kind === 'CONTROL' ? '  *(decision)*' : ''}`);
+      L.push(`- domain/capability: ${p.primary_domain_id} / ${p.primary_capability_id}`);
+      L.push(`- trigger: ${mdEsc(p.trigger)}`, `- input: ${mdEsc(p.input)}`,
+             `- output: ${mdEsc(p.output)}`);
+      if(p.jtbd) L.push(`- jtbd: when ${mdEsc(p.jtbd.when)} / want ${mdEsc(p.jtbd.want)} / ` +
+                        `so that ${mdEsc(p.jtbd.so_that)}`);
+      if(p.actors) L.push(`- actors: ${p.actors.join(', ')}`);
+      for(const b of ['business_rules','validation_rules','state_rules','integration_rules',
+                      'ui_behaviors','exception_flow']){
+        if(p[b] && p[b].length){
+          L.push(`- ${b.replace(/_/g,' ')}:`);
+          p[b].forEach(x => L.push(`  - ${mdEsc(x)}`));
+        }
+      }
+      for(const d of p.decision_branches || []){
+        // terminal_outcome and target_process_id are alternatives, not synonyms — a branch that
+        // ENDS the flow has no target, and rendering only the target loses the whole outcome.
+        const to = d.target_process_id ? `→ ${d.target_process_id}`
+                 : d.terminal_outcome  ? `→ terminal: ${mdEsc(d.terminal_outcome)}` : '';
+        L.push(`- branch: ${mdEsc(d.condition)} ${to}`);
+      }
+      const rd = (p.ext || {}).evidence_rd_ids || [];
+      if(rd.length) L.push(`- evidence: ${rd.join(', ')}`);
+      if((p.ext || {}).primary_assignment_reasoning)
+        L.push(`- placement: ${mdEsc(p.ext.primary_assignment_reasoning)}`);
+      L.push(...mdProvenance(p, ''), ...mdReview(p, ''), '');
+    }
+  }
+  return L.join('\n');
+}
+function mdDomain(did){
+  const d = S.byId[did]; const L = [`# ${did} — ${d.name}`, ''];
+  const ex = d.ext || {};
+  L.push(`- purpose: ${mdEsc(d.purpose)}`);
+  if(ex.core_business_object) L.push(`- core business object: ${mdEsc(ex.core_business_object)}`);
+  if(ex.object_lifecycle) L.push(`- object lifecycle: ${mdEsc(ex.object_lifecycle)}`);
+  L.push(...mdProvenance(d, ''), '');
+  for(const cid of IX.capsOfDom[did] || []){
+    const c = S.byId[cid];
+    L.push(`## ${cid} — ${c.name}`);
+    if(c.business_description) L.push(`- ${mdEsc(c.business_description)}`);
+    L.push(...mdProvenance(c, ''), '');
+    for(const fid of IX.featsOfCap[cid] || []){
+      const ft = S.byId[fid];
+      L.push(`### ${fid} — ${ft.name}`);
+      L.push(`- ${mdEsc(ft.business_description || ft.description)}`);
+      // the catalog axis's own review signal — never the BPM sign-off queue
+      L.push(`- confidence: ${ft.classification_confidence} · relevance: ${ft.business_relevance}` +
+             ` · level: ${ft.abstraction_level} · nature: ${ft.delivery_nature}` +
+             (ft.size ? ` · size: ${ft.size}` : '') + (ft.status ? ` · status: ${ft.status}` : ''));
+      if(ft.rd_ids && ft.rd_ids.length) L.push(`- evidence: ${ft.rd_ids.join(', ')}`);
+      L.push(...mdProvenance(ft, ''), '');
+    }
+  }
+  return L.join('\n');
+}
+function mdIndex(){
+  const L = ['# Project DNA — Markdown rendition', '',
+    `Exported from the DNA Store Explorer. Counts are what this page loaded, not a stale snapshot.`,
+    '', `- ${S.coll.domains.length} domains · ${S.coll.capabilities.length} capabilities · ` +
+        `${S.coll.features.length} features`,
+    `- ${S.coll.flows.length} flows · ${S.coll.stages.length} stages · ` +
+        `${S.coll.processes.length} processes`, ''];
+  const gaps = S.coll.stages.filter(s => s.gap);
+  if(gaps.length){
+    L.push(`## Recorded gaps (${gaps.length})`, '',
+      'A phase the journey needs that no process implements. Deliberate findings, not omissions.', '');
+    gaps.forEach(s => L.push(`- **${s.id}** ${s.name} (${s.flow_id}) — ${mdEsc(s.gap_note)}`));
+    L.push('');
+  }
+  L.push('## Flows', '');
+  S.coll.flows.forEach(f => L.push(`- [${f.id}](flows/${f.id}.md) — ${f.name} (${f.flow_type})`));
+  L.push('', '## Domains', '');
+  S.coll.domains.forEach(d => L.push(`- [${d.id}](domains/${d.id}.md) — ${d.name}`));
+  return L.join('\n');
+}
+/* Minimal STORE-mode zip (no compression) so the export needs no library and no network — the
+   page must keep working from a plain local http.server with nothing else served. */
+const CRC_T = (() => { const t = new Uint32Array(256);
+  for(let n = 0; n < 256; n++){ let c = n;
+    for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0; } return t; })();
+function crc32(u8){ let c = 0xFFFFFFFF;
+  for(let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipStore(files){
+  const enc = new TextEncoder(), chunks = [], central = [];
+  let off = 0;
+  const u16 = v => [v & 255, (v >> 8) & 255];
+  const u32 = v => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255];
+  for(const [name, text] of files){
+    const nb = enc.encode(name), db = enc.encode(text), crc = crc32(db);
+    const hdr = new Uint8Array([...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0), ...u32(crc), ...u32(db.length), ...u32(db.length),
+      ...u16(nb.length), ...u16(0)]);
+    chunks.push(hdr, nb, db);
+    central.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0),
+      ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(db.length), ...u32(db.length),
+      ...u16(nb.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off), ...nb]));
+    off += hdr.length + nb.length + db.length;
+  }
+  const cd = central.reduce((a, c) => a + c.length, 0);
+  const eocd = new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0),
+    ...u16(files.length), ...u16(files.length), ...u32(cd), ...u32(off), ...u16(0)]);
+  return new Blob([...chunks, ...central, eocd], {type: 'application/zip'});
+}
+$('exportMd').addEventListener('click', () => {
+  const btn = $('exportMd'), was = btn.textContent;
+  try{
+    const files = [['README.md', mdIndex()]];
+    S.coll.flows.forEach(f => files.push([`flows/${f.id}.md`, mdFlow(f.id)]));
+    S.coll.domains.forEach(d => files.push([`domains/${d.id}.md`, mdDomain(d.id)]));
+    const url = URL.createObjectURL(zipStore(files));
+    const a = document.createElement('a');
+    a.href = url; a.download = 'project-dna-md.zip';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    btn.textContent = `${files.length} files ✓`;
+  }catch(e){
+    btn.textContent = 'export failed';
+    console.error('MD export failed', e);
+  }
+  setTimeout(() => { btn.textContent = was; }, 2500);
+});
+
+/* ================= static HTML export, from the page itself ===================================
+   Same output as `scripts/export_static_explorer.py`, produced in the browser so a reader can
+   take a snapshot without a terminal. It works because the page can fetch its OWN source over
+   the local server: the export is literally this file plus its data, so there is still exactly
+   one UI — the button cannot drift from what you are looking at, because it IS what you are
+   looking at.
+
+   The two implementations must agree byte-for-byte. `scripts/check_export_parity.py` runs both
+   over the same store and diffs them; that gate is what keeps "keep them in sync" from being a
+   promise nobody checks. Change one, run it, or the other is already wrong.
+
+   Contract, shared with the Python script:
+     - payload: {store:{<collection>:<raw jsonl text>}, diagrams, manifest, exported_at, source}
+     - `</` is escaped to `<\/` in the JSON blob only (safe in JSON, NOT in JavaScript)
+     - laneflow.js replaces its own <script src> tag; only `</script` is escaped there
+     - the payload goes immediately before the page's LAST inline <script>
+*/
+const EXPORT_COLLECTIONS = ['domains','capabilities','features','flows','stages','processes',
+  'edges','updates','excluded','services','surfaces','intakes','releases','debts','findings'];
+
+async function buildStaticExport(){
+  const grab = async (p, asText) => {
+    const r = await fetch(p, {cache:'no-store'});
+    if(!r.ok) return null;
+    // Normalise CRLF: the server hands back the file's raw bytes, Python's text-mode read
+    // does not, and a store checked out on Windows drifted the two exporters by 4KB of
+    // invisible carriage returns.
+    return asText ? (await r.text()).replace(/\r\n/g, '\n') : r.json();
+  };
+  const src = await grab(location.pathname.split('/').pop() || 'explorer-v2.html', true);
+  if(!src) throw new Error('could not read this page’s own source over the server');
+  if(!src.includes('__DNA_EMBED'))
+    throw new Error('the page source does not read window.__DNA_EMBED — do not fork it; '
+                  + 'teach the loader to prefer the embedded source');
+
+  const payload = {store:{}, diagrams:{}, manifest:null,
+    exported_at: new Date().toISOString().slice(0,16).replace('T',' ') + ' UTC',
+    source: 'exported from the running explorer'};
+  for(const c of EXPORT_COLLECTIONS){
+    const t = await grab('_dna_store/'+c+'.jsonl', true);
+    if(t !== null) payload.store[c] = t;
+  }
+  if(!payload.store.flows) throw new Error('the store has no flows.jsonl — nothing to export');
+  payload.diagrams = (await grab('_bp_process_diagrams.json', false)) || {};
+  payload.manifest = await grab('_dna_store/manifest.json', false);
+
+  let html = src;
+  const lf = await grab('laneflow.js', true);
+  // Built from pieces, never written out as one token. A closing script tag ends the enclosing
+  // <script> element wherever the parser meets it — inside a JS string AND inside a comment, so
+  // even the sentence explaining the hazard cannot spell it. Writing it plainly cuts this page's
+  // own script in half; the parity harness hit it as a syntax error before a browser ever did.
+  const CLOSE = '<' + '/script>';
+  if(lf){
+    // escape ONLY what could close the tag: blanket-escaping `</` corrupts real JavaScript
+    // (laneflow contains `.replace(/</g, '&lt;')`, which becomes a syntax error)
+    const js = lf.replace(/<\/(?=script)/gi, '<\\/');
+    html = html.replace('<script src="laneflow.js">' + CLOSE, () => '<script>' + js + CLOSE);
+  }
+  const blob = JSON.stringify(payload).replace(/<\//g, '<\\/');
+  // byte-identical to export_static_explorer.py — check_export_parity.py diffs the two, so this
+  // comment is part of the contract, not decoration
+  const inject = '<script>/* embedded snapshot: data inlined ahead of the page\'s own script. '
+    + 'The UI is never forked — see scripts/export_static_explorer.py */\nwindow.__DNA_EMBED = '
+    + blob + ';' + CLOSE + '\n';
+  // Match the TAG on its own line, not the last occurrence of the characters: this very file
+  // contains the literal "<" + "script>" inside these error messages, and lastIndexOf walked
+  // into one of them, injecting the snapshot inside a JavaScript string literal.
+  const tags = [...html.matchAll(/^<script>[ \t]*$/gm)].map(m => m.index);
+  if(!tags.length) throw new Error('no inline script tag on its own line in the page source');
+  const at = tags[tags.length - 1];
+  return {html: html.slice(0, at) + inject + html.slice(at), payload};
+}
+
+(() => {
+  const btn = $('exportHtml'); if(!btn) return;
+  if(window.__DNA_EMBED){
+    // already a snapshot: there is no store to read and no server to read it from
+    btn.disabled = true;
+    btn.title = 'This IS the static export — re-export from the live explorer instead.';
+    btn.style.opacity = .45;
+    return;
+  }
+  btn.addEventListener('click', async () => {
+    const was = btn.textContent;
+    btn.textContent = 'building…';
+    try{
+      const {html, payload} = await buildStaticExport();
+      const url = URL.createObjectURL(new Blob([html], {type:'text/html;charset=utf-8'}));
+      const a = document.createElement('a');
+      a.href = url; a.download = 'dna-explorer-static.html';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      const rows = Object.values(payload.store)
+        .reduce((n, t) => n + t.split('\n').filter(l => l.trim()).length, 0);
+      btn.textContent = `${(html.length/1048576).toFixed(1)} MB · ${rows} rows ✓`;
+    }catch(e){
+      btn.textContent = 'export failed';
+      console.error('static export failed', e);
+      alert('Static export failed: ' + e.message
+        + '\n\nThis button needs the page served over http (scripts/serve_store.py) so it can '
+        + 'read its own source. It cannot work from a file:// URL.');
+    }
+    setTimeout(() => { btn.textContent = was; }, 4000);
+  });
+})();
+
+load();
+</script>
