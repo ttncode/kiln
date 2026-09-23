@@ -202,6 +202,20 @@ It prints the files that mention them, ranked, and records what it named: at REV
 scope` says how much of the real change it covered. Read the files it ranks first before
 widening the search.
 
+When the project has a DNA store (`kiln dna` says so), ask it how current it is before you
+trust it:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" dna drift
+```
+
+It fetches the integration branch first. Print its verdict line as the brief's first finding
+and act on it (D22, D82): `none` — use the store; `small` — offer to catch it up now, default
+yes; `large` — use it, name the drifted files as low-confidence in the brief, offer to catch up,
+default no; `unknown` — the fetch failed, so treat the whole store as low-confidence and say
+why. Catching up is the `kiln-dna` skill's update, on its own branch, never inside this work's
+diff.
+
 Read the code the work touches. Write `.kiln/work/<id>/brief.md`: what is asked, what you
 found, what is still unknown.
 

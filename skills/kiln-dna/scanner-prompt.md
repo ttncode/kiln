@@ -40,6 +40,18 @@ Subagent (general-purpose):
     One behavior per finding. A file with nothing business-meaningful (pure wiring, a DTO) gets
     no finding, and that is a correct answer.
 
+    ## A file that changed since it was last read
+
+    An entry with `was` was scanned before. Read what changed, not the whole file:
+    `git diff <was> <commit>:<path>`, with `<commit>` from `scan.commits`. Its `cites` are the
+    findings already describing it; fetch each with `grep <id> .kiln/dna/store/findings.jsonl`.
+
+    - A cited finding whose behavior changed: upsert it by its `id` with the new proposition and
+      evidence.
+    - New behavior: a new finding, as above.
+    - A cited finding the change made untrue: do not touch it — list it in your report with the
+      diff lines that retire it.
+
     ## Before you phrase a finding from a repository, service, store or client class
 
     Check whether it is one of several implementations of the same interface (a sibling named

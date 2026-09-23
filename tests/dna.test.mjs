@@ -533,3 +533,61 @@ test("DNA surface rules: routes, not HTTP clients; pages, not components; a CI3 
   const kinds = JSON.parse(kiln(ci3.root, ["dna", "infra"]).stdout).upsert.surfaces.map(({ kind, primary_paths }) => `${kind} ${primary_paths[0]}`).sort();
   assert.deepEqual(kinds, ["API application/modules/shop/controllers/Cart.php", "BATCH application/controllers/Job.php", "SCREEN application/controllers/Web.php"]);
 });
+
+// ------------------------------------------------------------------ drift and update (D22, D80, D82)
+
+/** A project whose integration branch lives on a bare origin, scanned once and pinned. */
+function pinnedWithOrigin() {
+  const { root, config } = scanFixture({ "src/price.js": BRANCHY, "src/old.js": BRANCHY });
+  const branch = config.vcs.integration_branch;
+  const origin = tempRoot("kiln-origin-");
+  git(origin, ["init", "-q", "--bare"]);
+  git(root, ["remote", "add", "origin", origin]);
+  git(root, ["push", "-q", "origin", branch]);
+  git(root, ["fetch", "-q", "origin"]);
+  const head = git(root, ["rev-parse", "HEAD"]);
+  applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/price.js", "src/old.js"] }, upsert: { findings: [
+    { category: "CODE_ONLY", proposition: "A VIP order ships free", module: "src/price.js" },
+    { category: "CODE_ONLY", proposition: "Old orders are archived", module: "src/old.js" },
+  ] } }, today: TODAY, config });
+  return { root, config, branch, origin };
+}
+
+test("kiln dna drift: nothing moved is none; a merged change is counted with the findings it puts in doubt", () => {
+  const { root, branch } = pinnedWithOrigin();
+  assert.match(kiln(root, ["dna", "drift"]).stdout, /0 changed · 0 new candidate\(s\) · 0 deleted — none/);
+  writeFile(join(root, "src/price.js"), `${BRANCHY}if (a) b(); if (c) d();\n`);
+  writeFile(join(root, "src/new.js"), BRANCHY);
+  git(root, ["rm", "-q", "src/old.js"]);
+  commitAll(root, "merged work");
+  git(root, ["push", "-q", "origin", branch]);
+  git(root, ["update-ref", `refs/remotes/origin/${branch}`, `${git(root, ["rev-parse", "HEAD"])}~1`]);
+  const drift = kiln(root, ["dna", "drift"]).stdout;
+  assert.match(drift, /1 changed · 1 new candidate\(s\) · 1 deleted — small/, "it fetched: origin was rewound locally and the fetch brought it forward");
+  assert.match(drift, /changed: src\/price\.js \(RD-0001\)/);
+  assert.match(drift, /deleted: src\/old\.js \(RD-0002\)/);
+});
+
+test("kiln dna drift: a failed fetch is reported and never counted as no drift", () => {
+  const { root } = pinnedWithOrigin();
+  git(root, ["remote", "set-url", "origin", join(tempRoot("kiln-gone-"), "missing.git")]);
+  const drift = kiln(root, ["dna", "drift"]).stdout;
+  assert.match(drift, /root: git fetch origin \S+ failed/);
+  assert.match(drift, /— unknown: a fetch failed/);
+});
+
+test("kiln dna update: refused on a store with no findings, and a changed file's skeleton carries what it was", () => {
+  const empty = project();
+  applyBatch(empty, { batch: { settings: { project: "x" } }, today: TODAY });
+  assert.match(kiln(empty, ["dna", "update"]).stderr, /a first build is \/kiln dna init/);
+
+  const { root, branch } = pinnedWithOrigin();
+  const before = readStore(root).scanned["src/price.js"];
+  writeFile(join(root, "src/price.js"), `${BRANCHY}if (a) b(); if (c) d();\n`);
+  commitAll(root, "merged work");
+  git(root, ["push", "-q", "origin", branch]);
+  const updated = kiln(root, ["dna", "update", "--out", ".kiln/tmp/u"]);
+  assert.equal(updated.status, 0, updated.stderr);
+  const [entry] = JSON.parse(readFileSync(join(root, ".kiln/tmp/u/update-001.json"), "utf8")).read;
+  assert.deepEqual([entry.path, entry.was, entry.cites], ["src/price.js", before, ["RD-0001"]]);
+});

@@ -33,12 +33,10 @@ if one fails. An `Edit` into the store is refused. You and your subagents write 
 ## When to Use
 
 - `/kiln dna init` — no store yet, or a store with no findings: the bootstrap below.
-- `/kiln dna update` — a store exists and the code has moved: [update-playbook.md](update-playbook.md),
-  through `kiln dna scan` (a changed file is unscanned again by itself, because the ledger is
-  keyed by blob).
+- `/kiln dna update` — a store exists and the code has moved: the update section below.
 - Any time a batch is about to be written into the store.
 
-**When NOT to use:** `/kiln dna` alone, `check`, `scan`, `infra`, `build`, `serve` — those are
+**When NOT to use:** `/kiln dna` alone, `check`, `scan`, `drift`, `infra`, `build`, `serve` — those are
 commands. Run `kiln dna <verb>` and print what it said. `update` on a store with no findings is
 refused and pointed at `init`: a diff scan of nothing is a full scan nobody agreed to (D79).
 
@@ -49,6 +47,8 @@ refused and pointed at `init`: a diff scan of nothing is a full scan nobody agre
 | `kiln dna` | counts, pins, whether the gates pass |
 | `kiln dna check` | every gate, one line each |
 | `kiln dna scan [--limit n] [--out dir]` | the unscanned candidates, densest first; `--out` writes one batch skeleton per group |
+| `kiln dna drift` | fetch, then how far the code has moved from what the store read |
+| `kiln dna update [--limit n] [--out dir]` | the drift, and skeletons for the changed and new files |
 | `kiln dna infra [--out file]` | a draft batch of services and surfaces, for the user to review |
 | `kiln dna apply <batch.json>` | the one write; prints each id it assigned (`RD-0012 ← f3`) |
 | `kiln dna build` | derive again, change nothing |
@@ -142,6 +142,30 @@ with an `OPEN` one.
 `audit_sample` and `flags`. `kiln dna check` passes. The store is tracked: commit
 `.kiln/dna/store/` on a branch of its own and hand the user the pull request — the pins take
 effect when it merges into the integration branch (D80). Never push to the integration branch.
+
+## Update — `/kiln dna update`
+
+The code moved; the store catches up. "Diff, don't re-scan" ([update-playbook.md](update-playbook.md)):
+
+1. `kiln dna drift` — fetches the integration branch and names every changed, new and deleted
+   file, with the findings each puts in doubt. `unknown` means a fetch failed: say so and stop
+   unless the user wants to go on with what the last fetch saw.
+2. `kiln dna update --out <scratch>/update-<n>` — skeletons for the changed and new files. A
+   changed file carries `was` (the blob it was read at) and `cites` (the findings that name it);
+   the scanner reads the diff, not the file ([scanner-prompt.md](scanner-prompt.md)).
+3. Apply each skeleton as in the bootstrap. A cited finding whose behavior changed comes back as
+   an upsert by its id; one the diff made untrue is reported, not deleted.
+4. **Deleted code.** A finding is never removed (id-schemes.md). A finding the code no longer
+   holds — its file deleted, or reported untrue in step 3 — leaves its feature's `rd_ids` and
+   joins the round's `excluded` entry — `id: "EXC-RETIRED-<the round's UPD id>"`,
+   `catalog: "RETIRED"`, a `disposition` saying what removed it — in one batch. The source's playbook has no step for this; without it a map only ever grows.
+5. Thread new findings into features with [clusterer-prompt.md](clusterer-prompt.md), verdicts
+   `UPDATE` / `NEW` / `IGNORE` against each capability's full existing feature list (update-playbook
+   §4). Then PLANNED features (§4b), open debts (§4c), and the sample audit over this round's
+   findings only (§5b).
+6. One `updates` record, `kind: "INCREMENTAL_RESCAN"`, with the round's numbers; `kiln dna check`
+   passes; the store change goes on its own branch and the user gets the pull request. The pins
+   move when it merges.
 
 ## Model tiers
 
