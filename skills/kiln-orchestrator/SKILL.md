@@ -234,12 +234,16 @@ chosen. Subagent stages create no todos — the list would nest into noise.
 **Use the `kiln-writing-plans` skill.** It decides what a plan has to contain; the things
 below are what kiln adds to it.
 
-Write `.kiln/work/<id>/plan.md`. Then record its change preview as `predicted[]` and ask
-which of the project's own rules apply to those files:
+Write `.kiln/work/<id>/plan.md`, then ask which of the project's own rules apply to the files
+its change preview names. **Pass those paths** — the approved claim in `state.predicted` is
+written by the gate, which has not happened yet:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage plan
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage plan --predicted <a.php,b.php>
 ```
+
+The same paths go to `--predicted` on the gate call below. Passing them here is a read;
+passing them there is the claim, and the claim is what the user approves.
 
 Every rule it prints is a constraint on this plan, not a reading suggestion. Revise the plan
 until it satisfies them, or say in the plan which one you are not satisfying and why — that

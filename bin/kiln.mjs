@@ -59,9 +59,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Write a project rule and route it. Adds only: it never rewrites or
       removes one, which is why a run may call it.
 
-  kiln rules <id> [--stage plan|review]
+  kiln rules <id> [--stage plan|review] [--predicted <a,b,c>]
       Print the project rules routed to the files this stage names, and record
-      which ones the run was handed.
+      which ones the run was handed. At --stage plan the files are the ones
+      you pass: the approved claim does not exist until the gate.
 
   kiln scope <id>
       Reconcile what the plan predicted against what the diff actually touched.
@@ -397,7 +398,7 @@ function runGate(argv) {
     out(JSON.stringify({ recorded: false, ...reAskFor(key) }, null, 2));
     return 2;
   }
-  const claimed = (flag(rest, "--predicted") ?? "").split(",").map((path) => path.trim()).filter(Boolean);
+  const claimed = claimedPaths(rest);
   const conflicts = claimConflicts(root, { paths: claimed, forId: id });
   if (conflicts.length > 0) {
     process.stderr.write(`${describeConflicts(conflicts)}\n`);
@@ -643,8 +644,25 @@ function runScope(argv) {
  * happened — which is how a rule reaches a file the plan never predicted, the case a router
  * that only sees what is already in context cannot cover.
  */
-function stagePaths(root, { state, stage }) {
-  if (stage === "plan") return pathsOf(state.predicted);
+/** One spelling of `--predicted`, shared by the gate that claims them and the router that reads them. */
+function claimedPaths(argv) {
+  return (flag(argv, "--predicted") ?? "").split(",").map((path) => path.trim()).filter(Boolean);
+}
+
+/**
+ * At PLAN the paths come from the caller, because `state.predicted` does not exist yet.
+ *
+ * D31 puts the claim at the gate on purpose — `predicted[]` is the *approved* preview, and
+ * D72 registers cross-work claims from it. So the plan-stage router was reading a field that
+ * is empty until after the gate it was supposed to inform, and every real run got "The plan
+ * names no files yet". Measured on the owner's run, where the agent diagnosed it itself and
+ * then matched the rules by hand — routing around the verb, which is D112 a third time.
+ *
+ * Passing the paths in is a read, not a claim: the agent wrote the plan, so it knows which
+ * files the preview names. The claim still happens at the gate, where approval is.
+ */
+function stagePaths(root, { state, stage, predicted }) {
+  if (stage === "plan") return predicted.length > 0 ? predicted : pathsOf(state.predicted);
   const anchor = anchorVerdict(root, state.last_verified);
   if (anchor.ok) return actualChanged(root, state.last_verified);
   process.stderr.write(`${offBranchMessage(state.id, { base: state.last_verified, reason: anchor.reason })}\n`);
@@ -696,7 +714,7 @@ function runRules(argv) {
   }
   const { root } = loadConfig(process.cwd());
   const state = readState(root, id);
-  const paths = stagePaths(root, { state, stage });
+  const paths = stagePaths(root, { state, stage, predicted: claimedPaths(rest) });
   if (paths === null) return 1;
 
   const report = rulesReport({ root, stage, id: state.id, paths });
