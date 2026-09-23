@@ -7,6 +7,7 @@ import { branchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { slugOfId } from "../lib/resolve.mjs";
 import { newWork } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
+import { kiln, nodeProject, ok, state } from "./helpers/journey.mjs";
 
 after(cleanupFixtures);
 
@@ -165,4 +166,55 @@ test("a type kiln does not know is refused at open, not discovered at ship", () 
   assert.equal(run.status, 1);
   assert.match(run.stderr, /"hotfix" is not a change type/);
   assert.match(run.stderr, /feat, fix, chore/);
+});
+
+/**
+ * `reviewed` and `shipped` were read by `resolve.mjs` and written by nothing. D24's resume
+ * table described three states and the product could reach one, so every work stayed
+ * `in_progress` for ever — and with it the claim its `predicted[]` holds, which `claimOwner`
+ * checks only against **active** works. A file touched once was claimed permanently, and the
+ * next work touching it halted at its plan gate naming a run that had finished days ago.
+ *
+ * Found while writing instructions for three runs of one ticket: runs two and three would
+ * have halted against run one, and the conflict would have been correct machinery firing on
+ * a finished work.
+ */
+test("approving the gate that authorises shipping leaves the work reviewed", () => {
+  const root = nodeProject({ name: "reviewed" });
+  ok(root, ["init"]);
+  ok(root, ["open", "w1", "--session", "s", "--path", "bounded"]);
+  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+
+  ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "1. Approve this review (recommended)"]);
+  assert.equal(state(root, "w1").status, "reviewed", "on bounded, accept is accept-and-ship");
+});
+
+test("a work stops claiming its files once the pull requests exist", () => {
+  const root = nodeProject({ name: "shipped" });
+  ok(root, ["init"]);
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  ok(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
+
+  ok(root, ["open", "w2", "--session", "s2"]);
+  writeFile(join(root, ".kiln", "work", "w2", "plan.md"), "# plan\n");
+  const blocked = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
+  assert.equal(blocked.status, 2, "D72: two works cannot claim one path");
+  assert.match(blocked.stderr, /w1/, "and the conflict names the owner");
+
+  const shipped = ok(root, ["ship", "w1", "--opened", "https://example.invalid/mr/1"]);
+  assert.match(shipped.stdout, /claims no files now/);
+  assert.equal(state(root, "w1").status, "shipped");
+  assert.deepEqual(state(root, "w1").opened, ["https://example.invalid/mr/1"]);
+
+  assert.equal(kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]).status, 0,
+    "a finished work is not a conflict");
+});
+
+test("ship without --opened still only prints, and changes nothing", () => {
+  const root = nodeProject({ name: "printonly" });
+  ok(root, ["init"]);
+  ok(root, ["open", "w1", "--session", "s"]);
+  ok(root, ["ship", "w1"]);
+  assert.equal(state(root, "w1").status, "in_progress", "printing a plan is not evidence anything was opened");
 });

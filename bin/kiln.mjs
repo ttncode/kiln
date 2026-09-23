@@ -17,7 +17,7 @@ import { recordFullVerified, recordRules, recordVerify } from "../lib/state.mjs"
 import { join } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { resolveArgument } from "../lib/resolve.mjs";
-import { STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
+import { SHIP_AUTHORIZING, STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
@@ -77,9 +77,11 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Move this work up a rung. Prints the uncommitted diff it found and stops;
       it never touches the working tree.
 
-  kiln ship <id>
+  kiln ship <id> [--opened <url,url>]
       Group this work's diff by repository and print what has to be opened:
       one pull request per repository, all carrying the work id as their topic.
+      --opened  record the pull requests that now exist. The work is shipped,
+                and stops claiming the files it predicted.
 
   kiln report <id>
       Print the run's report, including what auto mode decided on your behalf.
@@ -452,10 +454,29 @@ function refuseAuto(key, refusal) {
  */
 const STAGE_AFTER = { probe: "IMPLEMENT", spec: "PLAN", plan: "IMPLEMENT", review: "VERIFY", ship: "SHIP" };
 
+/**
+ * `reviewed` and `shipped` were read by `resolve.mjs` and written by nothing. D24's resume
+ * table described three states and the product could only ever reach one, so every work
+ * stayed `in_progress` for ever — and with it the claim its `predicted[]` holds, which
+ * `claimOwner` only checks against **active** works. A file touched once was claimed
+ * permanently, and the next work touching it halted at its plan gate naming a run that
+ * finished days ago. D72's conflict is right; firing it on a finished work is not.
+ *
+ * `reviewed` is the path's own ship-authorising gate being approved — `review` on bounded,
+ * where accept is accept-and-ship, and `ship` on full. A spike has none and never reaches it,
+ * which is correct: it also claims nothing, because it has no plan gate to claim with.
+ */
+function statusAfter(state, { key, decision }) {
+  if (decision !== "approved") return state.status;
+  return SHIP_AUTHORIZING[state.path] === key ? WORK_STATUS.reviewed : state.status;
+}
+
 function writeGate(root, { id, key, decision, answer, claimed, rest }) {
   const by = rest.includes("--auto") ? "auto" : "user";
   const opened = recordGate(readState(root, id), { key, decision, artifactPath: flag(rest, "--artifact"), answer, by });
-  const recorded = decision === "approved" ? { ...opened, stage: STAGE_AFTER[key] ?? opened.stage } : opened;
+  const recorded = decision === "approved"
+    ? { ...opened, stage: STAGE_AFTER[key] ?? opened.stage, status: statusAfter(opened, { key, decision }) }
+    : opened;
   // Re-approving without --predicted keeps the claim set rather than clearing it, so
   // the count reported is what the work now claims, not what this call passed in.
   const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;
@@ -1015,10 +1036,25 @@ function runResume(argv) {
 }
 
 /** Prints; writes nothing. What the run has to open, and what kiln cannot promise about it. */
+/**
+ * `--opened` is what makes a work stop claiming. kiln cannot see a pull request — the agent
+ * opens it with its own `gh`/`glab` — so the only honest record is the one handed back, and
+ * printing a plan is not evidence that anything was opened.
+ *
+ * It also gives tier D's fourth line something to measure. "Human edits after accept" was
+ * recorded as unmeasurable because no run had reached a pull request; the urls are where
+ * that measurement starts.
+ */
 function runShip(argv) {
+  const [id, ...rest] = argv;
   const { root, config } = loadConfig(process.cwd());
-  const state = readState(root, argv[0]);
-  out(renderShipPlan(shipPlan(root, { config, state }), config.vcs.branch_pattern));
+  const state = readState(root, id);
+  const opened = (flag(rest, "--opened") ?? "").split(",").map((url) => url.trim()).filter(Boolean);
+  if (opened.length === 0) return out(renderShipPlan(shipPlan(root, { config, state }), config.vcs.branch_pattern)) ?? 0;
+
+  writeState(root, { ...state, status: WORK_STATUS.shipped, opened });
+  out(`${id} is shipped: ${opened.join(", ")}`);
+  out("It claims no files now, so another work may touch them.");
   return 0;
 }
 
