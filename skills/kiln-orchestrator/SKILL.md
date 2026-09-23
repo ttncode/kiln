@@ -19,7 +19,7 @@ what is still open.
   GitLab token"* — it checks none of those. Nobody asked for that list; the gap where an
   authoritative one should have been got filled with a guess, and a guess about what a
   safety tool verifies is worse than no answer. If the user wants to know what a command
-  does, run it, or show them `kiln <verb>` with no arguments.
+  does, run it, or show them `kiln --help`.
 - No preamble. The user knows which stage they are in because you told them at the top.
 
 ## Overview
@@ -37,15 +37,19 @@ user override it. Ceremony scales to the work; it is not fixed.
 | `bounded` | `plan` · `review` | + `plan.md` · `review.md` | yes; the review accept **is** accept-and-ship |
 | `full` | `spec` · `plan` · `review` · `ship` | + `spec.md` | yes |
 
-The ratchet goes up and never down. To move a work up a rung:
+The ratchet goes up and never down once anything is recorded. Before that — no gate, no
+change — choosing the path is still classification, and `kiln ratchet` moves either way. To
+move a work up a rung:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ratchet <id> <path>
 ```
 
-It halts, prints the uncommitted work it found, and **touches none of it** — deleting a
-spike's probe would destroy data nobody asked kiln to destroy, and carrying it forward
-silently would launder pre-plan code past a gate record written for a different artifact.
+Once a gate or a change exists it **halts**: it prints what the earlier path left in the tree,
+a numbered menu, and **touches none of it** — deleting a spike's probe would destroy data
+nobody asked kiln to destroy, and carrying it forward silently would launder pre-plan code
+past a gate record written for a different artifact. Present the menu, then record the
+user's choice with `kiln resume <id> --answer "<their choice>"`.
 
 **When the work turns out not to be buildable yet, do not reach for a downward ratchet.**
 There isn't one, and the absence is deliberate: a task that proved large must not become
@@ -53,7 +57,8 @@ cheap again because investigating it was tiring. What you have found is a **bloc
 unknown**, and it has its own move:
 
 1. Name the unknown, and say what each answer would change.
-2. Halt: `kiln halt <id> --reason "<the unknown>"`. Source edits stop until it is answered.
+2. Halt: `node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" halt <id> --kind blocking_unknown --reason "<the unknown>"`.
+   Source edits stop until it is answered.
 3. Offer the user two futures, not a path change: **answer it and continue here**, or
    **close this work and open a spike** whose deliverable is that answer.
 
@@ -134,11 +139,11 @@ Act on `kind`, and on nothing else:
 
 | `kind` | Do |
 |---|---|
-| `list` | run `kiln list`, print it, stop |
+| `list` | run `node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" list`, print it, stop |
 | `reserved` | a `message` means the word is held for a later version — print it verbatim and stop. No `message` means it is a command: run it with `rest` as its arguments, and stop. A sentence that merely opens with one of these words is refused here rather than minted as work — say so, and offer to rephrase it |
 | `url` | fetch it with your own tools, then treat the text as a description |
-| `ticket` | fetch the ref with `gh`/`glab`/MCP, then treat the text as a description |
-| `work` | resume — see step 6 |
+| `ticket` | fetch the ref with `gh`/`glab`/MCP, then treat the text as a description. When it carries `modules`, more than one module owns tickets here and the ref alone does not say which: take the module from the ticket's URL, or ask, and the id is `<module>-<ref>` |
+| `work` | resume — see step 6. A `follow_up` carries a new `id`; the work it `follows` is finished |
 | `description` | this is new work; its `id` is already minted |
 
 A `ResolveError` means kiln refused to reuse a directory. Print it and stop. Do not pick
@@ -177,8 +182,8 @@ their own message**, which is why it outranks `auto.*` in config and satisfies `
 opt-in — and why you must never add it yourself. A `spike` is still never eligible.
 
 If the argument names no path, open `bounded` and correct it after investigating — while no
-gate is recorded and nothing has changed, `kiln ratchet` moves in **either** direction,
-because there is nothing yet to launder past a gate. Once a gate exists, it only goes up.
+gate is recorded and nothing has changed, `kiln ratchet` moves either way, because there is
+nothing yet to launder past a gate. Once a gate exists, it only goes up.
 
 ### 2b. INVESTIGATE
 
@@ -276,7 +281,11 @@ GATE — plan · <id>
 
 Plan complete — <one sentence saying why approving is the right move>
 
-Reply `approve` to record it, or tell me what to change.
+1. Approve this plan as written (recommended)
+2. Change something — tell me what
+3. Stop here, keep the artifacts
+
+Which option?
 ```
 
 The first line **says what finished**, naming the stage — `Plan complete`, `Review complete`,
@@ -289,14 +298,6 @@ the harness's own question UI already renders it.
 the number: `1. Approve this plan as written` records an approval, and a bare `1` does not —
 it is a click, and a click is not evidence anyone read the artifact. That is why the label
 has to name what is being approved rather than say "yes".
-
-```
-1. Approve this plan as written (recommended)
-2. Change something — tell me what
-3. Stop here, keep the artifacts
-
-Which option?
-```
 
 **`(recommended)` marks exactly one option, and the line above says why.** One mark, or it
 marks nothing. It is a suffix on the label and nothing else changes: the whole sentence still
@@ -324,15 +325,14 @@ and a summary that omits it is a black box.
 
 ```
 auto mode is off for bounded (auto.bounded is off) — every gate stops for you.
-auto mode is ON for bounded: kiln will rule its gates and say so in `kiln report`.
+auto mode is ON for bounded: kiln will rule its gates and print each ruling as it makes it.
 ```
 
 `--auto` in the request turns it on for that run alone; `auto.*` in config is the standing
 default. When it is **on**, record the gate with `--auto` instead of stopping:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" gate <id> plan \
-  --artifact .kiln/work/<id>/plan.md --auto --predicted src/a.ts,src/b.ts
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" gate <id> plan --auto --predicted src/a.ts,src/b.ts
 ```
 
 Still render the gate block first. A ruling nobody can see is worse than a question nobody
@@ -347,12 +347,13 @@ Then record what the user actually said:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" gate <id> plan \
-  --artifact .kiln/work/<id>/plan.md --answer "<their words, verbatim>" \
-  --predicted src/a.ts,src/b.ts
+  --answer "<their words, verbatim>" --predicted src/a.ts,src/b.ts
 ```
 
-You supply only `--answer` and `--predicted`. kiln hashes the artifact itself and
-classifies the answer.
+You supply only `--answer` and `--predicted`. kiln hashes the document the gate approves —
+`brief.md` for `probe`, `spec.md`, `plan.md`, and `review.md` for `review` and `ship` — and
+classifies the answer. Write that document before the gate; kiln refuses a gate whose
+document does not exist.
 
 `--predicted` is **the files the change preview named**, and at the plan gate it is not
 optional: it is the claim set a concurrent work is checked against, and it is what REVIEW
@@ -376,7 +377,7 @@ file, the gate is the thing to go back to.
 | `resume` | re-read the brief and plan, run a cheap preflight against the tree, then continue from `stage`. **Do not trust the checkboxes** |
 | `present_halt` | re-present the halt's numbered menu. Never continue past it |
 | `ship` | go to step 9 |
-| `next_pass` | confirm with the user first. Every gate must be given again — approvals belong to the pass that earned them |
+| `follow_up` | the work shipped and is not reopened. Say so, then open the new `id` with `--follows <the shipped id>`: every gate is given again, because approvals belong to the change they approved |
 
 ### 7. IMPLEMENT, then 8. REVIEW and VERIFY
 
@@ -399,9 +400,9 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" rules <id> --stage review
 A rule appearing here that did not appear at PLAN is the interesting case: the run reached a
 file the plan never named. Check the diff against it before anything else in the review.
 
-**The review gate refuses until this has run.** Not because the rules always matter, but
-because the run that most needs them is the one that wandered, and that run cannot be told
-from any other without asking.
+**Where the project has routed any rule, the review gate refuses until this has run.** Not
+because the rules always matter, but because the run that most needs them is the one that
+wandered, and that run cannot be told from any other without asking.
 
 If the review settles a convention this project will want again, offer to record it — the
 user decides, and the command is the only way to write one:
@@ -421,10 +422,15 @@ zero is a valid result.
 Then the review gate, same format as step 5. On `bounded`, approving it is
 approve-and-ship.
 
+After the review gate, source is closed: the change is the one that was reviewed. Run the
+full phase (`kiln verify <id>`). If it fails, kiln sends the work back to implementation and
+drops the review approval — fix it, then take it through review again. Any other change
+belongs in a new work.
+
 ### 9. SHIP
 
-Commit an **explicit path list** — never `git add -A`, and never a broad commit because the
-tree is dirty. Open the PR with your own `gh`/`glab`. The body carries the change summary and
+SHIP is the run's **one** commit point. Commit an **explicit path list** — never `git add -A`,
+and never a broad commit because the tree is dirty. Open the PR with your own `gh`/`glab`. The body carries the change summary and
 the verify rows; **no log content goes to the remote**.
 
 Ask what has to be opened before opening anything:
@@ -433,9 +439,9 @@ Ask what has to be opened before opening anything:
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id>
 ```
 
-Once they exist, hand the urls back. That record is what makes the work `shipped`, which is
-what lets a second pass open on it — and it is the only account anyone has of where the
-change went, because kiln cannot see a pull request:
+Once they exist, hand the urls back. That record is what makes the work `shipped`, and it is
+the only account anyone has of where the change went, because kiln cannot see a pull
+request. kiln refuses it unless the path's ship-authorising gate is approved:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" ship <id> --opened <url,url>
@@ -512,7 +518,7 @@ cannot tell one from another.
 
 Before you say the work is done:
 
-- [ ] `brief.md`, `plan.md` and `review.md` exist and their absolute paths were printed.
+- [ ] Every artifact the path has exists and its absolute path was printed — `brief.md` and `findings.md` on a spike; `brief.md`, `plan.md` and `review.md` (and `spec.md` on `full`) otherwise.
 - [ ] Every gate has a record, and each `answer` is the user's own words.
 - [ ] `kiln rules` ran at PLAN and at REVIEW, and every rule it printed is either satisfied or answered in writing.
 - [ ] The full step set ran and every exit code is recorded.

@@ -7,11 +7,11 @@ description: Use when a spec or a brief describes a multi-step task and the plan
 
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. No commits: SHIP commits the reviewed change once, by named paths.
 
 Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
 
-**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+**Announce at start:** "I'm using the kiln-writing-plans skill to create the implementation plan."
 
 **Save the plan to:** `.kiln/work/<id>/plan.md` — the path `guard-gate` allows you to write
 and the file the plan gate hashes. Print its absolute path the moment it exists.
@@ -47,7 +47,8 @@ independently testable deliverable.
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
 - "Run the tests and make sure they pass" - step
-- "Commit" - step
+
+There is no commit step. SHIP is the run's one commit point, after review and VERIFY.
 
 ## Plan Document Header
 
@@ -130,12 +131,6 @@ def function(input):
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
-```
 ````
 
 ## No Placeholders

@@ -187,6 +187,7 @@ const BEFORE_THE_GATE = [
   ["bash", "glab mr create --fill", "deny", /pull request/],
   ["edit", ".kiln/work/{id}/brief.md", "allow"],
   ["edit", ".kiln/work/{id}/plan.md", "allow"],
+  ["edit", ".kiln/tmp/{id}/.superpowers/brainstorm/s1/content/layout.html", "allow"],
   ["bash", "echo x > .kiln/tmp/{id}/scratch.txt", "allow"],
   ["bash", "cat src/app.js && grep -rn a src", "allow"],
   ["bash", "npm test", "allow"],
