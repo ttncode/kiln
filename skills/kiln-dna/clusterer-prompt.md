@@ -40,8 +40,13 @@ Subagent (general-purpose):
         "description": "…", "size": "S|M|L|XL", "size_justification": "…",
         "business_relevance": "…", "delivery_nature": "…", "abstraction_level": "…",
         "classification_confidence": "…", "rd_ids": ["RD-…"] } ],
-      "excluded": [ … generic UI/UX or engineering-standard findings, with a disposition … ] },
-      "misassigned": [ { "rd_id": "…", "belongs_to": "<existing capability id>", "why": "…" } ],
+      "excluded": [ { "catalog": "UX|ENGINEERING", "name": "…", "disposition": "…",
+        "rd_ids": ["RD-…"] } ] } }
+
+    And the findings that do not belong here in a second file, [FLAGS PATH] — `kiln dna apply`
+    takes only the first:
+
+    { "misassigned": [ { "rd_id": "…", "belongs_to": "<existing capability id>", "why": "…" } ],
       "taxonomy_gap": [ { "rd_ids": ["…"], "proposed_capability": "…", "why": "…" } ] }
 
     - Names state the ability, business-first: no table, component or implementation nouns.
@@ -54,13 +59,13 @@ Subagent (general-purpose):
       `misassigned` needs a real target.
     - Do not merge distinct abilities because they share a topic or a vendor. If your own
       `size_justification` says "combines", you have probably merged two.
-    - Leave `id` out: kiln counts the feature ids.
+    - Leave `id` out: kiln counts the feature and excluded ids.
 
     ## Report
 
     Features written, findings placed per destination, and the count check.
 ```
 
-**Placeholders:** `[OUTPUT PATH]` a file under the scratch directory · the rest as named. The
-orchestrator strips `misassigned` and `taxonomy_gap` before `kiln dna apply` and handles them as
-the skill says.
+**Placeholders:** `[OUTPUT PATH]` the batch and `[FLAGS PATH]` its flags, both under the scratch
+directory · the rest as named. The orchestrator applies the batch and handles the flags as the
+skill says.

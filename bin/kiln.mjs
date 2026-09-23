@@ -24,7 +24,7 @@ import { listWork } from "../lib/work.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { DNA_USAGE, runDnaCommand } from "../lib/dna/cli.mjs";
 import { dnaBlastRadius } from "../lib/dna/blast.mjs";
-import { hasStore, readStore } from "../lib/dna/store.mjs";
+import { DnaError, hasStore, readStore } from "../lib/dna/store.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
 
@@ -775,8 +775,15 @@ function printRows(rows, describe) {
  */
 function dnaRows(root, terms) {
   if (!hasStore(root)) return null;
-  const store = readStore(root);
-  return store.data.findings.length > 0 ? dnaBlastRadius(root, { store, terms }) : null;
+  try {
+    const store = readStore(root);
+    return store.data.findings.length > 0 ? dnaBlastRadius(root, { store, terms }) : null;
+  } catch (error) {
+    if (!(error instanceof DnaError)) throw error;
+    // A store that cannot be read loses tier 1 for this call, never tier 0 beside it.
+    process.stderr.write(`DNA (tier 1) unavailable: ${error.message}\n`);
+    return null;
+  }
 }
 
 function describeDnaRow(row) {

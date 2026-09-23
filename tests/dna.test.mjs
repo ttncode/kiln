@@ -12,7 +12,7 @@ import { jargonHits, runGates } from "../lib/dna/gates.mjs";
 import { idScheme, nextId } from "../lib/dna/ids.mjs";
 import { applyBatch, checkStore } from "../lib/dna/apply.mjs";
 import { readStore, storeDir } from "../lib/dna/store.mjs";
-import { classByPath, measure, scanProject } from "../lib/dna/scan.mjs";
+import { classByPath, measure, scanProject, skeletons } from "../lib/dna/scan.mjs";
 import { serveExplorer } from "../lib/dna/serve.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
@@ -684,4 +684,78 @@ test("the vendored explorer renders both trees of a store kiln wrote, with no co
   const { rendered: [catalog, processes], errs } = JSON.parse(run.stdout.trim().split("\n").at(-1));
   assert.ok(catalog > 0 && processes > 0, `rendered catalog ${catalog}b, process ${processes}b`);
   assert.deepEqual(errs, []);
+});
+
+// ------------------------------------------------------------------ D157–D160 review round
+
+test("DNA ids: an excluded entry gets a counted id, and a counter past 99 grows a digit without failing its own gate", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const plan = applyBatch(root, { batch: { upsert: { excluded: [{ catalog: "UX", name: "Buttons", disposition: "generic UI", rd_ids: ["RD-0002"] }], features: [{ id: "DOM-TXT-01-01", rd_ids: ["RD-0001"] }] } }, today: TODAY });
+  assert.equal(plan.assigned.find((each) => each.entity === "excluded").id, "EXC-001");
+  applyBatch(root, { batch: { upsert: { features: [{ id: "DOM-TXT-01-99", capability_id: "DOM-TXT-01", name: "Ninety-nine" }] } }, today: TODAY });
+  const next = applyBatch(root, { batch: { upsert: { features: [{ capability_id: "DOM-TXT-01", name: "One hundred" }] } }, today: TODAY });
+  assert.equal(next.assigned[0].id, "DOM-TXT-01-100");
+});
+
+test("kiln dna update: a module's changed file says which repository, path and commit to diff it in", () => {
+  const { root, config } = scanFixture({});
+  const module = join(root, "mods/sub");
+  mkdirSync(module, { recursive: true });
+  initRepo(module);
+  writeFile(join(module, "lib/pay.js"), BRANCHY);
+  commitAll(module, "module");
+  git(module, ["branch", "-M", config.vcs.integration_branch]);
+  const moduleConfig = { ...config, repo: { modules: { sub: "mods/sub" } } };
+  const { files, repos } = scanProject(root, { config: moduleConfig, ledger: {} });
+  const [skeleton] = skeletons(root, { repos, groups: [files.filter((file) => file.path === "mods/sub/lib/pay.js")] });
+  assert.deepEqual([skeleton.read[0].repo, skeleton.read[0].repo_path, skeleton.read[0].commit], ["mods/sub", "lib/pay.js", git(module, ["rev-parse", "HEAD"])]);
+});
+
+test("kiln dna drift: a candidate the bootstrap has not read yet is not drift", () => {
+  const { root } = pinnedWithOrigin();
+  const head = git(root, ["rev-parse", "HEAD"]);
+  writeFile(join(root, "src/late.js"), BRANCHY);
+  commitAll(root, "late");
+  const config = JSON.parse(readFileSync(join(root, ".kiln/config.json"), "utf8"));
+  git(root, ["push", "-q", "origin", config.vcs.integration_branch]);
+  applyBatch(root, { batch: { scan: { commits: { root: git(root, ["rev-parse", "HEAD"]) }, files: [] } }, today: TODAY, config });
+  assert.notEqual(readStore(root).manifest.source_pins.root, head, "the pin moved to the tip, where src/late.js already existed");
+  const drift = kiln(root, ["dna", "drift"]).stdout;
+  assert.match(drift, /0 changed · 0 new candidate\(s\) · 0 deleted — none/);
+  assert.match(drift, /1 candidate\(s\) the bootstrap has not read yet/);
+});
+
+test("kiln dna drift: an unknown verdict never prints its counts as a clean zero", () => {
+  const { root } = pinnedWithOrigin();
+  git(root, ["remote", "set-url", "origin", join(tempRoot("kiln-gone-"), "missing.git")]);
+  assert.match(kiln(root, ["dna", "drift"]).stdout, /as of the last fetch, 0 changed/);
+});
+
+test("kiln blast: a store that cannot be read loses tier 1 only, and an excluded owner is not shown as a feature", () => {
+  const { root, config } = scanFixture({ "src/credit.js": BRANCHY });
+  applyBatch(root, { batch: { upsert: { findings: [{ key: "f", category: "CODE_ONLY", proposition: "A refund is refused after the window", module: "src/credit.js" }], excluded: [{ catalog: "UX", name: "Generic", rd_ids: ["@f"] }] } }, today: TODAY, config });
+  const shown = kiln(root, ["blast", "refund"]).stdout;
+  assert.match(shown, /1\tsrc\/credit\.js\tRD-0001/, "no feature column entry for EXC-001");
+  writeFileSync(join(storeDir(root), "debts.jsonl"), "{not json\n");
+  const broken = kiln(root, ["blast", "refused"]);
+  assert.equal(broken.status, 0);
+  assert.match(broken.stderr, /DNA \(tier 1\) unavailable/);
+});
+
+test("kiln dna serve: a store rewritten mid-request answers 503, a busy port is a sentence, and the page's export can read itself", async () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const { url, server } = await serveExplorer(root, {});
+  try {
+    assert.equal((await request(`${url}explorer-v2.html`)).status, 200, "the Export button's fallback name at /<token>/");
+    renameSync(storeDir(root), `${storeDir(root)}.moved`);
+    assert.equal((await request(`${url}_dna_store/manifest.json`)).status, 503);
+    renameSync(`${storeDir(root)}.moved`, storeDir(root));
+    const busy = kiln(root, ["dna", "serve", "--port", new URL(url).port]);
+    assert.match(busy.stderr, /port \d+ is in use/);
+    assert.doesNotMatch(busy.stderr, /bug in kiln/);
+  } finally {
+    server.close();
+  }
 });

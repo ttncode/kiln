@@ -42,8 +42,9 @@ Subagent (general-purpose):
 
     ## A file that changed since it was last read
 
-    An entry with `was` was scanned before. Read what changed, not the whole file:
-    `git diff <was> <commit>:<path>`, with `<commit>` from `scan.commits`. Its `cites` are the
+    An entry with `was` was scanned before. Read what changed, not the whole file, with the
+    entry's own fields: `git -C <repo> diff <was> <commit>:<repo_path>` — a module's history is
+    in the module, under its own paths. Its `cites` are the
     findings already describing it; fetch each with `grep <id> .kiln/dna/store/findings.jsonl`.
 
     - A cited finding whose behavior changed: upsert it by its `id` with the new proposition and
