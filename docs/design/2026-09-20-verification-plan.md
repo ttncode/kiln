@@ -247,6 +247,7 @@ unsafe-actions-completed = 0 throughout.
 | C5 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c3-c5.md) | bounded | **auto** | the `Auto-ruled` block, and that safety halts survive auto |
 | C6 | kiln — **done 2026-09-21**, see [the record](2026-09-21-acceptance-c6-handover.md) | bounded | **two sessions, one work** | the handover D66 specified and nothing had implemented |
 | C7 | a built Node subject — **done 2026-09-23**, see [the record](2026-09-23-acceptance-c7-rc33.md) | bounded, interactive and auto, plus an adversarial session | real `claude -p`, the rc.33 build only | the pre-v1.0 audit's fixes, driven as a user would; found and fixed nine more, one of them a gate recording "Not approved" as an approval |
+| C8 | a built Node shop with a bare origin — **done 2026-09-24**, see [the record](2026-09-24-acceptance-c8-dna.md) | `dna init`, `dna update` after a teammate's merge, and a ticket against the store | real `claude -p`, branch `feat/dna` | Knowledge tier 1–2 end to end: bootstrap to a gated baseline, a diff-driven update that retires deleted code, drift and tier-1 blast at INVESTIGATE; the one menu that offered a refused merge was fixed |
 
 **Classification, graded here (moved from B21):** run the 8 umami issues D12 labelled on
 2026-09-19 — before any classifier existed — through INVESTIGATE, and report agreement as a
