@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
 import { canonical } from "../lib/dna/contract.mjs";
@@ -10,6 +10,7 @@ import { jargonHits, runGates } from "../lib/dna/gates.mjs";
 import { idScheme, nextId } from "../lib/dna/ids.mjs";
 import { applyBatch, checkStore } from "../lib/dna/apply.mjs";
 import { readStore, storeDir } from "../lib/dna/store.mjs";
+import { classByPath, measure, scanProject } from "../lib/dna/scan.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
@@ -221,4 +222,155 @@ test("kiln dna: status before and after a store exists, apply prints the ids it 
   assert.equal(refused.status, 1);
   assert.match(refused.stderr, /components are derived from findings/);
   assert.match(kiln(root, ["dna", "frobnicate"]).stderr, /kiln dna has no verb "frobnicate"/);
+});
+
+// ------------------------------------------------------------------ D153 review round
+
+test("DNA apply: changing a dated record keeps its date, so the id and the date agree", () => {
+  const root = project();
+  applyBatch(root, { batch: { upsert: { updates: [{ kind: "SCAN", title: "first", date: "2026-01-05" }] } }, today: TODAY });
+  applyBatch(root, { batch: { upsert: { updates: [{ id: "UPD-2026-01-05-01", title: "renamed" }] } }, today: TODAY });
+  assert.equal(readStore(root).data.updates[0].date, "2026-01-05");
+});
+
+test("DNA apply: a batch cannot author a derived field, so what it writes is what a rebuild derives", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const cases = [
+    { upsert: { findings: [{ id: "RD-0001", service_id: "SVC-APP" }] } },
+    { upsert: { findings: [{ id: "RD-0001", component_id: "CMP-X" }] } },
+    { upsert: { findings: [{ id: "RD-0001", feature_id: "DOM-TXT-01-01" }] } },
+    { upsert: { edges: [{ from: "SVC-APP", to: "SVC-APP", kind: "TOPOLOGY", type: "CALLS", derivation: "hop-lift", support: 1 }] } },
+  ];
+  for (const batch of cases) assert.throws(() => applyBatch(root, { batch, today: TODAY }), /derived/, JSON.stringify(batch));
+  assert.equal(checkStore(root).failed.length, 0);
+});
+
+test("DNA apply: an id in id_history is history, and a new record may not take a historical id", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  applyBatch(root, { batch: { upsert: { features: [{ id: "DOM-TXT-01-01", id_history: ["DOM-TXT-01-02"] }] } }, today: TODAY });
+  const plan = applyBatch(root, { batch: { upsert: { features: [{ capability_id: "DOM-TXT-01", domain_id: "DOM-TXT", name: "Next" }] } }, today: TODAY });
+  assert.equal(plan.assigned[0].id, "DOM-TXT-01-03");
+  assert.throws(() => applyBatch(root, { batch: { upsert: { features: [{ id: "DOM-TXT-01-02", capability_id: "DOM-TXT-01", name: "Reuse" }] } }, today: TODAY }), /history/);
+});
+
+test("DNA gates: an empty provenance field fails, as the source's check_gates does", () => {
+  const data = { ...empty(), features: [{ id: "DOM-TXT-01-01", capability_id: "DOM-TXT-01", previous_feature_id: "" }], capabilities: [{ id: "DOM-TXT-01" }] };
+  assert.ok(runGates({ data, settings: {} }).failed.some((result) => result.label === "provenance fields non-empty where present"));
+});
+
+test("DNA apply: removing a parent that still has children is refused by the gates", () => {
+  const root = project();
+  applyBatch(root, { batch: { upsert: { domains: [{ id: "DOM-TXT", key: "d" }], capabilities: [{ domain_id: "@d", name: "C" }], flows: [{ key: "f", name: "F" }], stages: [{ flow_id: "@f", name: "S" }] } }, today: TODAY });
+  assert.throws(() => applyBatch(root, { batch: { remove: { flows: ["BF-01"] } }, today: TODAY }), /ancestor/);
+  assert.throws(() => applyBatch(root, { batch: { remove: { domains: ["DOM-TXT"] } }, today: TODAY }), /ancestor/);
+});
+
+test("DNA store: a write interrupted between its two renames is recovered, not read as an empty store", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  renameSync(storeDir(root), `${storeDir(root)}.previous`);
+  assert.equal(readStore(root).data.findings.length, 2);
+  assert.ok(existsSync(storeDir(root)));
+});
+
+test("DNA apply: only a whole `@key` word is a reference, and null removes a field wherever it is kept", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  applyBatch(root, { batch: { upsert: { features: [{ id: "DOM-TXT-01-01", name: "@mention handling", owner_team: "web" }] } }, today: TODAY });
+  applyBatch(root, { batch: { upsert: { features: [{ id: "DOM-TXT-01-01", owner_team: null }] } }, today: TODAY });
+  const [feature] = readStore(root).data.features;
+  assert.equal(feature.name, "@mention handling");
+  assert.equal(feature.ext, undefined);
+});
+
+test("DNA apply: a malformed batch is refused in words, never as a crash", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  for (const batch of [{ remove: { features: [5] } }, { remove: { features: "x" } }, { upsert: { features: {} } }, { upsert: { features: ["x"] } }, { upserts: {} }]) {
+    assert.throws(() => applyBatch(root, { batch, today: TODAY }), (error) => error.constructor.name === "DnaError", JSON.stringify(batch));
+  }
+});
+
+test("DNA derive: when two excluded entries claim a finding, the first keeps it, as in the source", () => {
+  const data = { ...empty(), excluded: [{ id: "EXC-1", rd_ids: ["RD-0001"] }, { id: "EXC-2", rd_ids: ["RD-0001"] }], findings: [{ id: "RD-0001" }] };
+  assert.equal(derive(data, {}).findings[0].feature_id, "EXC-1");
+});
+
+// ------------------------------------------------------------------ the scan (bootstrap phase 1)
+
+const BRANCHY = "export function price(order) {\n  if (order.vip) return 0;\n  if (order.total > 100 && order.coupon) return 5;\n  for (const line of order.lines) if (line.free) return 1;\n  return 10;\n}\n";
+
+function scanned() {
+  const root = project();
+  writeFile(join(root, "src/price.js"), BRANCHY);
+  writeFile(join(root, "src/names.js"), "export const NAMES = ['a', 'b'];\n");
+  writeFile(join(root, "src/price.test.js"), BRANCHY);
+  writeFile(join(root, "vendor/lib.js"), BRANCHY);
+  writeFile(join(root, "README.md"), "if and while\n");
+  commitAll(root, "code");
+  return root;
+}
+
+test("DNA scan: classes by path and branching, and ranks only what is worth reading", () => {
+  assert.equal(classByPath({ path: "src/a.test.js", size: 10 }), "TEST");
+  assert.equal(classByPath({ path: "node_modules/x/a.js", size: 10 }), "OTHER");
+  assert.equal(classByPath({ path: ".kiln/hooks/pre-push.mjs", size: 10 }), "OTHER");
+  assert.equal(classByPath({ path: "docs/a.md", size: 10 }), "OTHER");
+  assert.equal(classByPath({ path: "src/a.js", size: 10 }), null);
+  assert.deepEqual(measure("if (a && b) {\n}\n\n"), { lines: 2, branches: 2, density: 1 });
+  const root = scanned();
+  const { files, repos } = scanProject(root, { config: { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } }, ledger: {} });
+  assert.equal(repos[0].pinnable, true);
+  const classOf = Object.fromEntries(files.map((file) => [file.path, file.class]));
+  assert.equal(files[0].path, "src/price.js");
+  assert.equal(classOf["src/price.js"], "CANDIDATE");
+  assert.equal(classOf["src/names.js"], "SHELL");
+  assert.equal(classOf["src/price.test.js"], "TEST");
+  assert.equal(classOf["vendor/lib.js"], "OTHER");
+});
+
+test("kiln dna scan: a round's skeleton, once applied, marks its files scanned at their blob and pins the store", () => {
+  const root = scanned();
+  const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: branch } });
+  const listed = kiln(root, ["dna", "scan", "--out", ".kiln/tmp/round-1"]);
+  assert.equal(listed.status, 0, listed.stderr);
+  assert.match(listed.stdout, /candidates 1 \(0 scanned, 1 unscanned\)/);
+  const skeleton = JSON.parse(readFileSync(join(root, ".kiln/tmp/round-1/scan-001.json"), "utf8"));
+  assert.deepEqual(skeleton.scan.files, ["src/price.js"]);
+  assert.equal(skeleton.read[0].at, "src/price.js", "the working tree holds the same blob, so the file is read where it is");
+  skeleton.upsert.findings.push({ category: "CODE_ONLY", proposition: "A VIP order ships free", module: "src/price.js", evidence: [{ src: "root", ref: "src/price.js", loc: "L2" }] });
+  writeFile(join(root, ".kiln/tmp/round-1/scan-001.json"), JSON.stringify(skeleton));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/round-1/scan-001.json"]).status, 0);
+  assert.match(kiln(root, ["dna"]).stdout, new RegExp(`pinned to root ${skeleton.scan.commits.root.slice(0, 12)}`));
+  assert.match(kiln(root, ["dna", "scan"]).stdout, /No unscanned candidate: the scan is exhausted/);
+
+  writeFile(join(root, "src/price.js"), `${BRANCHY}// changed\n`);
+  commitAll(root, "change");
+  assert.match(kiln(root, ["dna", "scan"]).stdout, /1 unscanned/, "a changed file is unscanned again, because the ledger holds blobs");
+});
+
+test("kiln dna scan: a file that differs in the working tree is read from the commit's copy", () => {
+  const root = scanned();
+  const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: branch } });
+  writeFile(join(root, "src/price.js"), "// work in progress\n");
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/round-1"]);
+  const [entry] = JSON.parse(readFileSync(join(root, ".kiln/tmp/round-1/scan-001.json"), "utf8")).read;
+  assert.match(entry.at, /^\.kiln\/tmp\/dna\/[0-9a-f]{12}\/src\/price\.js$/);
+  assert.equal(readFileSync(join(root, entry.at), "utf8"), BRANCHY);
+  assert.match(kiln(root, ["dna", "scan", "--out", "/tmp/elsewhere"]).stderr, /--out must be under/);
+});
+
+test("DNA apply: a scan round cannot record a file its commit does not hold, and never pins off the integration branch", () => {
+  const root = scanned();
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const config = { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "no-such-branch" } };
+  assert.throws(() => applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/missing.js"] } }, today: TODAY, config }), /has no src\/missing\.js/);
+  applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/price.js"] } }, today: TODAY, config });
+  const { manifest, scanned: ledger } = readStore(root);
+  assert.deepEqual(manifest.source_pins, {}, "HEAD is not the integration branch, so it is read but not pinned (D80)");
+  assert.ok(ledger["src/price.js"]);
 });
