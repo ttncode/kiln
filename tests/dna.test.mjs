@@ -337,6 +337,27 @@ test("DNA scan: classes by path and branching, and ranks only what is worth read
   assert.equal(classOf["vendor/lib.js"], "OTHER");
 });
 
+test("DNA scan: Linguist's attributes leave third-party code out, and -linguist-vendored keeps it (D170)", () => {
+  const root = scanned();
+  writeFile(join(root, "system/core/Router.php"), BRANCHY.replaceAll("export ", "<?php "));
+  writeFile(join(root, "public/asset/chart-min.js"), BRANCHY);
+  writeFile(join(root, "src/schema.js"), BRANCHY);
+  writeFile(join(root, "src/bundle.js"), BRANCHY);
+  writeFile(join(root, ".gitattributes"), "system/** linguist-vendored\nvendor/lib.js -linguist-vendored\n");
+  commitAll(root, "third party");
+  writeFile(join(root, ".git/info/attributes"), "src/schema.js linguist-generated\nsrc/bundle.js linguist-vendored=1\n");
+  const config = { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } };
+  const classOf = Object.fromEntries(scanProject(root, { config, ledger: {} }).files.map((file) => [file.path, file.class]));
+  assert.equal(classOf["system/core/Router.php"], "OTHER", "linguist-vendored in .gitattributes");
+  assert.equal(classOf["src/schema.js"], "OTHER", "linguist-generated in the never-committed .git/info/attributes");
+  assert.equal(classOf["public/asset/chart-min.js"], "OTHER", "Linguist's -min.js pattern");
+  assert.equal(classOf["src/bundle.js"], "OTHER", "as Linguist reads it, any value but false is true");
+  assert.equal(classOf["vendor/lib.js"], "CANDIDATE", "-linguist-vendored keeps what the built-in pattern drops");
+  assert.equal(classOf["src/price.js"], "CANDIDATE");
+  writeConfig(root, config);
+  assert.match(kiln(root, ["dna", "scan"]).stdout, /left out as vendored or generated: 4 — mark more with linguist-vendored/);
+});
+
 test("kiln dna scan: a round's skeleton, once applied, marks its files scanned at their blob and pins the store", () => {
   const root = scanned();
   const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).stdout.trim();
