@@ -922,3 +922,15 @@ test("kiln dna reconcile: consensus clusters, an escalation where a panel split 
   assert.deepEqual(result.escalations.map((entry) => entry.id), ["C01"], "panel I put P003 elsewhere, so the group is escalated, not voted");
   assert.deepEqual(parseRoster('{"P010": {}, "P002": {}}'), ["P010", "P002"]);
 });
+
+// ------------------------------------------------------------------ upstream check (D167)
+
+test("the vendored methodology pages carry kiln's note in exactly the place the upstream check strips it", () => {
+  for (const page of ["glossary", "id-schemes", "quality-gates", "agent-orchestration", "bootstrap-playbook", "update-playbook", "dna-store", "dna-erd", "bpm-alignment"]) {
+    const lines = readFileSync(new URL(`../skills/kiln-dna/${page}.md`, import.meta.url), "utf8").split("\n");
+    assert.match(lines[0], /^# /, page);
+    assert.equal(lines[1], "", page);
+    assert.match(lines[2], /^> \*\*In kiln:\*\* this page is tps-project-dna v2\.18\.1's text, verbatim\./, page);
+    assert.match(lines[4], /^> the two disagree, kiln's commands win\.$/, page);
+  }
+});
