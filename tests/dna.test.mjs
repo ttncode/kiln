@@ -15,7 +15,7 @@ import { readStore, storeDir } from "../lib/dna/store.mjs";
 import { classByPath, measure, scanProject, skeletons } from "../lib/dna/scan.mjs";
 import { serveExplorer } from "../lib/dna/serve.mjs";
 import { lineRanges, rangeGap } from "../lib/dna/footprint.mjs";
-import { parseRoster } from "../lib/dna/reconcile.mjs";
+import { parseRoster, readManifest, reconcilePanels } from "../lib/dna/reconcile.mjs";
 import { recordedPace, sizeLines, workSize } from "../lib/dna/size.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
@@ -790,13 +790,13 @@ test("DNA checkpoint: every write is kept on a ref of its own, with HEAD, the in
   const root = project();
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
   const plan = applyBatch(root, { batch: seedBatch(), today: TODAY });
-  assert.match(plan.checkpoint, /^[0-9a-f]{40}$/);
+  assert.match(plan.checkpoint.commit, /^[0-9a-f]{40}$/);
   assert.equal(spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim(), head);
   assert.equal(spawnSync("git", ["diff", "--cached", "--name-only"], { cwd: root, encoding: "utf8" }).stdout, "", "nothing staged in the user's index");
-  const listed = spawnSync("git", ["ls-tree", "-r", "--name-only", plan.checkpoint], { cwd: root, encoding: "utf8" }).stdout;
+  const listed = spawnSync("git", ["ls-tree", "-r", "--name-only", plan.checkpoint.commit], { cwd: root, encoding: "utf8" }).stdout;
   assert.match(listed, /^\.kiln\/dna\/store\/findings\.jsonl$/m);
   const second = applyBatch(root, { batch: { upsert: { findings: [{ category: "CODE_ONLY", proposition: "Another rule", module: "src/slug.js" }] } }, today: TODAY });
-  assert.equal(spawnSync("git", ["rev-parse", `${second.checkpoint}^`], { cwd: root, encoding: "utf8" }).stdout.trim(), plan.checkpoint, "each checkpoint follows the last");
+  assert.equal(spawnSync("git", ["rev-parse", `${second.checkpoint.commit}^`], { cwd: root, encoding: "utf8" }).stdout.trim(), plan.checkpoint.commit, "each checkpoint follows the last");
 });
 
 test("kiln dna restore: a store the working tree lost comes back, and one that is there is never overwritten", () => {
@@ -933,4 +933,80 @@ test("the vendored methodology pages carry kiln's note in exactly the place the 
     assert.match(lines[2], /^> \*\*In kiln:\*\* this page is tps-project-dna v2\.18\.1's text, verbatim\./, page);
     assert.match(lines[4], /^> the two disagree, kiln's commands win\.$/, page);
   }
+});
+
+// ------------------------------------------------------------------ D161–D168 review round (D169)
+
+test("DNA checkpoint: two projects in one repository, and two worktrees, never restore each other's store", () => {
+  const top = initRepo(tempRoot("kiln-mono-"));
+  for (const name of ["a", "b"]) {
+    writeFile(join(top, name, "package.json"), "{}");
+    writeConfig(join(top, name), DEFAULTS);
+  }
+  commitAll(top, "two projects");
+  applyBatch(join(top, "a"), { batch: { upsert: { domains: [{ id: "DOM-AAA", name: "A" }] } }, today: TODAY });
+  applyBatch(join(top, "b"), { batch: { upsert: { domains: [{ id: "DOM-BBB", name: "B" }] } }, today: TODAY });
+  rmSync(join(top, "a", ".kiln", "dna"), { recursive: true });
+  assert.match(kiln(join(top, "a"), ["dna", "restore"]).stdout, /Store restored/);
+  assert.deepEqual(readStore(join(top, "a")).data.domains.map((row) => row.id), ["DOM-AAA"], "a gets a's store back");
+  assert.deepEqual(readStore(join(top, "b")).data.domains.map((row) => row.id), ["DOM-BBB"], "and b's is untouched");
+
+  const other = join(tempRoot("kiln-wt-"), "wt");
+  git(top, ["worktree", "add", "-q", "-b", "side", other]);
+  assert.match(kiln(join(other, "a"), ["dna"]).stdout, /No DNA store in this project yet/, "a fresh worktree is not offered the main worktree's store");
+});
+
+test("DNA checkpoint: a rejecting reference-transaction hook and a failing clean filter neither run nor stop it, and a failure is said", () => {
+  const root = project();
+  const hooks = join(root, ".git", "hooks");
+  mkdirSync(hooks, { recursive: true });
+  writeFileSync(join(hooks, "reference-transaction"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+  git(root, ["config", "filter.broken.clean", "false"]);
+  writeFile(join(root, ".gitattributes"), "*.jsonl filter=broken\n");
+  const plan = applyBatch(root, { batch: seedBatch(), today: TODAY });
+  assert.match(plan.checkpoint.commit ?? "", /^[0-9a-f]{40}$/, JSON.stringify(plan.checkpoint));
+  const outside = tempRoot("kiln-nogit-");
+  writeConfig(outside, DEFAULTS);
+  const shown = kiln(outside, ["dna", "apply", join(outside, "b.json")]);
+  assert.match(shown.stderr, /could not be read as a batch/);
+  writeFile(join(outside, "b.json"), JSON.stringify({ upsert: { domains: [{ id: "DOM-AAA", name: "A" }] } }));
+  assert.match(kiln(outside, ["dna", "apply", join(outside, "b.json")]).stdout, /No checkpoint was taken \(.+\)/);
+});
+
+test("DNA remap: a delete is judged on the store as it was, and refused while anything still names the deleted capability", () => {
+  const root = remapFixture();
+  applyBatch(root, { batch: { upsert: { capabilities: [{ domain_id: "DOM-AAA", name: "Empty" }] } }, today: TODAY });
+  assert.throws(() => remapPlan(root, { plan: { feature_moves: [{ feature: "DOM-AAA-01-01", target_capability: "DOM-BBB-01" }], deletes: [{ capability: "DOM-AAA-01" }] }, apply: true }), /not empty/, "emptying and deleting in one plan is refused, as by the source");
+  applyBatch(root, { batch: { upsert: { excluded: [{ catalog: "UX", name: "Generic", capability_id: "DOM-AAA-03" }] } }, today: TODAY });
+  assert.throws(() => remapPlan(root, { plan: { deletes: [{ capability: "DOM-AAA-03" }] }, apply: true }), /still referenced — move or remove these first: excluded:EXC-001/);
+});
+
+test("DNA remap: a round's update record is history and is not rewritten; process fields keep legacy_ copies; a stageless process is named", () => {
+  const root = remapFixture();
+  applyBatch(root, { batch: { upsert: { updates: [{ kind: "RESTRUCTURE", title: "first", renamed: [["DOM-AAA-01", "DOM-BBB-02"]] }] } }, today: TODAY });
+  remapPlan(root, { plan: { capability_moves: [{ capability: "DOM-AAA-01", target_domain: "DOM-BBB" }] }, apply: true });
+  const { data } = readStore(root);
+  assert.deepEqual(data.updates[0].ext.renamed, [["DOM-AAA-01", "DOM-BBB-02"]]);
+  assert.equal(data.processes.find((row) => row.name === "Do one").legacy_primary_capability_id, "DOM-AAA-01");
+  applyBatch(root, { batch: { upsert: { processes: [{ id: "BF-01.S9.P1", flow_id: "BF-01", name: "Floating" }] } }, today: TODAY });
+  assert.throws(() => remapPlan(root, { plan: { renumber_flows: true }, apply: false }), /every process needs a stage .* BF-01\.S9\.P1/);
+  assert.match(kiln(root, ["dna", "remap"]).stderr, /kiln dna remap needs a plan file/);
+});
+
+test("the review round's smaller ones: --min-agree, an empty or repeated roster, --limit in the size, text metrics", () => {
+  const root = project();
+  const dir = join(root, ".kiln", "tmp", "panels");
+  const manifest = (panel) => ({ panel, flows: [{ id: "BF-01", name: "J", verdict: "crosses", stages: [{ name: "S1", processes: ["P001", "P002"] }] }] });
+  writeFile(join(dir, "g.json"), JSON.stringify(manifest("G")));
+  writeFile(join(dir, "h.json"), JSON.stringify(manifest("H")));
+  writeFile(join(dir, "roster.txt"), "P-1\nP-2\n");
+  const args = ["dna", "reconcile", join(dir, "g.json"), join(dir, "h.json")];
+  assert.match(kiln(root, [...args, "--min-agree", "x"]).stderr, /--min-agree takes a whole number/);
+  assert.match(kiln(root, [...args, "--min-agree", "0"]).stdout, /auto-accept threshold: 2\/2/, "0 is the majority, as in the source");
+  assert.match(kiln(root, [...args, "--roster", join(dir, "roster.txt")]).stdout, /no --roster given/, "a roster that parsed to nothing is no roster, and is said");
+  const repeated = reconcilePanels([readManifest(manifest("G"), "G")], { minAgree: 1, roster: ["P003", "P003"] });
+  assert.deepEqual(repeated.missing_from_every_panel, ["P003"]);
+  assert.equal(recordedPace([{ ext: { metrics: { lines_scanned: "500", minutes: "5" } } }]), null, "a metric that is not a number is not a measurement");
+  const { root: scanned } = scanFixture({ "src/a.js": BRANCHY, "src/b.js": BRANCHY });
+  assert.match(kiln(scanned, ["dna", "scan", "--limit", "1"]).stdout, /this run takes 1 of them \(--limit 1\): to read: 1 file/);
 });

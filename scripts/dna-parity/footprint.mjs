@@ -16,7 +16,14 @@ function random() {
 }
 const pick = (values) => values[Math.floor(random() * values.length)];
 const FILES = Array.from({ length: 12 }, (_, index) => `src/f${index}.js`);
-const LOCATORS = [() => `L${Math.floor(random() * 300)}-${Math.floor(random() * 300)}`, () => `lines ${Math.floor(random() * 300)}-${Math.floor(random() * 300)}`, () => `line ${Math.floor(random() * 300)}`, () => "no locator"];
+// Plain strings as the source's stores carry them, and kiln's own `[{ src, ref, loc }]` shape.
+const LOCATORS = [
+  () => `L${Math.floor(random() * 300)}-${Math.floor(random() * 300)}`,
+  () => `lines ${Math.floor(random() * 300)}-${Math.floor(random() * 300)}`,
+  () => `line ${Math.floor(random() * 300)}`,
+  () => "no locator",
+  () => [{ src: "root", ref: pick(FILES), loc: `L${Math.floor(random() * 300)}-${Math.floor(random() * 300)}` }],
+];
 
 function store() {
   const data = Object.fromEntries(Object.keys(COLLECTIONS).map((name) => [name, []]));

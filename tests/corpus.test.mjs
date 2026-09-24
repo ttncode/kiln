@@ -288,6 +288,11 @@ const CONTROL_FILES = [
   ["bash", "echo '{}' >> .kiln/dna/store/findings.jsonl", "deny", DNA],
   ["bash", "node /opt/kiln/bin/kiln.mjs dna apply .kiln/tmp/{id}/batch.json", "allow"],
   ["bash", "grep RD-0001 -r .kiln/dna/store/", "allow"],
+  ["bash", "rm -rf .kiln/dna", "deny", /DNA store|enforces the run/],
+  ["bash", "mv .kiln/dna/store .kiln/dna/old", "deny", /DNA store|enforces the run/],
+  ["edit", ".kiln/dna/store.previous/domains.jsonl", "deny", DNA],
+  ["bash", "cp -r src .kiln/dna/", "deny", DNA],
+  ["bash", "echo x > .kiln/dna/store.building/findings.jsonl", "deny", DNA],
 ];
 
 const NOTHING_OPEN = [
@@ -301,6 +306,9 @@ const NOTHING_OPEN = [
   ["edit", ".kiln/rules/new.md", "allow"],
   ["edit", ".kiln/dna/store/features.jsonl", "deny", DNA],
   ["edit", ".kiln/dna/domain-dictionary-shop.md", "allow"],
+  ["edit", ".kiln/dna/store.previous/domains.jsonl", "deny", DNA],
+  ["bash", "rm -rf .kiln/dna", "deny", /DNA store|enforces the run/],
+  ["bash", "mv .kiln/dna/store .kiln/dna/old", "deny", /DNA store|enforces the run/],
   ["bash", "rm -rf {outside}", "allow"],
   ["bash", "rm src/link.txt", "allow"],
 ];

@@ -59,7 +59,8 @@ function report(repo) {
   lines.push(...pages.map((page) => `  page differs:  skills/kiln-dna/${page}.md — re-copy it verbatim, keeping kiln's note`));
   lines.push(...assets.map((name) => `  asset differs: vendor/dna-explorer/${name} — re-copy, update the hash in NOTICE, rerun the explorer test`));
   lines.push(...scripts.map((path) => `  script changed: ${path} — read the diff against ${PORTED[path]}`));
-  const others = changed.filter((path) => !Object.keys(PORTED).includes(path) && !path.startsWith("references/") && !path.startsWith("assets/"));
+  const carried = new Set([...PAGES.map((page) => `references/${page}.md`), ...ASSETS.map((name) => `assets/${name}`), ...Object.keys(PORTED)]);
+  const others = changed.filter((path) => !carried.has(path));
   if (others.length > 0) lines.push(`  also changed, not carried by kiln: ${others.join(", ")}`);
   const drift = pages.length + assets.length + scripts.length;
   lines.push(drift === 0 ? "Nothing kiln carries has changed." : "Adopt what is worth adopting as a decision entry, never as a merge (D69, D167).");

@@ -83,8 +83,8 @@ The store is the progress record, so **resume by reading it** — `kiln dna` and
 say which phase you are in (findings but no domains: Phase 3; features with findings unowned:
 Phase 4; and so on). Say which phase you are resuming and why, then continue. If `kiln dna` says the
 working tree has no store but a checkpoint exists, run `kiln dna restore` first: every apply
-also keeps the store on `refs/kiln/dna-checkpoint`, so a `git clean` or a branch switch does not
-cost the round (D162).
+also keeps a checkpoint of the store on a ref of its own, so a `git clean`, a stash or a branch
+switch does not cost the round (D162, D169).
 
 **Phase 0 — the snapshot.** Run `kiln dna scan`. Its first line names the commit each
 repository is read at. `not the integration branch … never pinned` means there is no
