@@ -591,3 +591,28 @@ test("kiln dna update: refused on a store with no findings, and a changed file's
   const [entry] = JSON.parse(readFileSync(join(root, ".kiln/tmp/u/update-001.json"), "utf8")).read;
   assert.deepEqual([entry.path, entry.was, entry.cites], ["src/price.js", before, ["RD-0001"]]);
 });
+
+// ------------------------------------------------------------------ consumers (tier 1)
+
+test("kiln blast: with a store, tier 1 names files through the features that own them, marks what changed since, and both tiers are recorded", () => {
+  const { root, config } = scanFixture({ "src/credit.js": BRANCHY, "src/notes.js": "// refund policy lives elsewhere\n" });
+  const head = git(root, ["rev-parse", "HEAD"]);
+  applyBatch(root, { batch: {
+    scan: { commits: { root: head }, files: ["src/credit.js"] },
+    upsert: {
+      domains: [{ id: "DOM-BIL", key: "d", name: "Billing" }],
+      capabilities: [{ key: "c", domain_id: "@d", name: "Credits" }],
+      features: [{ capability_id: "@c", domain_id: "@d", name: "Refund a paid order", rd_ids: ["@f"] }],
+      findings: [{ key: "f", category: "CODE_ONLY", proposition: "A VIP order ships free", module: "src/credit.js" }],
+    },
+  }, today: TODAY, config });
+  writeFile(join(root, "src/credit.js"), `${BRANCHY}// edited\n`);
+  assert.equal(kiln(root, ["open", "w1", "--session", "s"]).status, 0);
+  const blast = kiln(root, ["blast", "--for", "w1", "refund"]);
+  assert.equal(blast.status, 0, blast.stderr);
+  assert.match(blast.stdout, /1\tsrc\/notes\.js/, "tier 0 greps the word");
+  assert.match(blast.stdout, /DNA \(tier 1\)[\s\S]*1\tsrc\/credit\.js\tDOM-BIL-01-01 — changed since the DNA read it/, "tier 1 reaches the file through its feature");
+  const state = JSON.parse(readFileSync(join(root, ".kiln/work/w1/state.json"), "utf8"));
+  assert.deepEqual(state.knowledge.map(({ tier, files }) => [tier, files]), [[0, ["src/notes.js"]], [1, ["src/credit.js"]]]);
+  assert.deepEqual(state.knowledge[1].changed, ["src/credit.js"]);
+});

@@ -23,6 +23,8 @@ import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { DNA_USAGE, runDnaCommand } from "../lib/dna/cli.mjs";
+import { dnaBlastRadius } from "../lib/dna/blast.mjs";
+import { hasStore, readStore } from "../lib/dna/store.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
 
@@ -760,20 +762,42 @@ const BLAST_ROW_LIMIT = 20;
  * it INVESTIGATE never called the knowledge port at all, and a richer tier would have nothing
  * to be measured against.
  */
+function printRows(rows, describe) {
+  for (const row of rows.slice(0, BLAST_ROW_LIMIT)) out(`  ${row.hits}\t${describe(row)}`);
+  // No tab in the notice: a caller splitting this output into paths must not pick it up
+  // as one. It counts files rather than hits, because `hits` counts matched terms.
+  if (rows.length > BLAST_ROW_LIMIT) out(`  … ${rows.length - BLAST_ROW_LIMIT} more of ${rows.length} files not shown — narrow the terms.`);
+}
+
+/**
+ * Tier 1 answers beside tier 0, never instead of it: D152 made the grep's coverage the bar, and
+ * a bar is only a bar if both are measured on the same work.
+ */
+function dnaRows(root, terms) {
+  if (!hasStore(root)) return null;
+  const store = readStore(root);
+  return store.data.findings.length > 0 ? dnaBlastRadius(root, { store, terms }) : null;
+}
+
+function describeDnaRow(row) {
+  const mark = row.freshness === "current" ? "" : ` — ${row.freshness} since the DNA read it`;
+  return `${row.path}\t${row.features.join(",") || row.findings.slice(0, 3).join(",")}${mark}`;
+}
+
 function runBlast(argv) {
   const { root } = loadConfig(process.cwd());
   const id = flag(argv, "--for");
   const terms = argv.filter((word, index) => word !== "--for" && argv[index - 1] !== "--for");
   const rows = grepBlastRadius(root, terms);
-  if (id) writeState(root, { ...readState(root, id), knowledge: [{ tier: 0, terms, files: rows.map((row) => row.path) }] });
-  if (rows.length === 0) return out("No file mentions those terms.") ?? 0;
-
-  for (const row of rows.slice(0, BLAST_ROW_LIMIT)) out(`  ${row.hits}\t${row.path}`);
-  // No tab in the notice: a caller splitting this output into paths must not pick it up
-  // as one. It counts files rather than hits, because `hits` counts matched terms.
-  if (rows.length > BLAST_ROW_LIMIT) {
-    out(`  … ${rows.length - BLAST_ROW_LIMIT} more of ${rows.length} files not shown — narrow the terms.`);
-  }
+  const dna = dnaRows(root, terms);
+  const knowledge = [{ tier: 0, terms, files: rows.map((row) => row.path) }];
+  if (dna) knowledge.push({ tier: 1, terms, files: dna.map((row) => row.path), changed: dna.filter((row) => row.freshness !== "current").map((row) => row.path) });
+  if (id) writeState(root, { ...readState(root, id), knowledge });
+  if (rows.length === 0) out("No file mentions those terms.");
+  else printRows(rows, (row) => row.path);
+  if (!dna) return 0;
+  out(dna.length === 0 ? "DNA (tier 1): no finding or feature names those terms." : "DNA (tier 1) — the files its evidence cites, with the features they serve:");
+  printRows(dna, describeDnaRow);
   return 0;
 }
 
@@ -784,14 +808,15 @@ function runBlast(argv) {
  * on "a commit on another branch". superpowers reviews from the branch point and BMAD from a
  * baseline that never moves; neither anchors review on the last verification.
  */
-/** How much of the real change the recorded blast radius named — null when none was asked. */
+/** How much of the real change each recorded tier named — one line per tier, none when none was asked. */
 function blastLine(root, state) {
-  const asked = (state.knowledge ?? []).at(-1);
-  if (!asked) return null;
+  if ((state.knowledge ?? []).length === 0) return null;
   const changed = actualChanged(root, state.base).filter((path) => !(state.dirty_at_open ?? []).includes(path));
-  const named = new Set(asked.files);
-  const hit = changed.filter((path) => named.has(path)).length;
-  return `Blast radius (tier ${asked.tier}): named ${asked.files.length} file(s); ${hit} of the ${changed.length} changed were among them.`;
+  return state.knowledge.map((asked) => {
+    const named = new Set(asked.files);
+    const hit = changed.filter((path) => named.has(path)).length;
+    return `Blast radius (tier ${asked.tier}): named ${asked.files.length} file(s); ${hit} of the ${changed.length} changed were among them.`;
+  }).join("\n");
 }
 
 function printReconciliation(result, blast) {
