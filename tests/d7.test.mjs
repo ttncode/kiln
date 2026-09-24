@@ -167,22 +167,45 @@ function sourceFiles(dir, root) {
   });
 }
 
+/**
+ * D83: a listener bound to loopback is not egress, and it is allowed by name — one file, which
+ * must bind 127.0.0.1 and must not open a connection of its own. Anything else importing the
+ * http module is still a failure.
+ */
+const LOOPBACK_LISTENER = "lib/dna/serve.mjs";
+
 test("D7 item 6 — STATIC: kiln's own code performs no network egress", async () => {
   const root = new URL("..", import.meta.url).pathname;
   for (const dir of SOURCE_DIRS) {
     for (const path of sourceFiles(dir, root)) {
       const text = readFileSync(path, "utf8");
-      for (const pattern of BANNED) {
+      const banned = path.endsWith(LOOPBACK_LISTENER) ? BANNED.filter((pattern) => !pattern.test("node:http")) : BANNED;
+      for (const pattern of banned) {
         assert.doesNotMatch(text, pattern, `${path} reaches the network`);
       }
     }
   }
 });
 
+test("D7 item 6 — STATIC: the one listener binds loopback and opens no connection (D83)", async () => {
+  const text = readFileSync(new URL(`../${LOOPBACK_LISTENER}`, import.meta.url), "utf8");
+  assert.match(text, /import \{ createServer \} from "node:http"/, "it imports the server and nothing else from http");
+  assert.match(text, /\.listen\(port, "127\.0\.0\.1"/);
+  assert.doesNotMatch(text, /\b(?:request|get|connect)\s*\(/, "a listener has no business opening a connection");
+});
+
+test("D7 item 6 — STATIC: the vendored explorer page loads nothing from the network", async () => {
+  for (const name of ["explorer.html", "laneflow.js"]) {
+    const text = readFileSync(new URL(`../vendor/dna-explorer/${name}`, import.meta.url), "utf8");
+    const urls = (text.match(/https?:\/\/[^\s"'`)<>]+/g) ?? []).filter((url) => !url.startsWith("http://www.w3.org/"));
+    assert.deepEqual(urls, [], `${name} names a remote address`);
+  }
+});
+
 test("D7 item 6 — STATIC: the two git verbs that do reach the network are allowlisted by name", async () => {
   const root = new URL("..", import.meta.url).pathname;
   const calls = SOURCE_DIRS.flatMap((dir) => sourceFiles(dir, root))
-    .flatMap((path) => [...readFileSync(path, "utf8").matchAll(/gitOutput\([^,]+,\s*\[\s*"([a-z-]+)"/g)].map((m) => m[1]));
+    .flatMap((path) => [...readFileSync(path, "utf8").matchAll(/(?:gitOutput\([^,]+,|execFileSync\(\s*"git",)\s*\[\s*"([a-z-]+)"/g)].map((m) => m[1]));
 
   for (const verb of calls) {
     const reachesNetwork = ["fetch", "ls-remote", "push", "pull", "clone"].includes(verb);

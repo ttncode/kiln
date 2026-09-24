@@ -2,6 +2,7 @@ import { Buffer } from "node:buffer";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { request as httpRequest } from "node:http";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
@@ -12,6 +13,7 @@ import { idScheme, nextId } from "../lib/dna/ids.mjs";
 import { applyBatch, checkStore } from "../lib/dna/apply.mjs";
 import { readStore, storeDir } from "../lib/dna/store.mjs";
 import { classByPath, measure, scanProject } from "../lib/dna/scan.mjs";
+import { serveExplorer } from "../lib/dna/serve.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
@@ -615,4 +617,71 @@ test("kiln blast: with a store, tier 1 names files through the features that own
   const state = JSON.parse(readFileSync(join(root, ".kiln/work/w1/state.json"), "utf8"));
   assert.deepEqual(state.knowledge.map(({ tier, files }) => [tier, files]), [[0, ["src/notes.js"]], [1, ["src/credit.js"]]]);
   assert.deepEqual(state.knowledge[1].changed, ["src/credit.js"]);
+});
+
+// ------------------------------------------------------------------ the explorer (D83, D84)
+
+function request(url, { method = "GET", host } = {}) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const sent = httpRequest({ hostname: target.hostname, port: target.port, path: target.pathname, method, headers: host ? { host } : {} }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => resolve({ status: response.statusCode, body: Buffer.concat(chunks).toString("utf8") }));
+    });
+    sent.on("error", reject);
+    sent.end();
+  });
+}
+
+test("kiln dna serve: loopback only, behind a token, read-only, and serving the store under the names the page asks for", async () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const { url, server } = await serveExplorer(root, {});
+  try {
+    const base = new URL(url);
+    assert.equal(base.hostname, "127.0.0.1");
+    const page = await request(url);
+    assert.equal(page.status, 200);
+    assert.match(page.body, /__DNA_EMBED/, "the vendored explorer, as it ships");
+    assert.equal((await request(`${url}laneflow.js`)).status, 200);
+    assert.match((await request(`${url}_dna_store/findings.jsonl`)).body, /RD-0001/);
+    assert.match((await request(`${url}_dna_store/manifest.json`)).body, /"adapter": "kiln"/);
+    assert.equal((await request(`${base.origin}/wrongtoken/explorer.html`)).status, 404);
+    assert.equal((await request(`${url}_dna_store/settings.json`)).status, 404, "only the contract's files");
+    assert.equal((await request(`${url}_dna_store/..%2F..%2Fconfig.json`)).status, 404);
+    assert.equal((await request(`${url}%E0%A4%A`)).status, 400);
+    assert.equal((await request(url, { method: "POST" })).status, 405);
+    assert.equal((await request(url, { host: `evil.example:${base.port}` })).status, 403, "a DNS-rebound name is refused");
+  } finally {
+    server.close();
+  }
+});
+
+test("kiln dna serve: with no store there is nothing to serve, and an idle server stops itself", async () => {
+  assert.match(kiln(project(), ["dna", "serve"]).stderr, /No DNA store to show yet/);
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const { server } = await serveExplorer(root, { idleMs: 50 });
+  await new Promise((resolve) => server.on("close", resolve));
+});
+
+test("the vendored explorer renders both trees of a store kiln wrote, with no console error", () => {
+  const root = project();
+  const batch = seedBatch();
+  batch.upsert.flows = [{ key: "fl", name: "Publish a post", trigger: "An editor has a draft", outcome: "The post is live" }];
+  batch.upsert.stages = [{ key: "st", flow_id: "@fl", name: "Drafting" }];
+  batch.upsert.processes = [{ flow_id: "@fl", stage_id: "@st", name: "Name the post", key: "p" }];
+  batch.upsert.edges = [{ from: "@p", to: "@feat", kind: "FEATURE_PROCESS" }];
+  applyBatch(root, { batch, today: TODAY });
+  const store = Object.fromEntries(["domains", "capabilities", "features", "excluded", "findings", "flows", "stages", "processes", "edges", "services", "surfaces", "components", "updates", "intakes", "releases", "debts"].map((name) => [name, readFileSync(join(storeDir(root), `${name}.jsonl`), "utf8")]));
+  const payload = join(root, ".kiln", "tmp", "embed.json");
+  writeFile(payload, JSON.stringify({ store, diagrams: {}, manifest: JSON.parse(readFileSync(join(storeDir(root), "manifest.json"), "utf8")), exported_at: "test", source: "kiln" }));
+  const harness = new URL("./helpers/explorer-harness.mjs", import.meta.url).pathname;
+  const page = new URL("../vendor/dna-explorer/explorer.html", import.meta.url).pathname;
+  const run = spawnSync(process.execPath, [harness, page, payload], { encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  const { rendered: [catalog, processes], errs } = JSON.parse(run.stdout.trim().split("\n").at(-1));
+  assert.ok(catalog > 0 && processes > 0, `rendered catalog ${catalog}b, process ${processes}b`);
+  assert.deepEqual(errs, []);
 });

@@ -12,7 +12,9 @@ report different from an ordinary bug, and both are welcome.
    sandbox, or opens a pull request from a `spike` is a vulnerability report — not an issue.
 2. **Anything kiln's own code does that the user did not ask for.** Network egress beyond
    `git fetch` / `git ls-remote` against the configured remote, a write outside the work
-   directory, or a destructive git operation.
+   directory, or a destructive git operation. `kiln dna serve` is the one listener: bound to
+   127.0.0.1, behind a random token, read-only. Reading the store through it without the
+   token, from another origin, or with a non-loopback `Host` is a vulnerability report.
 
 ## What is a known ceiling, not a vulnerability
 

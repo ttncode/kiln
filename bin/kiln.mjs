@@ -1387,4 +1387,13 @@ export function main(argv) {
 }
 
 const invokedDirectly = process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
-if (invokedDirectly) process.exit(main(process.argv.slice(2)));
+/** A command that keeps running (`kiln dna serve`) answers with a promise of its exit code. */
+async function exitWith(result) {
+  try {
+    process.exit(await result);
+  } catch (error) {
+    process.exit(reportFailure(error));
+  }
+}
+
+if (invokedDirectly) exitWith(main(process.argv.slice(2)));

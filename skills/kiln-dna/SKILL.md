@@ -52,6 +52,7 @@ refused and pointed at `init`: a diff scan of nothing is a full scan nobody agre
 | `kiln dna infra [--out file]` | a draft batch of services and surfaces, for the user to review |
 | `kiln dna apply <batch.json>` | the one write; prints each id it assigned (`RD-0012 ← f3`) |
 | `kiln dna build` | derive again, change nothing |
+| `kiln dna serve` | the explorer on 127.0.0.1, behind a token; run it in the background and give the user the address it prints |
 
 A batch: `{ "settings": {…}, "upsert": { "<collection>": [records] }, "remove": { "<collection>": [ids] }, "scan": {…} }`.
 A new record without an id gets the next counted one (findings, capabilities under their

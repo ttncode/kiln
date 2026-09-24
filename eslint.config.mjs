@@ -3,7 +3,8 @@ import js from "@eslint/js";
 export default [
   // The visual companion is forked code (D26, D69). Restyling it would mean
   // rewriting 1,400 lines kiln did not author and does not maintain.
-  { ignores: ["node_modules/**", "skills/kiln-brainstorming/scripts/**"] },
+  // So are the DNA explorer and the harness its authors run it under (D84, D160).
+  { ignores: ["node_modules/**", "skills/kiln-brainstorming/scripts/**", "vendor/**", "tests/helpers/explorer-harness.mjs"] },
   js.configs.recommended,
   {
     languageOptions: {
