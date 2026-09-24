@@ -15,6 +15,7 @@ import { readStore, storeDir } from "../lib/dna/store.mjs";
 import { classByPath, measure, scanProject, skeletons } from "../lib/dna/scan.mjs";
 import { serveExplorer } from "../lib/dna/serve.mjs";
 import { lineRanges, rangeGap } from "../lib/dna/footprint.mjs";
+import { parseRoster } from "../lib/dna/reconcile.mjs";
 import { recordedPace, sizeLines, workSize } from "../lib/dna/size.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
@@ -900,4 +901,24 @@ test("kiln dna footprint: neighbours by shared file, stage and typed relation, t
   assert.deepEqual(entry.neighbors.REL_CAPABILITY, [{ capability: "DOM-BBB-01", types: ["USES_DATA_FROM"] }]);
   assert.equal(entry.processes[0], "BF-01.S1.P1");
   assert.match(kiln(root, ["dna", "footprint", "DOM-ZZZ-01-01"]).stderr, /unknown feature id/);
+});
+
+// ------------------------------------------------------------------ panel reconciliation (D166)
+
+test("kiln dna reconcile: consensus clusters, an escalation where a panel split a group, and a process every panel dropped", () => {
+  const root = project();
+  const dir = join(root, ".kiln", "tmp", "panels");
+  const manifest = (panel, flows) => ({ panel, flows: flows.map(([id, processes]) => ({ id, name: `${panel} ${id}`, verdict: "crosses", stages: [{ name: "S1", processes }] })) });
+  writeFile(join(dir, "g.json"), JSON.stringify(manifest("G", [["BF-01", ["P001", "P002", "P003"]], ["BF-02", ["P004"]]])));
+  writeFile(join(dir, "h.json"), JSON.stringify(manifest("H", [["BF-01", ["P001", "P002", "P003"]], ["BF-02", ["P004"]]])));
+  writeFile(join(dir, "i.json"), JSON.stringify(manifest("I", [["BF-01", ["P001", "P002"]], ["BF-02", ["P003", "P004"]]])));
+  writeFile(join(dir, "roster.md"), "| id | name |\n|---|---|\n| P001 | a |\n| P002 | b |\n| P003 | c |\n| P004 | d |\n| P005 | e |\n");
+  const run = kiln(root, ["dna", "reconcile", join(dir, "g.json"), join(dir, "h.json"), join(dir, "i.json"), "--roster", join(dir, "roster.md"), "--out", ".kiln/tmp/panels/result.json"]);
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /Reconciled 5 processes across panels \["G","H","I"\] \(auto-accept threshold: 2\/3/);
+  assert.match(run.stdout, /P005 missing from every panel/);
+  const result = JSON.parse(readFileSync(join(dir, "result.json"), "utf8"));
+  assert.deepEqual(result.clusters.map((cluster) => cluster.processes), [["P001", "P002", "P003"], ["P004"], ["P005"]]);
+  assert.deepEqual(result.escalations.map((entry) => entry.id), ["C01"], "panel I put P003 elsewhere, so the group is escalated, not voted");
+  assert.deepEqual(parseRoster('{"P010": {}, "P002": {}}'), ["P010", "P002"]);
 });
