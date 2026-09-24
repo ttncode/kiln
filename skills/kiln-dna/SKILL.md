@@ -90,6 +90,11 @@ switch does not cost the round (D162, D169).
 repository is read at. `not the integration branch … never pinned` means there is no
 `origin/<branch>` and no local one: stop and tell the user — a store scanned there cannot be
 pinned (D80), and every later drift check would be wrong. Otherwise report the counts.
+If the candidates hold code nobody here wrote — a framework's core, a bundled SDK, copied
+libraries — do not scan it and do not record empty skeletons for it: ask the user to mark it
+`linguist-vendored` in `.gitattributes`, or in `.git/info/attributes` when it should not be
+committed, then run `kiln dna scan` again. The `left out as vendored or generated` line counts
+what is excluded (D170).
 
 **Before any subagent is dispatched — the size, and a cap (D161).** `kiln dna scan` (and
 `kiln dna update`) print `to read: N file(s) · L line(s) · S skeleton(s) · W wave(s)` and, once
