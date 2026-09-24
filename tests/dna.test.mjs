@@ -614,7 +614,9 @@ test("kiln dna update: refused on a store with no findings, and a changed file's
   git(root, ["push", "-q", "origin", branch]);
   const updated = kiln(root, ["dna", "update", "--out", ".kiln/tmp/u"]);
   assert.equal(updated.status, 0, updated.stderr);
-  const [entry] = JSON.parse(readFileSync(join(root, ".kiln/tmp/u/update-001.json"), "utf8")).read;
+  const updateSkeleton = JSON.parse(readFileSync(join(root, ".kiln/tmp/u/update-001.json"), "utf8"));
+  assert.ok(Number.isFinite(updateSkeleton.scan.started), "an update round is timed like a scan round (D177)");
+  const [entry] = updateSkeleton.read;
   assert.deepEqual([entry.path, entry.was, entry.cites], ["src/price.js", before, ["RD-0001"]]);
 });
 
@@ -878,13 +880,44 @@ test("kiln dna serve: a store rewritten mid-request answers 503, a busy port is 
 test("DNA size: exact counts always, and a pace only from this project's own recorded rounds", () => {
   const files = [{ total: 400 }, { total: 500 }, { total: 30 }];
   assert.deepEqual(workSize(files), { files: 3, lines: 930, skeletons: 2, waves: 1 });
-  assert.equal(recordedPace([{ ext: { metrics: { lines_scanned: 0, minutes: 3 } } }]), null, "a round with nothing measured is no pace");
-  const [size, none] = sizeLines(files, []);
+  assert.equal(recordedPace({ updates: [{ ext: { metrics: { lines_scanned: 0, minutes: 3 } } }] }), null, "a round with nothing measured is no pace");
+  const [size, none] = sizeLines(files, {});
   assert.match(size, /3 file\(s\) · 930 line\(s\) · 2 skeleton\(s\) · 1 wave\(s\)/);
   assert.match(none, /no round of this project has been recorded yet, so there is no time estimate/);
   const updates = [{ ext: { metrics: { lines_scanned: 600, minutes: 10, cost_usd: 1.2 } } }, { ext: { metrics: { lines_scanned: 300, minutes: 5 } } }];
-  assert.deepEqual(recordedPace(updates), { rounds: 2, linesPerMinute: 60, costPerKiloLine: 2 });
-  assert.match(sizeLines(files, updates)[1], /about 16 min, about \$1\.86 — taken from past rounds, not a promise/);
+  assert.deepEqual(recordedPace({ updates }), { rounds: 2, linesPerMinute: 60, costPerKiloLine: 2 });
+  assert.match(sizeLines(files, { updates })[1], /about 16 min, about \$1\.86 — taken from past rounds, not a promise/);
+});
+
+test("D177: a round's pace is its lines over its wall time, with skeletons read side by side counted once", () => {
+  const rounds = [
+    { started: 1000, finished: 1300, files: ["a", "b", "c"], lines: 600 },
+    { started: 1000, finished: 1600, files: ["d", "e", "f"], lines: 600 },
+    { started: 5000, finished: 5300, files: ["g", "h"], lines: 300 },
+  ];
+  assert.deepEqual(recordedPace({ rounds }), { rounds: 2, linesPerMinute: 1500 / 15, costPerKiloLine: null }, "10 min and 5 min, not 5 + 10 + 5");
+  const updates = [{ ext: { metrics: { lines_scanned: 1500, minutes: 60, cost_usd: 3 } } }];
+  assert.deepEqual(recordedPace({ rounds, updates }), { rounds: 2, linesPerMinute: 100, costPerKiloLine: 2 }, "timed rounds win; an update still supplies cost");
+});
+
+test("D177: a bootstrap cut off after one round already has a pace for the next session", () => {
+  const { root } = scanFixture({ "src/price.js": BRANCHY, "src/tax.js": BRANCHY });
+  assert.match(kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r1", "--limit", "1"]).stdout, /no round of this project has been recorded yet/);
+  const path = join(root, ".kiln/tmp/r1/scan-001.json");
+  const skeleton = JSON.parse(readFileSync(path, "utf8"));
+  assert.ok(Math.abs(skeleton.scan.started - Date.now() / 1000) < 60, "kiln stamps when the round was written out");
+  writeFile(path, JSON.stringify({ ...skeleton, scan: { ...skeleton.scan, started: skeleton.scan.started - 120 } }));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]).status, 0);
+  assert.equal(readStore(root).rounds.length, 1);
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]).status, 0);
+  assert.equal(readStore(root).rounds.length, 1, "a skeleton applied again is the same work, timed once");
+  assert.match(kiln(root, ["dna", "scan"]).stdout, /at the pace of 1 recorded round\(s\): about \d+ min/);
+
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r2"]);
+  const stale = JSON.parse(readFileSync(join(root, ".kiln/tmp/r2/scan-001.json"), "utf8"));
+  writeFile(join(root, ".kiln/tmp/r2/scan-001.json"), JSON.stringify({ ...stale, scan: { ...stale.scan, started: stale.scan.started - 3 * 86400 } }));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/r2/scan-001.json"]).status, 0);
+  assert.equal(readStore(root).rounds.length, 1, "a start days back measures a pause, not a round");
 });
 
 test("kiln dna scan: says how much is left to read before anything is dispatched", () => {
@@ -1116,7 +1149,7 @@ test("the review round's smaller ones: --min-agree, an empty or repeated roster,
   assert.match(kiln(root, [...args, "--roster", join(dir, "roster.txt")]).stdout, /no --roster given/, "a roster that parsed to nothing is no roster, and is said");
   const repeated = reconcilePanels([readManifest(manifest("G"), "G")], { minAgree: 1, roster: ["P003", "P003"] });
   assert.deepEqual(repeated.missing_from_every_panel, ["P003"]);
-  assert.equal(recordedPace([{ ext: { metrics: { lines_scanned: "500", minutes: "5" } } }]), null, "a metric that is not a number is not a measurement");
+  assert.equal(recordedPace({ updates: [{ ext: { metrics: { lines_scanned: "500", minutes: "5" } } }] }), null, "a metric that is not a number is not a measurement");
   const { root: scanned } = scanFixture({ "src/a.js": BRANCHY, "src/b.js": BRANCHY });
   assert.match(kiln(scanned, ["dna", "scan", "--limit", "1"]).stdout, /this run takes 1 of them \(--limit 1\): to read: 1 file/);
 });
