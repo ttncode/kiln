@@ -4,8 +4,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
-import { branchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
-import { slugOfId } from "../lib/resolve.mjs";
+import { branchName, isBranchName, renderShipPlan, shipPlan } from "../lib/ship.mjs";
+import { refOfId, slugOfId } from "../lib/resolve.mjs";
 import { newWork } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 import { kiln, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
@@ -96,6 +96,25 @@ test("the slug is the id's descriptive tail, not the id again", () => {
   const state = newWork({ id: "20260921-invalid-id-returns-404", base: "a", type: "fix" });
   assert.equal(branchName({ vcs: { branch_pattern: "${id}" } }, state), state.id);
   assert.equal(branchName({ vcs: { branch_pattern: "${type}/${slug}" } }, state), "fix/invalid-id-returns-404");
+});
+
+test("D172: ${ref} is the tracker's ref, so feature/v3/#${ref} renders feature/v3/#1586", () => {
+  assert.equal(refOfId("admin-page-1586"), "1586");
+  assert.equal(refOfId("SE-5236.2"), "SE-5236", "a follow-up renders its ticket's ref");
+  assert.equal(refOfId("admin-page-SE-5236"), "SE-5236");
+  assert.equal(refOfId("20260921-fix-issue-42"), null, "a sentence's id has no ref, even one ending in a number");
+
+  const pattern = "feature/v3/#${ref}";
+  assert.equal(branchName({ vcs: { branch_pattern: pattern } }, { id: "admin-page-1586" }), "feature/v3/#1586");
+  assert.deepEqual(branchName({ vcs: { branch_pattern: pattern } }, { id: "20260921-a-b" }).unfilled, ["ref"]);
+});
+
+test("D172: a branch name git refuses is named at ship, not at git switch", () => {
+  assert.equal(isBranchName("feature/v3/#1586"), true);
+  assert.equal(isBranchName("feature/v3/a b"), false);
+  for (const refused of ["-foo", "--help", "HEAD"]) assert.equal(isBranchName(refused), false, `${refused} is a ref name but not a branch`);
+  assert.match(renderShipPlan({ topic: "w", modules: [], branch: "feature/a..b" }), /git refuses "feature\/a\.\.b"/);
+  assert.doesNotMatch(renderShipPlan({ topic: "w", modules: [], branch: "feature/v3/#1586" }), /git refuses/);
 });
 
 test("a pattern that asks for the id and the slug is told it repeats itself", () => {
