@@ -52,6 +52,7 @@ refused and pointed at `init`: a diff scan of nothing is a full scan nobody agre
 | `kiln dna infra [--out file]` | a draft batch of services and surfaces, for the user to review |
 | `kiln dna apply <batch.json>` | the one write; prints each id it assigned (`RD-0012 ← f3`) |
 | `kiln dna build` | derive again, change nothing |
+| `kiln dna remap <plan.json> [--apply]` | restructure — moves, splits, deletes, stage re-layouts; dry run first, and the table of id changes goes into the round's update record |
 | `kiln dna serve` | the explorer on 127.0.0.1, behind a token; run it in the background and give the user the address it prints |
 
 A batch: `{ "settings": {…}, "upsert": { "<collection>": [records] }, "remove": { "<collection>": [ids] }, "scan": {…} }`.
@@ -129,7 +130,7 @@ it only on the user's explicit yes. This is the gate every later phase stands on
 [clusterer-prompt.md](clusterer-prompt.md) with the capability's full record and every finding
 proposed for it. It writes a batch of features (and `excluded` entries) with `rd_ids`, and a
 separate flags file of `misassigned` and `taxonomy_gap` — only the batch goes to `kiln dna apply`. Then, in order: re-dispatch every `misassigned` to its named capability; collect every
-`taxonomy_gap` into one extension proposal for the user; a consolidation pass over fragments;
+`taxonomy_gap` into one extension proposal for the user, applied on their yes with `kiln dna remap`; a consolidation pass over fragments;
 size and classify. Gates hold the partition: a finding owned twice fails the write, and
 `kiln dna check` warns while findings remain unowned. Generic UI and engineering-standard
 findings go to `excluded`, never the business tree.
