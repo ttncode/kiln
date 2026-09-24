@@ -28,7 +28,7 @@ no other prerequisite — kiln has zero runtime dependencies and intends to keep
 
 ## Changing behaviour the design already decided
 
-The design lives in [`docs/design/`](docs/design/) and is not decoration: 157 numbered
+The design lives in [`docs/design/`](docs/design/) and is not decoration: 158 numbered
 decisions, each with the reasoning that produced it.
 
 - **Disagreeing with a decision is welcome.** Cite it by number, say what you measured, and
