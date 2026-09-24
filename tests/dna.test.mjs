@@ -10,7 +10,7 @@ import { canonical } from "../lib/dna/contract.mjs";
 import { componentId, componentRoot, derive, serviceOfPath, stripDerived } from "../lib/dna/derive.mjs";
 import { jargonHits, runGates } from "../lib/dna/gates.mjs";
 import { idScheme, nextId } from "../lib/dna/ids.mjs";
-import { applyBatch, checkStore } from "../lib/dna/apply.mjs";
+import { applyBatch, checkStore, remapPlan } from "../lib/dna/apply.mjs";
 import { readStore, storeDir } from "../lib/dna/store.mjs";
 import { classByPath, measure, scanProject, skeletons } from "../lib/dna/scan.mjs";
 import { serveExplorer } from "../lib/dna/serve.mjs";
@@ -806,5 +806,69 @@ test("kiln dna restore: a store the working tree lost comes back, and one that i
   const restored = kiln(root, ["dna", "restore"]);
   assert.equal(restored.status, 0, restored.stderr);
   assert.equal(readStore(root).data.findings.length, 2);
+  assert.equal(kiln(root, ["dna", "check"]).status, 0);
+});
+
+// ------------------------------------------------------------------ remap (D164)
+
+/** Two domains, three capabilities, features with findings, and a flow whose process serves one of them. */
+function remapFixture() {
+  const root = project();
+  applyBatch(root, { batch: { upsert: {
+    domains: [{ id: "DOM-AAA", name: "A" }, { id: "DOM-BBB", name: "B" }],
+    capabilities: [{ key: "a1", domain_id: "DOM-AAA", name: "A one", boundary: "not DOM-AAA-02" }, { key: "a2", domain_id: "DOM-AAA", name: "A two" }, { key: "b1", domain_id: "DOM-BBB", name: "B one" }],
+    features: [{ key: "fa1", capability_id: "@a1", domain_id: "DOM-AAA", name: "Fa1", rd_ids: ["@r1"] }, { key: "fa2", capability_id: "@a2", domain_id: "DOM-AAA", name: "Fa2", rd_ids: ["@r2"] }, { key: "fb1", capability_id: "@b1", domain_id: "DOM-BBB", name: "Fb1" }],
+    findings: [{ key: "r1", proposition: "one", module: "src/a.js" }, { key: "r2", proposition: "two", module: "src/b.js" }],
+    flows: [{ key: "fl", name: "Journey" }],
+    stages: [{ key: "s1", flow_id: "@fl", name: "First" }, { key: "s2", flow_id: "@fl", name: "Second" }],
+    processes: [{ key: "p1", flow_id: "@fl", stage_id: "@s1", name: "Do one", primary_capability_id: "@a1", primary_domain_id: "DOM-AAA" }, { key: "p2", flow_id: "@fl", stage_id: "@s2", name: "Do two", primary_capability_id: "@a2", primary_domain_id: "DOM-AAA" }],
+    edges: [{ from: "@p1", to: "@fa1", kind: "FEATURE_PROCESS" }, { from: "@p2", to: "@fa2", kind: "FEATURE_PROCESS" }],
+  } }, today: TODAY });
+  return root;
+}
+
+test("DNA remap: a capability moved to another domain renumbers itself, its features and every reference, without chaining", () => {
+  const root = remapFixture();
+  const before = readFileSync(join(storeDir(root), "capabilities.jsonl"), "utf8");
+  const dry = remapPlan(root, { plan: { capability_moves: [{ capability: "DOM-AAA-01", target_domain: "DOM-BBB" }] }, apply: false });
+  assert.deepEqual(Object.fromEntries(dry.changed), { "DOM-AAA-01": "DOM-BBB-02", "DOM-AAA-01-01": "DOM-BBB-02-01", "DOM-AAA-02": "DOM-AAA-01", "DOM-AAA-02-01": "DOM-AAA-01-01" });
+  assert.equal(readFileSync(join(storeDir(root), "capabilities.jsonl"), "utf8"), before, "a dry run writes nothing");
+  remapPlan(root, { plan: { capability_moves: [{ capability: "DOM-AAA-01", target_domain: "DOM-BBB" }] }, apply: true });
+  const { data } = readStore(root);
+  const moved = data.capabilities.find((row) => row.id === "DOM-BBB-02");
+  assert.deepEqual([moved.domain_id, moved.legacy_capability_id, moved.ext.id_history], ["DOM-BBB", "DOM-AAA-01", ["DOM-AAA-01"]]);
+  assert.equal(moved.ext.boundary, "not DOM-AAA-01", "prose naming a renumbered capability follows it");
+  const renumbered = data.features.find((row) => row.name === "Fa2");
+  assert.deepEqual([renumbered.id, renumbered.capability_id], ["DOM-AAA-01-01", "DOM-AAA-01"], "DOM-AAA-02 became DOM-AAA-01 and was not carried on to DOM-BBB-02");
+  const process = data.processes.find((row) => row.name === "Do one");
+  assert.deepEqual([process.primary_capability_id, process.primary_domain_id, process.legacy_primary_domain_id], ["DOM-BBB-02", "DOM-BBB", "DOM-AAA"]);
+  assert.ok(data.edges.some((edge) => edge.to === "DOM-BBB-02-01" && edge.kind === "FEATURE_PROCESS"));
+  assert.equal(data.findings.find((row) => row.id === "RD-0001").feature_id, "DOM-BBB-02-01", "a finding's feature follows through derivation");
+  assert.equal(kiln(root, ["dna", "check"]).status, 0);
+});
+
+test("DNA remap: the source's refusals — a non-empty delete, an empty new capability, a move twice, a count not conserved", () => {
+  const root = remapFixture();
+  for (const [plan, reason] of [
+    [{ deletes: [{ capability: "DOM-AAA-01" }] }, /not empty/],
+    [{ new_capabilities: [{ domain: "DOM-BBB", name: "Hollow", from_features: [] }] }, /has no features/],
+    [{ capability_moves: [{ capability: "DOM-AAA-01", target_domain: "DOM-BBB" }, { capability: "DOM-AAA-01", target_domain: "DOM-AAA" }] }, /moved twice/],
+    [{ stage_layouts: { "BF-01": { stages: [{ name: "Only", processes: ["BF-01.S1.P1"] }] } } }, /cover the flow's processes exactly/],
+  ]) assert.throws(() => remapPlan(root, { plan, apply: true }), reason, JSON.stringify(plan));
+  const split = remapPlan(root, { plan: { new_capabilities: [{ domain: "DOM-BBB", name: "Split out", from_features: ["DOM-AAA-01-01"] }], deletes: [] }, apply: true });
+  assert.equal(split.changed.get("DOM-AAA-01-01"), "DOM-BBB-02-01");
+  assert.ok(readStore(root).data.capabilities.some((row) => row.id === "DOM-AAA-01" && row.name === "A one"), "the emptied capability stays; deleting it is its own decision");
+});
+
+test("DNA remap: a stage layout re-lays a flow, keeps a gap stage, and renumbers every process beneath it", () => {
+  const root = remapFixture();
+  const layout = { "BF-01": { stages: [{ name: "Intake", processes: ["BF-01.S2.P1", "BF-01.S1.P1"] }, { name: "Settlement", note: "nothing pays out yet" }] } };
+  const result = remapPlan(root, { plan: { stage_layouts: layout }, apply: true });
+  assert.deepEqual([result.changed.get("BF-01.S2.P1"), result.changed.get("BF-01.S1.P1")], ["BF-01.S1.P1", "BF-01.S1.P2"]);
+  const { data } = readStore(root);
+  assert.deepEqual(data.stages.map((row) => [row.id, row.name, row.gap ?? false]), [["BF-01.S1", "Intake", false], ["BF-01.S2", "Settlement", true]]);
+  const two = data.processes.find((row) => row.name === "Do two");
+  assert.deepEqual([two.id, two.stage_id, two.legacy_process_id], ["BF-01.S1.P1", "BF-01.S1", "BF-01.S2.P1"]);
+  assert.ok(data.edges.some((edge) => edge.from === "BF-01.S1.P2" && edge.to === "DOM-AAA-01-01"), "an edge follows its process");
   assert.equal(kiln(root, ["dna", "check"]).status, 0);
 });
