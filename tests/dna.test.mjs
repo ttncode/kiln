@@ -781,3 +781,30 @@ test("kiln dna scan: says how much is left to read before anything is dispatched
   assert.match(scan, /to read: 1 file\(s\) · 6 line\(s\) · 1 skeleton\(s\) · 1 wave\(s\)/);
   assert.match(scan, /there is no time estimate — agree a cap/);
 });
+
+// ------------------------------------------------------------------ checkpoints (D162)
+
+test("DNA checkpoint: every write is kept on a ref of its own, with HEAD, the index and branches untouched", () => {
+  const root = project();
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const plan = applyBatch(root, { batch: seedBatch(), today: TODAY });
+  assert.match(plan.checkpoint, /^[0-9a-f]{40}$/);
+  assert.equal(spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim(), head);
+  assert.equal(spawnSync("git", ["diff", "--cached", "--name-only"], { cwd: root, encoding: "utf8" }).stdout, "", "nothing staged in the user's index");
+  const listed = spawnSync("git", ["ls-tree", "-r", "--name-only", plan.checkpoint], { cwd: root, encoding: "utf8" }).stdout;
+  assert.match(listed, /^\.kiln\/dna\/store\/findings\.jsonl$/m);
+  const second = applyBatch(root, { batch: { upsert: { findings: [{ category: "CODE_ONLY", proposition: "Another rule", module: "src/slug.js" }] } }, today: TODAY });
+  assert.equal(spawnSync("git", ["rev-parse", `${second.checkpoint}^`], { cwd: root, encoding: "utf8" }).stdout.trim(), plan.checkpoint, "each checkpoint follows the last");
+});
+
+test("kiln dna restore: a store the working tree lost comes back, and one that is there is never overwritten", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  assert.match(kiln(root, ["dna", "restore"]).stderr, /already has a store/);
+  rmSync(join(root, ".kiln", "dna"), { recursive: true, force: true });
+  assert.match(kiln(root, ["dna"]).stdout, /a checkpoint of one exists[\s\S]*kiln dna restore/);
+  const restored = kiln(root, ["dna", "restore"]);
+  assert.equal(restored.status, 0, restored.stderr);
+  assert.equal(readStore(root).data.findings.length, 2);
+  assert.equal(kiln(root, ["dna", "check"]).status, 0);
+});

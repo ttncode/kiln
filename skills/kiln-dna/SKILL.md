@@ -71,7 +71,10 @@ edges) are refused: they are computed.
 Multi-session by nature: the reference projects took 8,000–26,000 findings over many sessions.
 The store is the progress record, so **resume by reading it** — `kiln dna` and `kiln dna scan`
 say which phase you are in (findings but no domains: Phase 3; features with findings unowned:
-Phase 4; and so on). Say which phase you are resuming and why, then continue.
+Phase 4; and so on). Say which phase you are resuming and why, then continue. If `kiln dna` says the
+working tree has no store but a checkpoint exists, run `kiln dna restore` first: every apply
+also keeps the store on `refs/kiln/dna-checkpoint`, so a `git clean` or a branch switch does not
+cost the round (D162).
 
 **Phase 0 — the snapshot.** Run `kiln dna scan`. Its first line names the commit each
 repository is read at. `not the integration branch … never pinned` means there is no
