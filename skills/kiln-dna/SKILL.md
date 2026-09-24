@@ -78,6 +78,13 @@ repository is read at. `not the integration branch … never pinned` means there
 `origin/<branch>` and no local one: stop and tell the user — a store scanned there cannot be
 pinned (D80), and every later drift check would be wrong. Otherwise report the counts.
 
+**Before any subagent is dispatched — the size, and a cap (D161).** `kiln dna scan` (and
+`kiln dna update`) print `to read: N file(s) · L line(s) · S skeleton(s) · W wave(s)` and, once
+this project has recorded rounds, the pace they ran at. Show the user both lines as they are,
+and ask them to confirm with a cap: a number of waves for this session, or `--max-budget-usd`
+when they run headless. With no recorded round there is no time estimate — say so; never invent
+one. Note the time with `date +%s` when the first wave goes out.
+
 **Phase 1–2 — scan to exhaustion.** Repeat until `kiln dna scan` says the scan is exhausted:
 
 1. `kiln dna scan --limit 30 --out <scratch>/round-<n>` — one skeleton per group of files.
@@ -140,6 +147,8 @@ with its reason, `DEFERRED`, `SETTLED`) on the round's update record. The round 
 with an `OPEN` one.
 
 **Phase 8 — baseline.** One `updates` record, `kind: "INITIAL_BUILD"`, carrying the totals,
+`metrics` (`lines_scanned`, `files_scanned`, `minutes` from the noted start; `cost_usd` only
+when the user read it from `/cost` — never a guess), which later rounds take their pace from,
 `audit_sample` and `flags`. `kiln dna check` passes. The store is tracked: commit
 `.kiln/dna/store/` on a branch of its own and hand the user the pull request — the pins take
 effect when it merges into the integration branch (D80). Merging it is the user's, through their
@@ -166,7 +175,8 @@ The code moved; the store catches up. "Diff, don't re-scan" ([update-playbook.md
    `UPDATE` / `NEW` / `IGNORE` against each capability's full existing feature list (update-playbook
    §4). Then PLANNED features (§4b), open debts (§4c), and the sample audit over this round's
    findings only (§5b).
-6. One `updates` record, `kind: "INCREMENTAL_RESCAN"`, with the round's numbers; `kiln dna check`
+6. One `updates` record, `kind: "INCREMENTAL_RESCAN"`, with the round's numbers and `metrics`
+   as in Phase 8; `kiln dna check`
    passes; the store change goes on its own branch and the user gets the pull request. The pins
    move when it merges.
 
