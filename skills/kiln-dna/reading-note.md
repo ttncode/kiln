@@ -29,6 +29,7 @@ batch that follows a page's instruction to edit a file by hand is refused.
 | The page says | In kiln |
 |---|---|
 | `project-dna/`, `_dna_store/` | `.kiln/dna/store/` |
+| `project-dna/domain-dictionary-*.md` | `.kiln/dna/domain-dictionary-*.md` — beside the store, written by hand |
 | `dna-store.config.json` | `settings` in a batch (`project`, `evidence_sources`, `ext_field_labels`, `diagram`) |
 | `_infra_map.json` | the `services`, `surfaces` and `edges` collections; its `components.custom` is `settings.components.custom` |
 | `_actor_registry.json` | `settings.actors` — the registry gates run on it |

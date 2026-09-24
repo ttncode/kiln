@@ -300,6 +300,7 @@ const NOTHING_OPEN = [
   ["edit", "{outside}/file.txt", "allow"],
   ["edit", ".kiln/rules/new.md", "allow"],
   ["edit", ".kiln/dna/store/features.jsonl", "deny", DNA],
+  ["edit", ".kiln/dna/domain-dictionary-shop.md", "allow"],
   ["bash", "rm -rf {outside}", "allow"],
   ["bash", "rm src/link.txt", "allow"],
 ];

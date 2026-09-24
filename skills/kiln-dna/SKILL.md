@@ -63,6 +63,13 @@ feature that owns them can arrive together. `null` removes a field. Derived fiel
 (`service_id`, `surface_id`, `component_id`, a finding's `feature_id`, components, hop-lift
 edges) are refused: they are computed.
 
+**Business vocabulary.** If `.kiln/dna/domain-dictionary-*.md` exists, it is binding
+([glossary.md](glossary.md), "Domain dictionary"): paste it into every subagent prompt, use its
+standard terms, resolve aliases through its tables, and ask the user about a ⚠ term rather than
+pick a meaning. It is optional — with none, proceed, and propose starting one once a round has
+surfaced enough vocabulary to need it. It is the one DNA file written by hand (a person, or an
+agent with the user's yes), because it records decisions about words, not evidence.
+
 **Scratch.** Batches are temp files: `.kiln/tmp/<work-id>/dna/` while a work is open, otherwise
 `.kiln/tmp/dna-rounds/`.
 
