@@ -30,6 +30,7 @@ validation run on a production repository, on the current build — see [Status]
 - [Auto mode](#auto-mode)
 - [What it blocks](#what-it-blocks)
 - [Project rules](#project-rules)
+- [Project DNA](#project-dna)
 - [Configuration](#configuration)
 - [Adding a stack](#adding-a-stack)
 - [What it refuses to do](#what-it-refuses-to-do)
@@ -88,6 +89,9 @@ and `/kiln:kiln doctor --write` replaces it; every run warns once until it is do
 /kiln:kiln <url|ticket-ref|work-id>  the same, from a link, a ticket, or work in progress
 /kiln:kiln                           list work in progress
 /kiln:kiln doctor                    check this setup
+/kiln:kiln dna init                  build the project's business map from its code
+/kiln:kiln dna update                catch the map up with what merged since
+/kiln:kiln dna                       what the map holds; `dna serve` opens it in a browser
 ```
 
 Say a path or `--auto` at the **start** of the request to choose how it runs:
@@ -100,7 +104,7 @@ Say a path or `--auto` at the **start** of the request to choose how it runs:
 
 Underneath, the orchestrator calls `node <plugin>/bin/kiln.mjs <verb>` — `resolve`, `open`,
 `gate`, `rules`, `scope`, `verify`, `ship`, `report`, `halt`, `resume`, `ratchet`, `blast`,
-`list`, `config set`, `init`, `doctor`. This README writes that as `kiln <verb>`; `--help`
+`list`, `config set`, `init`, `doctor`, `dna`. This README writes that as `kiln <verb>`; `--help`
 prints the list with every flag.
 
 ## Your first run
@@ -279,6 +283,27 @@ every later ticket, and the longer the rules get the lower its compliance with e
 adding a rule to force compliance can backfire. `kiln rules add` asks the three questions
 where you write the rule: what already covers these files, the line count before and after,
 and the routing. `kiln doctor` reports the total every time.
+
+## Project DNA
+
+What the codebase does, in business terms, reverse-engineered from the code: findings
+(`RD-####`, each citing file and lines) grouped into features, capabilities and domains; the
+journeys that cross them as flows, stages and processes; the services, surfaces and components
+they run on. Every claim walks back to a finding and every finding to a file at a pinned
+commit. The method and the store's contract are
+[tps-project-dna](NOTICE)'s, used under a written grant; kiln builds the store itself, in Node.
+
+`/kiln:kiln dna init` builds it with subagents: a mechanical scan ranks the files worth reading,
+scanners read them at the integration branch, and you approve the taxonomy and the service
+names before anything is built on them. The store lives in `.kiln/dna/store/`, is tracked, and
+reaches the integration branch through a pull request like any other change.
+
+| | |
+|---|---|
+| **One door** | `kiln dna apply <batch.json>` is the only write. It counts the ids, derives what the store computes, runs every gate, and writes nothing if one fails; an edit into the store is refused |
+| **Asked at the start of a ticket** | when a store exists, INVESTIGATE fetches the integration branch and says how far the code has moved from what the store read — none, small, large, or unknown because the fetch failed, never zero |
+| **Measured, not assumed** | `kiln blast` answers from the store beside the grep, marks every file changed since the store read it, and `kiln scope` reports how much of the real change each one named |
+| **Read-only viewer** | `kiln dna serve` serves the explorer on 127.0.0.1, behind a token, and stops when unused |
 
 ## Configuration
 
