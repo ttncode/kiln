@@ -14,6 +14,7 @@ import { applyBatch, checkStore } from "../lib/dna/apply.mjs";
 import { readStore, storeDir } from "../lib/dna/store.mjs";
 import { classByPath, measure, scanProject, skeletons } from "../lib/dna/scan.mjs";
 import { serveExplorer } from "../lib/dna/serve.mjs";
+import { recordedPace, sizeLines, workSize } from "../lib/dna/size.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
 after(cleanupFixtures);
@@ -758,4 +759,25 @@ test("kiln dna serve: a store rewritten mid-request answers 503, a busy port is 
   } finally {
     server.close();
   }
+});
+
+// ------------------------------------------------------------------ run size and recorded pace (D161)
+
+test("DNA size: exact counts always, and a pace only from this project's own recorded rounds", () => {
+  const files = [{ total: 400 }, { total: 500 }, { total: 30 }];
+  assert.deepEqual(workSize(files), { files: 3, lines: 930, skeletons: 2, waves: 1 });
+  assert.equal(recordedPace([{ ext: { metrics: { lines_scanned: 0, minutes: 3 } } }]), null, "a round with nothing measured is no pace");
+  const [size, none] = sizeLines(files, []);
+  assert.match(size, /3 file\(s\) · 930 line\(s\) · 2 skeleton\(s\) · 1 wave\(s\)/);
+  assert.match(none, /no round of this project has been recorded yet, so there is no time estimate/);
+  const updates = [{ ext: { metrics: { lines_scanned: 600, minutes: 10, cost_usd: 1.2 } } }, { ext: { metrics: { lines_scanned: 300, minutes: 5 } } }];
+  assert.deepEqual(recordedPace(updates), { rounds: 2, linesPerMinute: 60, costPerKiloLine: 2 });
+  assert.match(sizeLines(files, updates)[1], /about 16 min, about \$1\.86 — taken from past rounds, not a promise/);
+});
+
+test("kiln dna scan: says how much is left to read before anything is dispatched", () => {
+  const { root } = scanFixture({ "src/price.js": BRANCHY });
+  const scan = kiln(root, ["dna", "scan"]).stdout;
+  assert.match(scan, /to read: 1 file\(s\) · 6 line\(s\) · 1 skeleton\(s\) · 1 wave\(s\)/);
+  assert.match(scan, /there is no time estimate — agree a cap/);
 });
