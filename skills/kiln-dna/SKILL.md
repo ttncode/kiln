@@ -105,7 +105,7 @@ one. Note the time with `date +%s` when the first wave goes out.
    "Dispatch in small waves"), with the template in [scanner-prompt.md](scanner-prompt.md):
 
    ```
-   Task(subagent_type: "general-purpose", model: <the fast tier>, prompt: <scanner-prompt.md, filled in>)
+   Task(subagent_type: "general-purpose", model: "sonnet", prompt: <scanner-prompt.md, filled in>)
    ```
 
 3. Audit each skeleton by content before trusting a notification: it parses, `scan` is
@@ -201,8 +201,12 @@ The code moved; the store catches up. "Diff, don't re-scan" ([update-playbook.md
 
 ## Model tiers
 
-Scanning and mechanical classification: the fast tier. Clustering, consolidation, taxonomy
-proposals and the sample audit: the strongest tier you have — one wrong verdict there propagates
+Scanning: the mid tier (Sonnet) at least — never the fast tier. Reading a guard and restating
+its threshold exactly is interpretation, not transcription, and the fast tier's findings needed
+18 corrections in 27 on the first acceptance run (D168); the methodology's own rule covers it:
+"when a stronger tier costs little at your call count, take it". The fast tier stays for pure
+mechanical classification. Clustering, consolidation, taxonomy proposals, panels and the sample
+audit: the strongest tier you have — one wrong verdict there propagates
 ([agent-orchestration.md](agent-orchestration.md), "Model tiers").
 
 ## Common Rationalizations
