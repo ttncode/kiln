@@ -179,7 +179,7 @@ test("D7 item 6 — STATIC: kiln's own code performs no network egress", async (
   for (const dir of SOURCE_DIRS) {
     for (const path of sourceFiles(dir, root)) {
       const text = readFileSync(path, "utf8");
-      const banned = path.endsWith(LOOPBACK_LISTENER) ? BANNED.filter((pattern) => !pattern.test("node:http")) : BANNED;
+      const banned = path.endsWith(LOOPBACK_LISTENER) ? [...BANNED.filter((pattern) => !pattern.test("node:http")), /node:https\b/] : BANNED;
       for (const pattern of banned) {
         assert.doesNotMatch(text, pattern, `${path} reaches the network`);
       }
@@ -189,7 +189,8 @@ test("D7 item 6 — STATIC: kiln's own code performs no network egress", async (
 
 test("D7 item 6 — STATIC: the one listener binds loopback and opens no connection (D83)", async () => {
   const text = readFileSync(new URL(`../${LOOPBACK_LISTENER}`, import.meta.url), "utf8");
-  assert.match(text, /import \{ createServer \} from "node:http"/, "it imports the server and nothing else from http");
+  const imports = [...text.matchAll(/import\s+([^;]+?)\s+from\s+"node:http"/g)].map((match) => match[1]);
+  assert.deepEqual(imports, ["{ createServer }"], "it imports the server and nothing else from http");
   assert.match(text, /\.listen\(port, "127\.0\.0\.1"/);
   assert.doesNotMatch(text, /\b(?:request|get|connect)\s*\(/, "a listener has no business opening a connection");
 });

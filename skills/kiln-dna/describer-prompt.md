@@ -30,9 +30,12 @@ Subagent (general-purpose):
         "what_it_does": "…", "input": "…", "process": "…", "output": "…" } } ] } }
 
     - All four keys, each a plain sentence or two.
-    - No dotted identifiers, no snake_case, none of: controller, endpoint, middleware, ORM,
-      recordset, cron, database table, SQL, API, HTTP, JSON, webhook, callback, token, session.
-      kiln refuses the batch if one appears.
+    - kiln refuses the batch if a field holds a dotted identifier (`res.partner`), a snake_case
+      name of three or more parts (`order_line_item`), or any of: controller, endpoint,
+      middleware, ORM, recordset, cron, database table, SQL, CSRF, CORS, session token, bearer
+      token, API, HTTP, JSON, XML-RPC, webhook, callback, regex, primary key, foreign key, stored
+      procedure, cache invalidation. The litmus asks more than the list catches: keep out any
+      word a product owner would not use, such as a two-part `order_line` or a bare "session".
     - If the description does not tell you what the feature is for, say so in your report rather
       than inventing a purpose.
 

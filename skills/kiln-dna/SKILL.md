@@ -110,8 +110,8 @@ it only on the user's explicit yes. This is the gate every later phase stands on
 
 **Phase 4 — features.** Per capability (or batch of them), dispatch the template in
 [clusterer-prompt.md](clusterer-prompt.md) with the capability's full record and every finding
-proposed for it. It returns features with `rd_ids`, plus `misassigned` and `taxonomy_gap` kept
-apart. Then, in order: re-dispatch every `misassigned` to its named capability; collect every
+proposed for it. It writes a batch of features (and `excluded` entries) with `rd_ids`, and a
+separate flags file of `misassigned` and `taxonomy_gap` — only the batch goes to `kiln dna apply`. Then, in order: re-dispatch every `misassigned` to its named capability; collect every
 `taxonomy_gap` into one extension proposal for the user; a consolidation pass over fragments;
 size and classify. Gates hold the partition: a finding owned twice fails the write, and
 `kiln dna check` warns while findings remain unowned. Generic UI and engineering-standard
