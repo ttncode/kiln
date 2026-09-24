@@ -77,6 +77,7 @@ const DISARM = /turns off verification/;
 const CONTROL = /enforces the run|control files|kiln cannot read what an inline program does/;
 const SANDBOX = /outside the project root|another work's directory|symlink/;
 const GATE = /plan gate is not approved|gate is not approved/;
+const DNA = /DNA store is written only by `kiln dna apply/;
 
 // ------------------------------------------------------------- D7 item 1
 
@@ -282,6 +283,11 @@ const CONTROL_FILES = [
   ["bash", "python3 -m json.tool .kiln/config.json", "allow"],
   ["bash", "node /opt/kiln/bin/kiln.mjs gate {id} plan --artifact .kiln/work/{id}/plan.md --answer yes", "allow"],
   ["bash", "rm src/link.txt", "allow"],
+  ["edit", ".kiln/dna/store/features.jsonl", "deny", DNA],
+  ["edit", ".kiln/dna/store/settings.json", "deny", DNA],
+  ["bash", "echo '{}' >> .kiln/dna/store/findings.jsonl", "deny", DNA],
+  ["bash", "node /opt/kiln/bin/kiln.mjs dna apply .kiln/tmp/{id}/batch.json", "allow"],
+  ["bash", "grep RD-0001 -r .kiln/dna/store/", "allow"],
 ];
 
 const NOTHING_OPEN = [
@@ -293,6 +299,7 @@ const NOTHING_OPEN = [
   ["edit", "src/app.js", "allow"],
   ["edit", "{outside}/file.txt", "allow"],
   ["edit", ".kiln/rules/new.md", "allow"],
+  ["edit", ".kiln/dna/store/features.jsonl", "deny", DNA],
   ["bash", "rm -rf {outside}", "allow"],
   ["bash", "rm src/link.txt", "allow"],
 ];
