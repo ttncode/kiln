@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Check that kiln's DNA derivations give what tps-project-dna's own Python gives, over many
-# generated stores (D153). Needs a checkout of that project; it is not run in CI, because the
-# source is not public.
+# Check that kiln's DNA derivations and context footprint give what tps-project-dna's own Python
+# gives, over many generated stores (D153, D165). Needs a checkout of that project; it is not run
+# in CI, because the source is not public.
 #
 # Usage:   run.sh <tps-project-dna scripts dir> [stores]
 # Example: run.sh ~/claude_skill/plugins/tps-project-dna/skills/tps-project-dna/scripts 300
@@ -31,5 +31,14 @@ for seed in $(seq 1 "$stores"); do
     failed=$(( failed + 1 ))
   fi
 done
-printf '%s of %s generated stores differ\n' "$failed" "$stores"
-(( failed == 0 ))
+printf '%s of %s generated stores differ in their derivations\n' "$failed" "$stores"
+
+footprint_failed=0
+for seed in $(seq 1 "$stores"); do
+  if ! node "${HERE}/footprint.mjs" "${work_dir}/footprint-${seed}" "$seed" | python3 "${HERE}/compare-footprint.py" "${work_dir}/footprint-${seed}" "$source_dir"; then
+    printf 'footprint seed %s differs\n' "$seed"
+    footprint_failed=$(( footprint_failed + 1 ))
+  fi
+done
+printf '%s of %s generated stores differ in their context footprint\n' "$footprint_failed" "$stores"
+(( failed == 0 && footprint_failed == 0 ))
