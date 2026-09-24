@@ -105,6 +105,13 @@ Only ask what `questions` actually contains. `stack.id` appears only when the ch
 like several stacks; `vcs.integration_branch` only when nothing in the repository names a
 default branch. Detection answers the rest.
 
+**A command you offer must run as written (D173).** kiln runs every `stack.cmd.*` verbatim —
+nothing fills in a test name per task. On a real setup the agent offered
+`make test NO_DUMP=1 FILTER=...` as the recommended fast command; the literal `...` would have
+reached PHPUnit as a filter that matches nearly every test. Offer only kiln's own answer or a
+command you have just run and seen pass, and mark nothing else `(Recommended)`. When the fast
+subset needs a per-task argument, the recommended answer is blank.
+
 ## The skills that do the stages
 
 You drive the run. **Each stage is done by its own skill, and you invoke it** — none of them
