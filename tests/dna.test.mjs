@@ -1,7 +1,8 @@
+import { Buffer } from "node:buffer";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
 import { canonical } from "../lib/dna/contract.mjs";
@@ -319,7 +320,7 @@ test("DNA scan: classes by path and branching, and ranks only what is worth read
   assert.equal(classByPath({ path: ".kiln/hooks/pre-push.mjs", size: 10 }), "OTHER");
   assert.equal(classByPath({ path: "docs/a.md", size: 10 }), "OTHER");
   assert.equal(classByPath({ path: "src/a.js", size: 10 }), null);
-  assert.deepEqual(measure("if (a && b) {\n}\n\n"), { lines: 2, branches: 2, density: 1 });
+  assert.deepEqual(measure("if (a && b) {\n}\n\n"), { lines: 2, total: 3, branches: 2, density: 1 }, "density reads code lines; a range cites every line");
   const root = scanned();
   const { files, repos } = scanProject(root, { config: { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } }, ledger: {} });
   assert.equal(repos[0].pinnable, true);
@@ -368,7 +369,7 @@ test("DNA apply: a scan round cannot record a file its commit does not hold, and
   const root = scanned();
   const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
   const config = { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "no-such-branch" } };
-  assert.throws(() => applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/missing.js"] } }, today: TODAY, config }), /has no src\/missing\.js/);
+  assert.throws(() => applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/missing.js"] } }, today: TODAY, config }), /has no file src\/missing\.js/);
   applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/price.js"] } }, today: TODAY, config });
   const { manifest, scanned: ledger } = readStore(root);
   assert.deepEqual(manifest.source_pins, {}, "HEAD is not the integration branch, so it is read but not pinned (D80)");
@@ -407,4 +408,128 @@ test("DNA gates: a finding owned twice, or an rd_id naming no finding, fails; on
   assert.ok(failed.includes("a finding belongs to at most one feature or excluded entry"));
   assert.ok(failed.includes("rd_ids resolve to findings"));
   assert.deepEqual(report.warnings.find((result) => result.label.startsWith("findings no feature")).warn, "2/3");
+});
+
+// ------------------------------------------------------------------ D155/D156 review round
+
+function scanFixture(files) {
+  const root = project();
+  for (const [path, body] of Object.entries(files)) writeFile(join(root, path), body);
+  commitAll(root, "code");
+  const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const config = { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: branch } };
+  writeConfig(root, config);
+  return { root, config };
+}
+
+function git(root, args, input) {
+  const run = spawnSync("git", args, { cwd: root, encoding: "utf8", input });
+  assert.equal(run.status, 0, run.stderr);
+  return run.stdout.trim();
+}
+
+test("DNA scan: a tree entry named `..` is never read or written, wherever the tree came from", () => {
+  const { root, config } = scanFixture({ "src/price.js": BRANCHY });
+  const blob = git(root, ["hash-object", "-w", "--stdin"], BRANCHY);
+  const inner = git(root, ["mktree"], `100644 blob ${blob}\tPWNED.js\n`);
+  const tree = git(root, ["mktree"], `040000 tree ${inner}\t..\n100644 blob ${blob}\tok.js\n`);
+  const commit = git(root, ["commit-tree", tree, "-m", "hostile"]);
+  git(root, ["update-ref", `refs/heads/${config.vcs.integration_branch}`, commit]);
+  const { files } = scanProject(root, { config, ledger: {} });
+  assert.deepEqual(files.map((file) => file.path), ["ok.js"]);
+});
+
+test("DNA scan: chunks cover every line of a file, blank ones included", () => {
+  const body = Array.from({ length: 1000 }, (_, index) => (index % 3 === 0 ? "" : `if (x${index}) y();`)).join("\n");
+  const { root } = scanFixture({ "src/big.js": `${body}\n` });
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r"]);
+  const [entry] = JSON.parse(readFileSync(join(root, ".kiln/tmp/r/scan-001.json"), "utf8")).read;
+  assert.equal(entry.lines, 1000);
+  assert.deepEqual(entry.chunks.at(-1), [801, 1000]);
+});
+
+test("DNA scan: a module that is not its own checkout is refused, not scanned as its parent", () => {
+  const { root, config } = scanFixture({ "mods/sub/a.js": BRANCHY });
+  assert.throws(() => scanProject(root, { config: { ...config, repo: { modules: { sub: "mods/sub" } } }, ledger: {} }), /not a checkout of its own/);
+});
+
+test("DNA scan: names with a tab or a newline, and a file that became a directory, are read without a crash", () => {
+  const { root } = scanFixture({ "src/tab\tname.js": BRANCHY, "src/new\nline.js": BRANCHY, "src/d.js": BRANCHY });
+  rmSync(join(root, "src/d.js"));
+  mkdirSync(join(root, "src/d.js"));
+  const listed = kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r"]);
+  assert.equal(listed.status, 0, listed.stderr);
+  const paths = JSON.parse(readFileSync(join(root, ".kiln/tmp/r/scan-001.json"), "utf8")).read.map((entry) => entry.path).sort();
+  assert.deepEqual(paths, ["src/d.js", "src/new\nline.js", "src/tab\tname.js"]);
+});
+
+test("DNA scan: a snapshot copy is the blob byte for byte, whatever its encoding", () => {
+  const latin = Buffer.from("// caf\xe9\nif (a) b(); if (c) d();\n", "latin1");
+  const { root } = scanFixture({});
+  writeFileSync(join(root, "src.js"), latin);
+  commitAll(root, "latin");
+  writeFileSync(join(root, "src.js"), "// changed\n");
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r"]);
+  const [entry] = JSON.parse(readFileSync(join(root, ".kiln/tmp/r/scan-001.json"), "utf8")).read;
+  assert.deepEqual(readFileSync(join(root, entry.at)), latin);
+});
+
+test("DNA apply: a malformed scan section is refused in words, a directory is not a file, and a deleted path leaves the ledger", () => {
+  const { root, config } = scanFixture({ "src/price.js": BRANCHY, "src/other.js": BRANCHY });
+  const head = git(root, ["rev-parse", "HEAD"]);
+  for (const scan of [{ commits: { root: head }, files: "src/price.js" }, { commits: "x", files: [] }]) {
+    assert.throws(() => applyBatch(root, { batch: { scan }, today: TODAY, config }), (error) => error.constructor.name === "DnaError");
+  }
+  assert.throws(() => applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src"] } }, today: TODAY, config }), /has no file src/);
+  applyBatch(root, { batch: { scan: { commits: { root: head }, files: ["src/price.js", "src/other.js"] } }, today: TODAY, config });
+  git(root, ["rm", "-q", "src/other.js"]);
+  commitAll(root, "delete");
+  applyBatch(root, { batch: { scan: { commits: { root: git(root, ["rev-parse", "HEAD"]) }, files: [] } }, today: TODAY, config });
+  assert.deepEqual(Object.keys(readStore(root).scanned), ["src/price.js"]);
+});
+
+test("kiln dna scan: --out follows symlinks to where they lead, resolves from the project root, and --limit must be a count", () => {
+  const { root } = scanFixture({ "src/price.js": BRANCHY });
+  const outside = tempRoot("kiln-outside-");
+  mkdirSync(join(root, ".kiln/tmp"), { recursive: true });
+  symlinkSync(outside, join(root, ".kiln/tmp/link"));
+  assert.match(kiln(root, ["dna", "scan", "--out", ".kiln/tmp/link/r"]).stderr, /--out must be under/);
+  const fromSource = spawnSync(process.execPath, [new URL("../bin/kiln.mjs", import.meta.url).pathname, "dna", "scan", "--out", ".kiln/tmp/r"], { cwd: join(root, "src"), encoding: "utf8" });
+  assert.equal(fromSource.status, 0, fromSource.stderr);
+  assert.ok(existsSync(join(root, ".kiln/tmp/r/scan-001.json")));
+  for (const limit of ["0", "abc"]) assert.match(kiln(root, ["dna", "scan", "--limit", limit]).stderr, /--limit takes a whole number/);
+});
+
+test("kiln dna infra: one service per image, no exporters, whole-word front ends, and the project's own code beside its modules", () => {
+  const { root } = scanFixture({
+    "webhooks/handler.js": BRANCHY,
+    "index.js": BRANCHY,
+    "docker-compose.yml": "services:\n  db:\n    image: postgres:16\n  metrics:\n    image: prom/mysqld-exporter\n",
+    "docker-compose.dev.yml": "services:\n  db:\n    image: docker.io/library/postgres:16@sha256:abc\n",
+  });
+  const draft = JSON.parse(kiln(root, ["dna", "infra"]).stdout);
+  assert.deepEqual(draft.upsert.services.map(({ kind, root_paths, name }) => [kind, root_paths ?? name]), [["BACKEND", ["index.js", "webhooks"]], ["DATABASE", "postgres"]]);
+});
+
+test("DNA surface rules: routes, not HTTP clients; pages, not components; a CI3 web controller is not a batch", () => {
+  const { root } = scanFixture({
+    "src/client.js": "api.get('/users'); app.get('port');\n",
+    "src/server.js": "app.get('/orders', list);\n",
+    "src/components/pages/Card.tsx": "export default () => null;\n",
+    "pages/index.js": "export default () => null;\n",
+    "app/dash/page.js": "export default () => null;\n",
+    "src/routes/shop/+page.svelte": "<p/>\n",
+    "src/orders.controller.ts": "@Controller('orders')\nexport class Orders {\n  @Get()\n  list() {}\n}\n",
+  });
+  const surfaces = JSON.parse(kiln(root, ["dna", "infra"]).stdout).upsert.surfaces.map(({ kind, primary_paths }) => `${kind} ${primary_paths[0]}`).sort();
+  assert.deepEqual(surfaces, ["API src/orders.controller.ts", "API src/server.js", "SCREEN app/dash/page.js", "SCREEN pages/index.js", "SCREEN src/routes/shop/+page.svelte"]);
+
+  const ci3 = scanFixture({
+    "application/controllers/Web.php": "<?php class Web { function index() { if (is_cli()) show_404(); $this->load->view('home', ['x' => json_encode([])]); } }\n",
+    "application/controllers/Job.php": "<?php class Job { function run() { if (!is_cli()) exit; } }\n",
+    "application/modules/shop/controllers/Cart.php": "<?php class Cart { function add() { $this->output->set_content_type('application/json'); } }\n",
+  });
+  writeConfig(ci3.root, { ...ci3.config, stack: { id: "php-ci3", cmd: {} } });
+  const kinds = JSON.parse(kiln(ci3.root, ["dna", "infra"]).stdout).upsert.surfaces.map(({ kind, primary_paths }) => `${kind} ${primary_paths[0]}`).sort();
+  assert.deepEqual(kinds, ["API application/modules/shop/controllers/Cart.php", "BATCH application/controllers/Job.php", "SCREEN application/controllers/Web.php"]);
 });

@@ -39,25 +39,25 @@
       {
         "id": "cli-controller",
         "kind": "BATCH",
-        "files": "(?:^|/)application/controllers/.+\\.php$",
-        "contains": "is_cli\\(\\)|is_cli_request\\(\\)"
-      },
-      {
-        "id": "json-controller",
-        "kind": "API",
-        "files": "(?:^|/)application/controllers/.+\\.php$",
-        "contains": "set_content_type\\(\\s*['\\\"]application/json|json_encode\\("
+        "files": "(?:^|/)application/(?:modules/[^/]+/)?controllers/.+\\.php$",
+        "contains": "!\\s*(?:\\$this->input->)?is_cli(?:_request)?\\s*\\(\\s*\\)"
       },
       {
         "id": "view-controller",
         "kind": "SCREEN",
-        "files": "(?:^|/)application/controllers/.+\\.php$",
-        "contains": "->load->view\\("
+        "files": "(?:^|/)application/(?:modules/[^/]+/)?controllers/.+\\.php$",
+        "contains": "->load->view\\s*\\("
+      },
+      {
+        "id": "json-controller",
+        "kind": "API",
+        "files": "(?:^|/)application/(?:modules/[^/]+/)?controllers/.+\\.php$",
+        "contains": "set_content_type\\s*\\(\\s*['\\\"]application/json|json_encode\\s*\\("
       },
       {
         "id": "model",
         "kind": "ENTITY",
-        "files": "(?:^|/)application/models/.+\\.php$"
+        "files": "(?:^|/)application/(?:modules/[^/]+/)?models/.+\\.php$"
       }
     ]
   }
