@@ -374,3 +374,28 @@ test("DNA apply: a scan round cannot record a file its commit does not hold, and
   assert.deepEqual(manifest.source_pins, {}, "HEAD is not the integration branch, so it is read but not pinned (D80)");
   assert.ok(ledger["src/price.js"]);
 });
+
+// ------------------------------------------------------------------ the infra draft (bootstrap phase 2b)
+
+test("kiln dna infra: services from code directories and compose images, surfaces from the stack's rules, and a draft that applies", () => {
+  const root = project();
+  writeFile(join(root, "server/routes.js"), "router.get('/orders', list);\nif (a) b();\nif (c) d();\n");
+  writeFile(join(root, "server/jobs.js"), "cron.schedule('0 * * * *', run);\n");
+  writeFile(join(root, "server/util.js"), "export const x = 1;\n");
+  writeFile(join(root, "web/pages/index.tsx"), "export default function Home() { return null; }\n");
+  writeFile(join(root, "docker-compose.yml"), "services:\n  db:\n    image: postgres:16\n  cache:\n    image: \"redis:7\"\n  app:\n    build: .\n");
+  commitAll(root, "code");
+  const branch = spawnSync("git", ["branch", "--show-current"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: branch } });
+  const drafted = kiln(root, ["dna", "infra", "--out", ".kiln/tmp/infra.json"]);
+  assert.equal(drafted.status, 0, drafted.stderr);
+  const draft = JSON.parse(readFileSync(join(root, ".kiln/tmp/infra.json"), "utf8"));
+  const [backend, frontend, ...images] = draft.upsert.services;
+  assert.deepEqual([backend.kind, backend.root_paths, frontend.kind, frontend.root_paths], ["BACKEND", ["server"], "FRONTEND", ["web"]], "one repository is one service, with the front end split out by name");
+  assert.deepEqual(images.map(({ id, kind }) => [id, kind]), [["SVC-POSTGRES", "DATABASE"], ["SVC-REDIS", "CACHE"]]);
+  assert.deepEqual(draft.upsert.surfaces.map(({ kind, primary_paths, service_id }) => [kind, primary_paths[0], service_id]).sort(), [["API", "server/routes.js", backend.id], ["BATCH", "server/jobs.js", backend.id], ["SCREEN", "web/pages/index.tsx", frontend.id]]);
+  assert.deepEqual(draft.settings.evidence_sources, [{ id: "root", kind: "SOURCE_CODE", root: "." }]);
+  const applied = kiln(root, ["dna", "apply", ".kiln/tmp/infra.json"]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.equal(readStore(root).data.surfaces.length, 3);
+});

@@ -33,5 +33,32 @@
       "phase": "post-edit",
       "script": "php-ci3/php-lint.mjs"
     }
-  ]
+  ],
+  "dna": {
+    "surfaces": [
+      {
+        "id": "cli-controller",
+        "kind": "BATCH",
+        "files": "(?:^|/)application/controllers/.+\\.php$",
+        "contains": "is_cli\\(\\)|is_cli_request\\(\\)"
+      },
+      {
+        "id": "json-controller",
+        "kind": "API",
+        "files": "(?:^|/)application/controllers/.+\\.php$",
+        "contains": "set_content_type\\(\\s*['\\\"]application/json|json_encode\\("
+      },
+      {
+        "id": "view-controller",
+        "kind": "SCREEN",
+        "files": "(?:^|/)application/controllers/.+\\.php$",
+        "contains": "->load->view\\("
+      },
+      {
+        "id": "model",
+        "kind": "ENTITY",
+        "files": "(?:^|/)application/models/.+\\.php$"
+      }
+    ]
+  }
 }

@@ -10,5 +10,31 @@
     }
   ],
   "effects": [],
-  "guards": []
+  "guards": [],
+  "dna": {
+    "surfaces": [
+      {
+        "id": "next-api",
+        "kind": "API",
+        "files": "(?:^|/)pages/api/.+\\.[cm]?[jt]sx?$|(?:^|/)app/(?:.+/)?route\\.[jt]s$"
+      },
+      {
+        "id": "next-page",
+        "kind": "SCREEN",
+        "files": "(?:^|/)pages/(?!_).+\\.[jt]sx$|(?:^|/)app/(?:.+/)?page\\.[jt]sx$"
+      },
+      {
+        "id": "schedule",
+        "kind": "BATCH",
+        "files": "\\.[cm]?[jt]s$",
+        "contains": "\\bcron\\.schedule\\s*\\(|\\bnew CronJob\\s*\\(|\\bscheduleJob\\s*\\("
+      },
+      {
+        "id": "http-route",
+        "kind": "API",
+        "files": "\\.[cm]?[jt]s$",
+        "contains": "\\b(?:app|router|server|fastify|api)\\.(?:get|post|put|patch|delete|route)\\s*\\(\\s*['\\\"`/]"
+      }
+    ]
+  }
 }
