@@ -101,7 +101,11 @@ what is excluded (D170).
 this project has recorded rounds, the pace they ran at. Show the user both lines as they are,
 and ask them to confirm with a cap: a number of waves for this session, or `--max-budget-usd`
 when they run headless. With no recorded round there is no time estimate — say so; never invent
-one. Note the time with `date +%s` when the first wave goes out.
+one, and never work one out yourself from this session's clock: kiln times every round it
+applies (the start `kiln dna scan --out` stamps, the last apply of its skeletons), so the next
+session's estimate comes from rounds already done (D177). Generate a round's skeletons right
+before dispatching them — the stamp is when they were written. Note the time with `date +%s`
+when the first wave goes out, for Phase 8's `metrics`.
 
 **Phase 1–2 — scan to exhaustion.** Repeat until `kiln dna scan` says the scan is exhausted:
 
