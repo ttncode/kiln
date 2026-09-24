@@ -52,6 +52,7 @@ refused and pointed at `init`: a diff scan of nothing is a full scan nobody agre
 | `kiln dna infra [--out file]` | a draft batch of services and surfaces, for the user to review |
 | `kiln dna apply <batch.json>` | the one write; prints each id it assigned (`RD-0012 ← f3`) |
 | `kiln dna build` | derive again, change nothing |
+| `kiln dna reconcile <manifests> --roster <sheet>` | Phase 5a panels: what they agree on, what to escalate, what every panel dropped |
 | `kiln dna footprint <feature-id ...>` | the context a feature takes: its rules, files, processes and tiered neighbours |
 | `kiln dna remap <plan.json> [--apply]` | restructure — moves, splits, deletes, stage re-layouts; dry run first, and the table of id changes goes into the round's update record |
 | `kiln dna serve` | the explorer on 127.0.0.1, behind a token; run it in the background and give the user the address it prints |
@@ -143,7 +144,13 @@ while holding the code is how jargon leaks in. The jargon gate runs on every wri
 **Phase 5 — processes.** Phase 5a is **whole-inventory**: hypothesise journeys top-down across
 all capabilities, lay out stages as lifecycle phases, then attach evidence; a stage nothing
 implements is a recorded gap (`gap`, `gap_note`), never deleted and never filled with an
-invented process ([bootstrap-playbook.md](bootstrap-playbook.md), 5a). Seed `settings.actors`
+invented process ([bootstrap-playbook.md](bootstrap-playbook.md), 5a). On a large or unfamiliar
+corpus run step 1 as a **panel**: two or three independent agents (the strongest tier), each
+given the same one-line-per-process sheet and each writing a JSON manifest in the playbook's
+schema beside its prose. Then `kiln dna reconcile <manifests> --roster <sheet>`: consensus
+clusters are accepted and not re-litigated; every escalation, and every process no panel placed,
+goes to a fresh agent that reads the panels' actual reasoning — or to the user — never to a vote
+(5a-recon). Seed `settings.actors`
 before 5b. Phase 5b fills process detail per flow with [process-prompt.md](process-prompt.md).
 
 **Phase 6 — links.** Put the repositories' remotes into `settings.evidence_sources` with
