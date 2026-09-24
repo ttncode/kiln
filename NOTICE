@@ -118,6 +118,11 @@ What kiln uses under it, from v2.18.1 (commit 4a05eec): the DNA store contract
 derivation logic of `scripts/build_dna_store.py` and `scripts/check_gates.py`,
 re-implemented in Node in `lib/dna/` (D153) — the field lists, closed
 vocabularies and the jargon list there are taken from those files verbatim. No
-Python is copied. If that ever changes, the files
+Python is copied.
+
+Copied verbatim into skills/kiln-dna/, each with a three-line kiln note added at
+the top and nothing else changed (D157): references/glossary.md, id-schemes.md,
+quality-gates.md, agent-orchestration.md, bootstrap-playbook.md,
+update-playbook.md, dna-store.md, dna-erd.md and bpm-alignment.md. If that ever changes, the files
 copied are listed here before they are committed, the way the superpowers fork
 above is listed.
