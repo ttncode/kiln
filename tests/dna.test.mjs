@@ -45,7 +45,7 @@ const DESCRIPTION = { what_it_does: "Turns a title into a web address", input: "
 /** A small but whole store: one of each tier, findings owned by a feature, one service. */
 function seedBatch() {
   return {
-    settings: { project: "slugger" },
+    settings: { project: "slugger", evidence_sources: [{ id: "code", kind: "SOURCE_CODE", root: "." }] },
     upsert: {
       domains: [{ id: "DOM-TXT", name: "Text", key: "dom" }],
       capabilities: [{ key: "cap", domain_id: "@dom", name: "Addresses" }],
@@ -722,6 +722,37 @@ test("DNA ids: an excluded entry gets a counted id, and a counter past 99 grows 
   assert.equal(next.assigned[0].id, "DOM-TXT-01-100");
 });
 
+test("D174: a citation that does not resolve is refused at apply, and one that does is written", () => {
+  const root = scanned();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } });
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r1"]);
+  const path = join(root, ".kiln/tmp/r1/scan-001.json");
+  const skeleton = JSON.parse(readFileSync(path, "utf8"));
+  assert.deepEqual([skeleton.read[0].src, skeleton.read[0].ref], ["root", "src/price.js"], "the skeleton hands over what a citation copies");
+  const cite = (evidence) => ({ category: "CODE_ONLY", proposition: "A VIP order ships free", module: "src/price.js", evidence: [evidence] });
+  const bad = [
+    [{ src: "root", ref: "price.js", loc: "L2" }, /root at \w+ has no file price\.js/],
+    [{ src: "root", ref: "src/price.js", loc: "L2-3" }, /loc "L2-3" is not L<from> or L<from>-L<to>/],
+    [{ src: "root", ref: "src/price.js", loc: "L3-L2" }, /runs backwards/],
+    [{ src: "root", ref: "src/price.js", loc: "L2-L99" }, /runs past the 6 line\(s\) of src\/price\.js/],
+    [{ src: "AdminPage", ref: "src/price.js", loc: "L2" }, /src "AdminPage" is neither a repository \(root\)/],
+    [{ ref: "src/nope.js", loc: "L9-L2" }, /a finding's evidence is \{ src, ref, loc \}/],
+    ["src/nope.js:L999", /a finding's evidence is \{ src, ref, loc \}/],
+  ];
+  for (const [evidence, reason] of bad) {
+    writeFile(path, JSON.stringify({ ...skeleton, upsert: { findings: [cite(evidence)] } }));
+    const refused = kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]);
+    assert.equal(refused.status, 1, JSON.stringify(evidence));
+    assert.match(refused.stderr, reason);
+  }
+  assert.equal(existsSync(join(root, ".kiln/dna/store")), false, "a refused batch writes nothing");
+  const docCited = { ...cite({ src: "spec", ref: "pricing.md", loc: "#vip" }), key: "doc" };
+  writeFile(path, JSON.stringify({ ...skeleton, settings: { evidence_sources: [{ id: "spec", kind: "DOCUMENT" }] }, upsert: { findings: [cite({ src: "root", ref: "src/price.js", loc: "L2-L2" }), docCited] } }));
+  const applied = kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.match(applied.stdout, /RD-0002 ← doc/, "a document source keeps its own kind of anchor");
+});
+
 test("kiln dna update: a module's changed file says which repository, path and commit to diff it in", () => {
   const { root, config } = scanFixture({});
   const module = join(root, "mods/sub");
@@ -733,7 +764,7 @@ test("kiln dna update: a module's changed file says which repository, path and c
   const moduleConfig = { ...config, repo: { modules: { sub: "mods/sub" } } };
   const { files, repos } = scanProject(root, { config: moduleConfig, ledger: {} });
   const [skeleton] = skeletons(root, { repos, groups: [files.filter((file) => file.path === "mods/sub/lib/pay.js")] });
-  assert.deepEqual([skeleton.read[0].repo, skeleton.read[0].repo_path, skeleton.read[0].commit], ["mods/sub", "lib/pay.js", git(module, ["rev-parse", "HEAD"])]);
+  assert.deepEqual([skeleton.read[0].repo, skeleton.read[0].src, skeleton.read[0].ref, skeleton.read[0].commit], ["mods/sub", "sub", "lib/pay.js", git(module, ["rev-parse", "HEAD"])]);
 });
 
 test("kiln dna drift: a candidate the bootstrap has not read yet is not drift", () => {

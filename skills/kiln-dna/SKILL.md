@@ -194,7 +194,9 @@ The code moved; the store catches up. "Diff, don't re-scan" ([update-playbook.md
 4. **Deleted code.** A finding is never removed (id-schemes.md). A finding the code no longer
    holds — its file deleted, or reported untrue in step 3 — leaves its feature's `rd_ids` and
    joins the round's `excluded` entry — `id: "EXC-RETIRED-<the round's UPD id>"`,
-   `catalog: "RETIRED"`, a `disposition` saying what removed it — in one batch. The source's playbook has no step for this; without it a map only ever grows.
+   `catalog: "RETIRED"`, a `disposition` saying what removed it — in one batch. Change the retired
+finding by its `id` without sending its `evidence` again: an upsert merges, and its old citation
+names a file the new commit no longer holds, which `apply` would refuse (D174). The source's playbook has no step for this; without it a map only ever grows.
 5. Thread new findings into features with [clusterer-prompt.md](clusterer-prompt.md), verdicts
    `UPDATE` / `NEW` / `IGNORE` against each capability's full existing feature list (update-playbook
    §4). Then PLANNED features (§4b), open debts (§4c), and the sample audit over this round's
