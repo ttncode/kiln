@@ -17,7 +17,8 @@
 | 3 | `/kiln:kiln dna init`, a new session | `kiln dna` reported *no store in the working tree, but a checkpoint of one exists*; the agent ran `kiln dna restore`, `kiln dna check` (PASS), and `kiln dna scan` (*the scan is exhausted*), said it was resuming at Phase 2b, drafted the infra map and stopped at the naming gate. **No file was scanned twice** | $0.72 |
 
 Afterwards the user's `HEAD`, branch, index and stash were exactly as they had left them; the
-checkpoint lives on `refs/kiln/dna-checkpoint` and nowhere else.
+checkpoint lives on `refs/kiln/dna-checkpoint` and nowhere else. (D169, after this run, moved
+it to one ref per project and worktree under `refs/worktree/kiln/`.)
 
 ## The scanner tier
 
