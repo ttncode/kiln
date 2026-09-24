@@ -44,7 +44,9 @@ function readState(root, id) {
  */
 export function writesSince(reflog, base) {
   const entries = reflog.split("\n").filter(Boolean).map((line) => ({ sha: line.split(" ")[0], subject: line.slice(line.indexOf(" ") + 1) }));
-  const cut = entries.findIndex((entry) => base && base.startsWith(entry.sha));
+  // The oldest entry at the base, not the newest: a commit reset back to the base leaves a
+  // newer entry at the same sha, and cutting there hid the commit it undid.
+  const cut = entries.findLastIndex((entry) => base && base.startsWith(entry.sha));
   return (cut === -1 ? entries : entries.slice(0, cut)).filter((entry) => /commit|reset|merge/.test(entry.subject));
 }
 

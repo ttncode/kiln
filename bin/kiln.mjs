@@ -524,9 +524,15 @@ function reportAutoRulings(state, { key, by }) {
   process.stderr.write(`${renderAutoRuled(state)}\n`);
 }
 
+/**
+ * The review gate is what makes a work `reviewed`, on every path that has one. Tying it to the
+ * ship-authorising gate instead left the full path `in_progress` between review and ship —
+ * source still open during VERIFY, and a failed VERIFY keeping a review of a change that was
+ * about to move. Found by an independent review of the D137 fix, which covered bounded only.
+ */
 function statusAfter(state, { key, decision }) {
   if (decision !== "approved") return state.status;
-  return SHIP_AUTHORIZING[state.path] === key ? WORK_STATUS.reviewed : state.status;
+  return key === "review" || SHIP_AUTHORIZING[state.path] === key ? WORK_STATUS.reviewed : state.status;
 }
 
 function writeGate(root, { id, key, decision, answer, claimed, rest, artifact }) {
