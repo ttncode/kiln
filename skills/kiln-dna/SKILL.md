@@ -46,6 +46,7 @@ refused and pointed at `init`: a diff scan of nothing is a full scan nobody agre
 |---|---|
 | `kiln dna` | counts, pins, whether the gates pass |
 | `kiln dna check` | every gate, one line each |
+| `kiln dna recite [--apply]` | old citations that do not resolve; `--apply` re-cites the mechanical ones |
 | `kiln dna scan [--limit n] [--out dir]` | the unscanned candidates, densest first; `--out` writes one batch skeleton per group |
 | `kiln dna drift` | fetch, then how far the code has moved from what the store read |
 | `kiln dna update [--limit n] [--out dir]` | the drift, and skeletons for the changed and new files |
@@ -85,6 +86,11 @@ Phase 4; and so on). Say which phase you are resuming and why, then continue. If
 working tree has no store but a checkpoint exists, run `kiln dna restore` first: every apply
 also keeps a checkpoint of the store on a ref of its own, so a `git clean`, a stash or a branch
 switch does not cost the round (D162, D169).
+
+**A store written by an older kiln.** When `kiln dna check` warns that citations do not resolve
+at the store's pinned commits, run `kiln dna recite` before scanning on: it lists what it would
+re-cite and what needs a reader. `kiln dna recite --apply` writes the mechanical ones through the
+gated write; re-cite the rest in a batch of your own, each by its `id` (D178).
 
 **Phase 0 — the snapshot.** Run `kiln dna scan`. Its first line names the commit each
 repository is read at. `not the integration branch … never pinned` means there is no

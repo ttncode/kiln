@@ -813,6 +813,80 @@ test("D176: dna infra drafts the project's own components as CUSTOM, and a decla
   assert.match(again.stdout, /Not in components\.custom, so read as VENDOR: src\/names\.js/, "a root found later is named, not added");
 });
 
+test("D178: citations already in a store are warned about at its pins, and recite fixes only the mechanical ones", () => {
+  const root = initRepo(tempRoot("kiln-dna-"));
+  writeFile(join(root, "README.md"), "x\n");
+  commitAll(root, "init");
+  const admin = join(root, "Admin");
+  writeFile(join(admin, "app/price.php"), BRANCHY.replaceAll("export ", "<?php "));
+  initRepo(admin);
+  commitAll(admin, "module");
+  writeConfig(root, { ...DEFAULTS, repo: { kind: "multi", root: null, modules: { admin: "Admin" } }, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } });
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r1"]);
+  const path = join(root, ".kiln/tmp/r1/scan-001.json");
+  const skeleton = JSON.parse(readFileSync(path, "utf8"));
+  const finding = (proposition, loc) => ({ category: "CODE_ONLY", proposition, module: "Admin/app/price.php", evidence: [{ src: "admin", ref: "app/price.php", loc }] });
+  skeleton.upsert.findings.push(finding("A VIP order ships free", "L2"), finding("A large order with a coupon costs 5", "L3"), finding("An order line marked free costs 1", "L4"));
+  writeFile(path, JSON.stringify(skeleton));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]).status, 0);
+  assert.doesNotMatch(kiln(root, ["dna", "check"]).stdout, /citations resolve/);
+
+  const findings = join(root, ".kiln/dna/store/findings.jsonl");
+  writeFile(findings, readFileSync(findings, "utf8").split("\n").map((line) => line
+    .replace('"src":"admin","ref":"app/price.php","loc":"L2"', '"src":"Admin","ref":"Admin/app/price.php","loc":"L2-3"')
+    .replace('"src":"admin","ref":"app/price.php","loc":"L3"', '"src":"Admin","ref":"Admin/app/gone.php","loc":"L3"')).join("\n"));
+  const checked = kiln(root, ["dna", "check"]);
+  assert.equal(checked.status, 0, "old debt is reported, not blocking");
+  assert.match(checked.stdout, /citations resolve at the store's pinned commits.*2 do not — `kiln dna recite`/);
+
+  const dry = kiln(root, ["dna", "recite"]);
+  assert.match(dry.stdout, /needs a reader — RD-0002: admin at \w+ has no file app\/gone\.php/);
+  assert.match(dry.stdout, /1 record\(s\) would be re-cited: RD-0001\. Nothing written/);
+  assert.match(readFileSync(findings, "utf8"), /"src":"Admin"/, "a dry run writes nothing");
+
+  assert.equal(kiln(root, ["dna", "recite", "--apply"]).status, 0);
+  assert.equal(readStore(root).data.findings[0].evidence[0].src, "admin");
+  assert.deepEqual(readStore(root).data.findings[0].evidence[0], { src: "admin", ref: "app/price.php", loc: "L2-L3" });
+  assert.match(kiln(root, ["dna", "check"]).stdout, /1 do not/, "what needs a reader is still said");
+
+  writeFile(join(root, ".kiln/tmp/retire.json"), JSON.stringify({ upsert: { excluded: [{ id: "EXC-RETIRED-UPD-0001", catalog: "RETIRED", name: "Retired", disposition: "the file was deleted", rd_ids: ["RD-0002"] }] } }));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/retire.json"]).status, 0);
+  assert.doesNotMatch(kiln(root, ["dna", "check"]).stdout, /citations resolve/, "a retired finding's citation is history");
+});
+
+test("D178: a pin this clone lacks, a module not checked out, and a root citation into a module are each handled", () => {
+  const root = initRepo(tempRoot("kiln-dna-"));
+  writeFile(join(root, "README.md"), "x\n");
+  commitAll(root, "init");
+  const admin = join(root, "Admin");
+  writeFile(join(admin, "app/price.php"), BRANCHY.replaceAll("export ", "<?php "));
+  initRepo(admin);
+  commitAll(admin, "module");
+  writeConfig(root, { ...DEFAULTS, repo: { kind: "multi", root: null, modules: { admin: "Admin" } }, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } });
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r1"]);
+  const path = join(root, ".kiln/tmp/r1/scan-001.json");
+  const skeleton = JSON.parse(readFileSync(path, "utf8"));
+  skeleton.upsert.findings.push({ category: "CODE_ONLY", proposition: "A VIP order ships free", module: "Admin/app/price.php", evidence: [{ src: "admin", ref: "app/price.php", loc: "L2" }] });
+  writeFile(path, JSON.stringify(skeleton));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]).status, 0);
+  const findings = join(root, ".kiln/dna/store/findings.jsonl");
+  writeFile(findings, readFileSync(findings, "utf8").replace('"src":"admin","ref":"app/price.php"', '"src":"root","ref":"Admin/app/price.php"'));
+  assert.match(kiln(root, ["dna", "recite", "--apply"]).stdout, /Re-cited 1 record/, "a root citation into a module moves to the module");
+  assert.deepEqual(readStore(root).data.findings[0].evidence[0], { src: "admin", ref: "app/price.php", loc: "L2" });
+
+  const manifestPath = join(root, ".kiln/dna/store/manifest.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  writeFile(manifestPath, JSON.stringify({ ...manifest, source_pins: { ...manifest.source_pins, admin: "0123456789abcdef0123456789abcdef01234567" } }));
+  const checked = kiln(root, ["dna", "check"]).stdout;
+  assert.match(checked, /pinned commits are in this clone — admin 0123456789ab missing — run git fetch/);
+  assert.doesNotMatch(checked, /citations resolve at the store's pinned commits —/, "judged at the tip, a good citation is not called broken");
+
+  renameSync(join(admin, ".git"), join(root, "admin-git"));
+  const status = kiln(root, ["dna"]);
+  assert.equal(status.status, 0, "status survives a module that is not checked out");
+  assert.match(kiln(root, ["dna", "check"]).stdout, /citations resolve at the store's pinned commits — not judged — module admin/);
+});
+
 test("kiln dna update: a module's changed file says which repository, path and commit to diff it in", () => {
   const { root, config } = scanFixture({});
   const module = join(root, "mods/sub");
