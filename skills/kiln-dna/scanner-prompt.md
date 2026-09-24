@@ -59,6 +59,12 @@ Subagent (general-purpose):
     InMemory/Mock/Fake/Stub/Test beside a real one). If it is, the proposition says which variant
     it describes. A test double worded like the real behavior is the error this check exists for.
 
+    ## The project's business vocabulary
+
+    [DOMAIN DICTIONARY — the project's .kiln/dna/domain-dictionary-*.md, verbatim, or "none"]
+    Use its standard terms; an alias becomes its standard term; a term marked ⚠ is ambiguous —
+    name it in your report instead of choosing a meaning.
+
     ## Rules
 
     - Business nouns in propositions; code identifiers belong in `evidence`.

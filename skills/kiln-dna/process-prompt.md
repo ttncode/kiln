@@ -32,6 +32,12 @@ Subagent (general-purpose):
     [GLOSSARY: Process fields, jtbd, process_kind, decision_branches, the rule buckets with their
     litmus table, the attachment litmus and the rule-sentence bar — verbatim]
 
+    ## The project's business vocabulary
+
+    [DOMAIN DICTIONARY — the project's .kiln/dna/domain-dictionary-*.md, verbatim, or "none"]
+    Use its standard terms; an alias becomes its standard term; a term marked ⚠ is ambiguous —
+    name it in your report instead of choosing a meaning.
+
     ## What to return
 
     Write a batch file at [OUTPUT PATH] with `upsert.processes` (each by its `id`) and, when
