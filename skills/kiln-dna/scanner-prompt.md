@@ -70,6 +70,9 @@ Subagent (general-purpose):
     ## Rules
 
     - Business nouns in propositions; code identifiers belong in `evidence`.
+    - Never copy a credential's value — a key, token, password or private key — into a
+      proposition or a `quote`. Cite its lines and quote around it; `kiln dna apply` refuses a
+      record that carries one (D175).
     - Do not guess what a called function does — read it, or say "calls X" plainly.
     - Write the file as valid JSON.
 
