@@ -23,6 +23,7 @@ batch that follows a page's instruction to edit a file by hand is refused.
 | `apply_taxonomy_split.py`, `apply_stage_layout.py apply` | `kiln dna remap <plan.json> [--apply]` — the same plan schema (plus `stage_layouts` and `renumber_flows`), the same gates, dry run by default |
 | a one-off `_merge_*.py`, `sweep_ids.py` | a batch: `upsert` with `merged_from` / `split_from` on the survivors, `remove` for what is gone. The dangling-reference and ancestor gates run on every write, so there is no rendered output to sweep afterwards |
 | `apply_intake.py` | none. Intake rounds, PLANNED reservations and their gates are part of the contract, and a batch can write them; the intake workflow itself is not part of kiln |
+| `context_footprint.py` | `kiln dna footprint <feature-id ...> \| --all-planned` — the same schema-3 JSON; hours are still not computed |
 | `apply_stage_layout.py dossiers`, `sidecar` | none: kiln keeps no id-keyed sidecar, and a dossier is the flow's records read from the store |
 | `check_bpm.py`, `reconcile_5a.py`, `build_panel_dossier.py`, `topology_round.py`, `render_*.py`, `bootstrap_dd_sources.py`, `check_export_parity.py`, `check_explorer_compat.py`, `migrate_project_dna_rename.py` | none. Where a page says to run one, do by reading what it would have checked — the store is grep-able by design ([dna-store.md](dna-store.md)) — and record what you found in the round's update record |
 

@@ -203,6 +203,9 @@ scope` says how much of the real change it covered. Read the files it ranks firs
 widening the search. With a DNA store it also prints a tier-1 list: files reached through the
 findings and features that name the terms, which a grep cannot see. A row marked `changed since
 the DNA read it` or `gone` is a claim older than the code — open the file before you rely on it.
+For the features tier 1 names, `kiln dna footprint <feature-id ...>` lists the features a change
+to them puts at risk — sharing a file (STRONG, MEDIUM, WEAK), a stage, or a typed relation. Name
+the STRONG and MEDIUM ones in the brief: they are the regression scope the plan must cover.
 
 When the project has a DNA store (`kiln dna` says so), ask it how current it is before you
 trust it:

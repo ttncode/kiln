@@ -14,6 +14,7 @@ import { applyBatch, checkStore, remapPlan } from "../lib/dna/apply.mjs";
 import { readStore, storeDir } from "../lib/dna/store.mjs";
 import { classByPath, measure, scanProject, skeletons } from "../lib/dna/scan.mjs";
 import { serveExplorer } from "../lib/dna/serve.mjs";
+import { lineRanges, rangeGap } from "../lib/dna/footprint.mjs";
 import { recordedPace, sizeLines, workSize } from "../lib/dna/size.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
 
@@ -871,4 +872,32 @@ test("DNA remap: a stage layout re-lays a flow, keeps a gap stage, and renumbers
   assert.deepEqual([two.id, two.stage_id, two.legacy_process_id], ["BF-01.S1.P1", "BF-01.S1", "BF-01.S2.P1"]);
   assert.ok(data.edges.some((edge) => edge.from === "BF-01.S1.P2" && edge.to === "DOM-AAA-01-01"), "an edge follows its process");
   assert.equal(kiln(root, ["dna", "check"]).status, 0);
+});
+
+// ------------------------------------------------------------------ context footprint (D165)
+
+test("DNA footprint: evidence locators the source reads, plus kiln's L3-L12, and the proximity that tiers a neighbour", () => {
+  assert.deepEqual(lineRanges("(lines 174-202)"), [[174, 202]]);
+  assert.deepEqual(lineRanges([{ src: "root", ref: "a.js", loc: "L3-L12" }]), [[3, 12]], "kiln's own range form, which the source read as two lines");
+  assert.deepEqual(lineRanges("L8-12 and L20"), [[8, 12]], "the first family that matches wins");
+  assert.deepEqual(lineRanges("no locator"), []);
+  assert.equal(rangeGap([[1, 10]], [[5, 20]]), 0);
+  assert.equal(rangeGap([[1, 10]], [[40, 50]]), 30);
+  assert.equal(rangeGap([], [[1, 2]]), null);
+});
+
+test("kiln dna footprint: neighbours by shared file, stage and typed relation, tiered, for the features named", () => {
+  const root = remapFixture();
+  applyBatch(root, { batch: { upsert: {
+    findings: [{ key: "x", proposition: "three", module: "src/a.js", evidence: [{ src: "root", ref: "src/a.js", loc: "L5-L9" }] }],
+    features: [{ id: "DOM-BBB-01-01", rd_ids: ["@x"] }],
+    edges: [{ from: "BF-01.S1.P1", to: "DOM-BBB-01", kind: "TYPED_REL", type: "USES_DATA_FROM" }],
+  } }, today: TODAY });
+  const shown = kiln(root, ["dna", "footprint", "DOM-AAA-01-01"]);
+  assert.equal(shown.status, 0, shown.stderr);
+  const [entry] = Object.values(JSON.parse(shown.stdout));
+  assert.deepEqual(entry.neighbors.SHARES_FILE.map(({ id, tier }) => [id, tier]), [["DOM-BBB-01-01", "MEDIUM"]]);
+  assert.deepEqual(entry.neighbors.REL_CAPABILITY, [{ capability: "DOM-BBB-01", types: ["USES_DATA_FROM"] }]);
+  assert.equal(entry.processes[0], "BF-01.S1.P1");
+  assert.match(kiln(root, ["dna", "footprint", "DOM-ZZZ-01-01"]).stderr, /unknown feature id/);
 });
