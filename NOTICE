@@ -137,3 +137,17 @@ The fork point is commit 4a05eec3139038f72cf5913a8e38065826c7dfed (v2.18.1).
 changed since (D167). If that ever changes, the files
 copied are listed here before they are committed, the way the superpowers fork
 above is listed.
+
+--------------------------------------------------------------------------------
+gitleaks — https://github.com/gitleaks/gitleaks
+Copyright (c) 2019 Zachary Rice
+Licensed under the MIT License.
+
+Taken from config/gitleaks.toml at commit 09242ce9c8a60d9b051fc2d166f9e849b88c7ac0:
+the regular expressions of ten prefix-anchored rules (aws-access-token,
+private-key, github-pat, github-fine-grained-pat, github-oauth, slack-bot-token,
+slack-user-token, slack-webhook-url, stripe-access-token, gcp-api-key), in
+lib/dna/secrets.mjs (D175). Translated to JavaScript syntax: the inline (?i)
+became the i flag, and the trailing delimiter group of the stripe and gcp rules
+became a lookahead. The aws-access-token rule's allowlist (.+EXAMPLE$) was taken
+with it; entropy thresholds, keywords and the other allowlists were not.

@@ -753,6 +753,40 @@ test("D174: a citation that does not resolve is refused at apply, and one that d
   assert.match(applied.stdout, /RD-0002 ← doc/, "a document source keeps its own kind of anchor");
 });
 
+test("D175: a record carrying a credential is refused, and the refusal never repeats the value", () => {
+  const root = project();
+  const batch = join(root, ".kiln", "tmp", "batch.json");
+  const awsKey = `AKIA${"Z7Q2WXKD4PBR3M5N"}`;
+  const pem = `-----BEGIN RSA PRIVATE ${"KEY"}-----\n${"M".repeat(64)}\n-----END RSA PRIVATE ${"KEY"}-----`;
+  const stripe = `sk_live_${"4eC39HqLyjWDarjtT1zdp7dc"}`;
+  const gcp = `AIza${"SyD-9tSrke72PouQMnMX7mB2EFdXK13h8xA"}`;
+  const leaksAs = [
+    [`'key' => '${awsKey}'`, "aws-access-token"],
+    [pem, "private-key"],
+    [`const key = "${stripe}";`, "stripe-access-token"],
+    [`apiKey: "${gcp}"`, "gcp-api-key"],
+    [`$a = 1;\n${awsKey}`, "aws-access-token"],
+    [`\t${awsKey}`, "aws-access-token"],
+  ];
+  for (const [quote, rule] of leaksAs) {
+    const leaking = seedBatch();
+    leaking.upsert.findings[0].evidence[0].quote = quote;
+    writeFile(batch, JSON.stringify(leaking));
+    const refused = kiln(root, ["dna", "apply", batch]);
+    assert.equal(refused.status, 1);
+    assert.match(refused.stderr, new RegExp(`f1: ${rule}`));
+    assert.doesNotMatch(refused.stderr, /Z7Q2WXKD4PBR3M5N|MMMMMMMM|4eC39Hq|SyD-9tS/);
+  }
+  const inSettings = seedBatch();
+  inSettings.settings.note = `token ${awsKey}`;
+  writeFile(batch, JSON.stringify(inSettings));
+  assert.match(kiln(root, ["dna", "apply", batch]).stderr, /settings: aws-access-token/, "settings.json is committed too");
+  const quoted = seedBatch();
+  quoted.upsert.findings[0].evidence[0].quote = `'key' => getenv('AWS_KEY') // AKIA prefix expected, e.g. AKIA${"IOSFODNN7EXAMPLE"}`;
+  writeFile(batch, JSON.stringify(quoted));
+  assert.equal(kiln(root, ["dna", "apply", batch]).status, 0, "a name, a prefix, or AWS's documentation key is not a credential");
+});
+
 test("kiln dna update: a module's changed file says which repository, path and commit to diff it in", () => {
   const { root, config } = scanFixture({});
   const module = join(root, "mods/sub");
