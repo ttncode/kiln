@@ -787,6 +787,30 @@ test("D175: a record carrying a credential is refused, and the refusal never rep
   assert.equal(kiln(root, ["dna", "apply", batch]).status, 0, "a name, a prefix, or AWS's documentation key is not a credential");
 });
 
+test("D176: dna infra drafts the project's own components as CUSTOM, and a declared list is left alone", () => {
+  const root = scanned();
+  writeConfig(root, { ...DEFAULTS, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } });
+  kiln(root, ["dna", "scan", "--out", ".kiln/tmp/r1"]);
+  const path = join(root, ".kiln/tmp/r1/scan-001.json");
+  const skeleton = JSON.parse(readFileSync(path, "utf8"));
+  skeleton.upsert.findings.push({ category: "CODE_ONLY", proposition: "A VIP order ships free", module: "src/price.js", evidence: [{ src: "root", ref: "src/price.js", loc: "L2" }] });
+  writeFile(path, JSON.stringify(skeleton));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/r1/scan-001.json"]).status, 0);
+  assert.equal(readStore(root).data.components[0].origin, "VENDOR", "the source's default before anything is declared");
+
+  assert.equal(kiln(root, ["dna", "infra", "--out", ".kiln/tmp/infra.json"]).status, 0);
+  const draft = JSON.parse(readFileSync(join(root, ".kiln/tmp/infra.json"), "utf8"));
+  assert.deepEqual(draft.settings.components, { custom: [readStore(root).data.components[0].name] });
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/infra.json"]).status, 0);
+  assert.equal(readStore(root).data.components[0].origin, "CUSTOM");
+
+  writeFile(join(root, ".kiln/tmp/later.json"), JSON.stringify({ upsert: { findings: [{ category: "CODE_ONLY", proposition: "Customer names are listed in a fixed order", module: "src/names.js", evidence: [{ src: "root", ref: "src/names.js", loc: "L1" }] }] } }));
+  assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/later.json"]).status, 0);
+  const again = kiln(root, ["dna", "infra", "--out", ".kiln/tmp/infra-2.json"]);
+  assert.equal(JSON.parse(readFileSync(join(root, ".kiln/tmp/infra-2.json"), "utf8")).settings.components, undefined, "what the person declared is not redrafted");
+  assert.match(again.stdout, /Not in components\.custom, so read as VENDOR: src\/names\.js/, "a root found later is named, not added");
+});
+
 test("kiln dna update: a module's changed file says which repository, path and commit to diff it in", () => {
   const { root, config } = scanFixture({});
   const module = join(root, "mods/sub");
