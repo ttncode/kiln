@@ -32,8 +32,10 @@ Subagent (general-purpose):
     - `category` — one of `CODE_ONLY`, `COVERED`, `PARTIAL_MISMATCH` ([GLOSSARY: Finding
       category]). With no documentation in [DOC SOURCES], every finding is `CODE_ONLY`.
     - `module` — the file's `path` (never its `at`).
-    - `evidence` — `[{ "src": "<repository name>", "ref": "<path>", "loc": "L<from>-L<to>" }]`,
-      the lines that show it. Quote the guard's own predicate in `quote` when the sentence says
+    - `evidence` — `[{ "src": "<the entry's src>", "ref": "<the entry's ref>", "loc": "L<from>-L<to>" }]`,
+      the lines that show it. Copy `src` and `ref` from the file's `read` entry: `ref` is the path
+      inside that repository, not `path`. `loc` is `L12` or `L12-L30`, both ends with an `L`, and
+      within the file. `kiln dna apply` refuses a citation that does not resolve (D174). Quote the guard's own predicate in `quote` when the sentence says
       only, never, always, cannot or must: the sentence may claim exactly what the predicate
       supports and no more.
 
@@ -43,7 +45,7 @@ Subagent (general-purpose):
     ## A file that changed since it was last read
 
     An entry with `was` was scanned before. Read what changed, not the whole file, with the
-    entry's own fields: `git -C <repo> diff <was> <commit>:<repo_path>` — a module's history is
+    entry's own fields: `git -C <repo> diff <was> <commit>:<ref>` — a module's history is
     in the module, under its own paths. Its `cites` are the
     findings already describing it; fetch each with `grep <id> .kiln/dna/store/findings.jsonl`.
 
