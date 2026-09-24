@@ -191,6 +191,17 @@ On `full`, the design comes before the spec: **use the `kiln-brainstorming` skil
 it ask its questions. On `bounded` and `spike` the design is a short exchange in chat, and
 brainstorming is skipped — say which of the two you are doing.
 
+Ask the project's knowledge tier first, with two to five terms from the request — names,
+identifiers, the words the user used for the thing:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" blast --for <id> <term> <term>
+```
+
+It prints the files that mention them, ranked, and records what it named: at REVIEW, `kiln
+scope` says how much of the real change it covered. Read the files it ranks first before
+widening the search.
+
 Read the code the work touches. Write `.kiln/work/<id>/brief.md`: what is asked, what you
 found, what is still unknown.
 

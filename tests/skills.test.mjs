@@ -390,3 +390,8 @@ test("A9: hooks.json registers the three entries the dispatcher answers, each wi
   ]);
   for (const row of entries) assert.equal(row.hooks[0].timeout, 5, `${row.event} ${row.matcher} has no bound on how long it may hang`);
 });
+
+test("D47: INVESTIGATE asks the knowledge tier, recorded against the work", () => {
+  const { body } = frontmatter("kiln-orchestrator");
+  assert.match(body, /blast --for <id>/, "a knowledge port nothing calls at investigation cannot be measured");
+});

@@ -60,8 +60,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       the first failure with the tool's own output. A full run that fails after
       the review gate sends the work back to implementation.
 
-  kiln blast <term> [<term> ...]
+  kiln blast [--for <id>] <term> [<term> ...]
       Tier-0 blast radius: which files mention these terms.
+      --for  record what it named on that work, so REVIEW can say how much
+             of the real change it covered.
 
   kiln rules add <file.md> --trigger "<glob>" [--text "<the rule>"]
       Write a project rule and route it. Adds only: it never rewrites or
@@ -749,9 +751,18 @@ function recordRun({ root, state, phase, head, result }) {
 
 const BLAST_ROW_LIMIT = 20;
 
+/**
+ * `--for <id>` records what the blast radius named, so D47's observable — does tier-0 output
+ * lead to action — has a number: at REVIEW, how much of the real change it had named. Without
+ * it INVESTIGATE never called the knowledge port at all, and a richer tier would have nothing
+ * to be measured against.
+ */
 function runBlast(argv) {
   const { root } = loadConfig(process.cwd());
-  const rows = grepBlastRadius(root, argv);
+  const id = flag(argv, "--for");
+  const terms = argv.filter((word, index) => word !== "--for" && argv[index - 1] !== "--for");
+  const rows = grepBlastRadius(root, terms);
+  if (id) writeState(root, { ...readState(root, id), knowledge: [{ tier: 0, terms, files: rows.map((row) => row.path) }] });
   if (rows.length === 0) return out("No file mentions those terms.") ?? 0;
 
   for (const row of rows.slice(0, BLAST_ROW_LIMIT)) out(`  ${row.hits}\t${row.path}`);
@@ -770,6 +781,22 @@ function runBlast(argv) {
  * on "a commit on another branch". superpowers reviews from the branch point and BMAD from a
  * baseline that never moves; neither anchors review on the last verification.
  */
+/** How much of the real change the recorded blast radius named — null when none was asked. */
+function blastLine(root, state) {
+  const asked = (state.knowledge ?? []).at(-1);
+  if (!asked) return null;
+  const changed = actualChanged(root, state.base).filter((path) => !(state.dirty_at_open ?? []).includes(path));
+  const named = new Set(asked.files);
+  const hit = changed.filter((path) => named.has(path)).length;
+  return `Blast radius (tier ${asked.tier}): named ${asked.files.length} file(s); ${hit} of the ${changed.length} changed were among them.`;
+}
+
+function printReconciliation(result, blast) {
+  out(reconciliationLine(result));
+  if (result.beyond.length > 0) out(`  beyond: ${result.beyond.slice(0, 8).join(" · ")}`);
+  if (blast) out(blast);
+}
+
 function runScope(argv) {
   const { root } = loadConfig(process.cwd());
   const state = readState(root, argv[0]);
@@ -783,8 +810,7 @@ function runScope(argv) {
     actual: actualChanged(root, state.base),
     dirtyAtOpen: state.dirty_at_open,
   });
-  out(reconciliationLine(result));
-  if (result.beyond.length > 0) out(`  beyond: ${result.beyond.slice(0, 8).join(" · ")}`);
+  printReconciliation(result, blastLine(root, state));
 
   const verdict = reconcileVerdict(result);
   if (!verdict.halt) return 0;
@@ -1259,6 +1285,8 @@ function runReport(argv) {
   const state = readState(root, argv[0]);
   out(`${state.id} · ${state.path} · ${state.status}${state.follows ? ` · follows ${state.follows}` : ""}`);
   out(verifiedLine(root, state));
+  const blast = blastLine(root, state);
+  if (blast) out(blast);
   out(renderAutoRuled(state) ?? "No gate was ruled on your behalf.");
   return 0;
 }

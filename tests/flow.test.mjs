@@ -198,3 +198,31 @@ test("an uncommitted edit inside a submodule makes an earlier run stale", () => 
   writeFile(join(root, "AdminPage", "src", "User.php"), "<?php // changed\n");
   assert.match(ok(root, ["report", "w1"]).stdout, /tree has changed since/);
 });
+
+/**
+ * D47 gave tier 0 one observable — does its output lead to action — and INVESTIGATE never
+ * called it: the knowledge port had a consumer only after the plan existed. `--for <id>`
+ * records what the blast radius named, and the report says how much of the real change it
+ * covered. That number is the bar a richer knowledge tier has to clear.
+ */
+test("a blast radius asked for a work is recorded, and the report measures it against the change", () => {
+  const root = nodeProject({ name: "blast-measure" });
+  writeFile(join(root, "src", "export.js"), "export function exportCsv() {}\n");
+  writeFile(join(root, "src", "unrelated.js"), "export const x = 1;\n");
+  commitAll(root, "files");
+  throughPlanGate(root, "w1", { predicted: "src/export.js" });
+
+  const blast = ok(root, ["blast", "--for", "w1", "exportCsv"]);
+  assert.match(blast.stdout, /src\/export\.js/);
+  assert.deepEqual(state(root, "w1").knowledge, [{ tier: 0, terms: ["exportCsv"], files: ["src/export.js"] }]);
+
+  writeFile(join(root, "src", "export.js"), "export function exportCsv() { return 1; }\n");
+  writeFile(join(root, "src", "unrelated.js"), "export const x = 2;\n");
+  assert.match(ok(root, ["report", "w1"]).stdout, /Blast radius \(tier 0\): named 1 file\(s\); 1 of the 2 changed were among them/);
+  assert.match(ok(root, ["scope", "w1"]).stdout, /Blast radius \(tier 0\): named 1 file\(s\); 1 of the 2 changed were among them/);
+});
+
+test("a blast radius asked for no work records nothing, as before", () => {
+  const root = nodeProject({ name: "blast-plain" });
+  assert.equal(kiln(root, ["blast", "anything"]).status, 0);
+});
