@@ -142,6 +142,18 @@ test("the orchestrator describes every path the code actually supports", () => {
 });
 
 /**
+ * D173: at a real init the agent recommended `make test NO_DUMP=1 FILTER=...` for the fast
+ * command. kiln runs it verbatim, so the placeholder would have become a filter.
+ */
+test("init offers only commands that run as written", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  const init = body.slice(body.indexOf("### `/kiln:kiln init`"), body.indexOf("## The skills that do the stages"));
+  assert.match(init, /must run as written/);
+  assert.match(init, /just run and seen pass/);
+  assert.match(init, /the recommended answer is blank/);
+});
+
+/**
  * Acceptance run C4 hit a blocking unknown on the full path and recommended "drop to
  * spike" — a downward ratchet, which does not exist. The code refused it correctly; the
  * skill had told the agent the ratchet only goes up without saying what to do instead.
