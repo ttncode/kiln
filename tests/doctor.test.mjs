@@ -206,6 +206,32 @@ test("a map with no multi kind still fails, because then nothing resolves it", (
   assert.equal(found.status, STATUS.fail);
 });
 
+test("D171: an integration branch a checkout does not have is named, per checkout", () => {
+  const root = initRepo(project({ repo: { kind: "multi", root: null, modules: { admin: "AdminPage" } }, vcs: { ...DEFAULTS.vcs, integration_branch: "v3-master" } }));
+  commitAll(root, "init");
+  const admin = join(root, "AdminPage");
+  writeFile(join(admin, "a.php"), "<?php\n");
+  initRepo(admin);
+  commitAll(admin, "init");
+  git(admin, ["branch", "v3-master"]);
+
+  const found = row(root, "integration branch")[0];
+  assert.equal(found.status, STATUS.warn);
+  assert.match(found.detail, /^\. has no v3-master — neither origin\/v3-master nor a local one/);
+  assert.doesNotMatch(found.detail, /AdminPage has no/);
+  assert.match(found.detail, /Configured: \. → v3-master, admin → v3-master/, "the per-module list stays in view");
+});
+
+test("D171: a module never initialised is named, not judged by its parent's branches", () => {
+  const root = initRepo(project({ repo: { kind: "multi", root: null, modules: { admin: "AdminPage" } }, vcs: { ...DEFAULTS.vcs, integration_branch: "main" } }));
+  writeFile(join(root, "AdminPage", ".keep"), "");
+  commitAll(root, "init");
+
+  const found = row(root, "integration branch")[0];
+  assert.equal(found.status, STATUS.warn);
+  assert.match(found.detail, /AdminPage is not a checkout of its own/);
+});
+
 test("doctor says when a work has no owner, because its gate enforces nothing", () => {
   const root = project();
   writeState(root, { ...newWork({ id: "42", sessionId: null, base: "aaa" }) });
