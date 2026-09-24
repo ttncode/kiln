@@ -121,7 +121,9 @@ one. Note the time with `date +%s` when the first wave goes out.
    that batch and apply it again; never loosen a record to make a gate pass.
 
 **Phase 2b — the infra map.** `kiln dna infra --out <scratch>/infra.json`, then show the user a
-table of the drafted services (id, kind, roots) and surfaces (id, kind, file). Naming a service
+table of the drafted services (id, kind, roots) and surfaces (id, kind, file), and the drafted
+`components.custom` — the module roots the project owns, whose components then read `CUSTOM`;
+a root that is really a platform or a copied library comes off the list (D176). Naming a service
 is theirs: apply only after they confirm or edit it. Add EXTERNAL services the findings name
 (a payment provider, a mail service) with the user, and the process-to-EXTERNAL call sites as
 `EXTERNAL_HOP` edges once processes exist — hop-lift derives service topology from them.
