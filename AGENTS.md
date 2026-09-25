@@ -34,6 +34,10 @@ Avoid:
 - Inventing a new solution that has not been proven and put into use somewhere.
 - Rewriting something open source already provides.
 
+Whether a fix is needed is decided by this process, not by asking the owner whether they want
+it. Never end with "want me to fix this?": judge whether the product needs it, then either do it
+or say why it is not needed.
+
 ## Hard rules
 
 - IMPORTANT: every behaviour change gets a decision entry in the architecture log, with the
