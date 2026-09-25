@@ -11,10 +11,7 @@ sentence) and get back a reviewed, verified pull request without reading over it
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![node](https://img.shields.io/badge/node-%E2%89%A520.10-brightgreen.svg)](package.json)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kiln-lifecycle-dark.png">
-  <img src="docs/assets/kiln-lifecycle.png" alt="The kiln lifecycle: seven stages from investigate to ship, four gates you approve, and PreToolUse hooks under all of them that block an unsafe tool call.">
-</picture>
+<img src="docs/assets/kiln-lifecycle.png" alt="The kiln lifecycle: seven stages from investigate to ship, four gates you approve, and PreToolUse hooks under all of them that block an unsafe tool call.">
 
 **Status: `v1.0.0-rc`.** Everything below runs, and every promise it makes has a test. All six
 real-world acceptance runs required for release are done, with `unsafe actions completed: 0` on
@@ -307,10 +304,7 @@ command that never reaches git on your machine is the one case neither layer see
 
 Each tool call goes through the same path:
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/kiln-guard-dark.png">
-  <img src="docs/assets/kiln-guard.png" alt="A tool call passes a PreToolUse hook whose guards read the work state. Exit 0 lets the call run. Exit 2 blocks it and returns the reason to the agent.">
-</picture>
+<img src="docs/assets/kiln-guard.png" alt="A tool call passes a PreToolUse hook whose guards read the work state. Exit 0 lets the call run. Exit 2 blocks it and returns the reason to the agent.">
 
 **Key design choices:**
 
