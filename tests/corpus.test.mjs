@@ -297,6 +297,10 @@ const CONTROL_FILES = [
   ["bash", "cd .kiln/dna && cp ../tmp/notes.md notes.md", "deny", DNA],
   ["bash", "rsync .kiln/tmp/notes.md .kiln/dna/notes.md", "deny", DNA],
   ["bash", "cd .kiln && rm -rf dna", "deny", /DNA store|enforces the run/],
+  ["bash", "rm .kiln/dna/security-and-bugs.md", "allow"],
+  ["bash", "rm .kiln/dna/store/findings.jsonl", "deny", /DNA store|enforces the run/],
+  ["bash", "rm -rf .kiln/dna/store.previous", "deny", /DNA store|enforces the run/],
+  ["bash", "rm .kiln/dna/*", "deny", /DNA store|enforces the run/],
 ];
 
 const NOTHING_OPEN = [
@@ -316,6 +320,7 @@ const NOTHING_OPEN = [
   ["edit", ".kiln/dna/store.previous/domains.jsonl", "deny", DNA],
   ["bash", "rm -rf .kiln/dna", "deny", /DNA store|enforces the run/],
   ["bash", "mv .kiln/dna/store .kiln/dna/old", "deny", /DNA store|enforces the run/],
+  ["bash", "rm .kiln/dna/security-and-bugs.md", "allow"],
   ["bash", "rm -rf {outside}", "allow"],
   ["bash", "rm src/link.txt", "allow"],
 ];
