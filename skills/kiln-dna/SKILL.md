@@ -202,7 +202,10 @@ The code moved; the store catches up. "Diff, don't re-scan" ([update-playbook.md
    changed file carries `was` (the blob it was read at) and `cites` (the findings that name it);
    the scanner reads the diff, not the file ([scanner-prompt.md](scanner-prompt.md)).
 3. Apply each skeleton as in the bootstrap. A cited finding whose behavior changed comes back as
-   an upsert by its id; one the diff made untrue is reported, not deleted.
+   an upsert by its id; one the diff made untrue is reported, not deleted. The apply that moves a
+   pin carries every older citation in that repository through the diff (D182) and names the
+   records whose cited lines the change rewrote: re-cite each by its id, or confirm a later
+   skeleton of the round does.
 4. **Deleted code.** A finding is never removed (id-schemes.md). A finding the code no longer
    holds — its file deleted, or reported untrue in step 3 — leaves its feature's `rd_ids` and
    joins the round's `excluded` entry — `id: "EXC-RETIRED-<the round's UPD id>"`,
