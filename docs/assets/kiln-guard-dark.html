@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>How kiln judges a tool call</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0}body{background:#2d3142}svg{display:block}</style>
+</head>
+<body>
+<svg viewBox="0 0 952 404" width="952" height="404" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="kiln-guard-dark-title kiln-guard-dark-desc">
+<title id="kiln-guard-dark-title">How kiln judges a tool call</title>
+<desc id="kiln-guard-dark-desc">Every Edit, Write or Bash call passes a PreToolUse hook whose guards read the work state; exit 0 lets the call run, exit 2 blocks it and returns the reason to the agent.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker><marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker></defs>
+<rect width="100%" height="100%" fill="#2d3142"/>
+<path d="M200,164 H256" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M416,164 H472" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<path d="M552,264 V200" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="569" y="227" width="38" height="12" rx="2" fill="#2d3142"/>
+<text x="588" y="236" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">READS</text>
+<path d="M632,152 H684 Q692,152 692,144 V88 Q692,80 700,80 H752" fill="none" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<rect x="702" y="111" width="44" height="12" rx="2" fill="#2d3142"/>
+<text x="724" y="120" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">EXIT 0</text>
+<path d="M632,176 H684 Q692,176 692,184 V240 Q692,248 700,248 H752" fill="none" stroke="#f08a59" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+<rect x="702" y="207" width="44" height="12" rx="2" fill="#2d3142"/>
+<text x="724" y="216" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">EXIT 2</text>
+<path d="M832,280 V328 Q832,336 824,336 H128 Q120,336 120,328 V200" fill="none" stroke="#bfc0c0" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+<rect x="266" y="313" width="68" height="12" rx="2" fill="#2d3142"/>
+<text x="300" y="322" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">THE REASON</text>
+<rect x="40" y="128" width="160" height="72" rx="6" fill="#2d3142"/>
+<rect x="40" y="128" width="160" height="72" rx="6" fill="rgba(191,192,192,0.10)" stroke="#8e98ac" stroke-width="1"/>
+<rect x="48" y="136" width="42" height="12" rx="2" fill="transparent" stroke="#8e98ac" stroke-opacity="0.4" stroke-width="0.8"/>
+<text x="69" y="145" fill="#8e98ac" font-size="7" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">AGENT</text>
+<text x="120" y="170" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Tool call</text>
+<text x="120" y="186" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">Edit · Write · Bash</text>
+<rect x="256" y="128" width="160" height="72" rx="6" fill="#2d3142"/>
+<rect x="256" y="128" width="160" height="72" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<rect x="264" y="136" width="36" height="12" rx="2" fill="transparent" stroke="#f5f5f5" stroke-opacity="0.4" stroke-width="0.8"/>
+<text x="282" y="145" fill="#f5f5f5" font-size="7" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">HOOK</text>
+<text x="336" y="170" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">PreToolUse hook</text>
+<text x="336" y="186" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">hooks/dispatch.mjs</text>
+<rect x="472" y="128" width="160" height="72" rx="6" fill="#2d3142"/>
+<rect x="472" y="128" width="160" height="72" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<rect x="480" y="136" width="48" height="12" rx="2" fill="transparent" stroke="#f5f5f5" stroke-opacity="0.4" stroke-width="0.8"/>
+<text x="504" y="145" fill="#f5f5f5" font-size="7" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.08em">GUARDS</text>
+<text x="552" y="170" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Seven promises</text>
+<text x="552" y="186" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">lib/guards/</text>
+<rect x="472" y="264" width="160" height="56" rx="6" fill="#2d3142"/>
+<rect x="472" y="264" width="160" height="56" rx="6" fill="rgba(245,245,245,0.05)" stroke="#bfc0c0" stroke-width="1"/>
+<text x="552" y="290" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Work state</text>
+<text x="552" y="306" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">state.json · config.json</text>
+<rect x="752" y="48" width="160" height="64" rx="6" fill="#2d3142"/>
+<rect x="752" y="48" width="160" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="832" y="78" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">The call runs</text>
+<text x="832" y="94" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">no promise broken</text>
+<rect x="752" y="216" width="160" height="64" rx="6" fill="#2d3142"/>
+<rect x="752" y="216" width="160" height="64" rx="6" fill="rgba(240,138,89,0.1)" stroke="#f08a59" stroke-width="1"/>
+<text x="832" y="246" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Blocked</text>
+<text x="832" y="262" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">the call never runs</text>
+<line x1="36" y1="364" x2="916" y2="364" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
+<text x="36" y="388" fill="#bfc0c0" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">LEGEND</text>
+<rect x="120" y="380" width="24" height="16" rx="3" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="152" y="392" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start">kiln code</text>
+<rect x="256" y="380" width="24" height="16" rx="3" fill="rgba(245,245,245,0.05)" stroke="#bfc0c0" stroke-width="1"/>
+<text x="288" y="392" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start">state the agent cannot write</text>
+<line x1="508" y1="388" x2="540" y2="388" stroke="#bfc0c0" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+<text x="552" y="392" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start">the block is the message, not an obstacle</text>
+</svg>
+</body>
+</html>

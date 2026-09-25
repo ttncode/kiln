@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>The kiln lifecycle</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>*{margin:0;padding:0}body{background:#2d3142}svg{display:block}</style>
+</head>
+<body>
+<svg viewBox="0 0 1200 260" width="1200" height="260" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="kiln-lifecycle-dark-title kiln-lifecycle-dark-desc">
+<title id="kiln-lifecycle-dark-title">The kiln lifecycle</title>
+<desc id="kiln-lifecycle-dark-desc">Seven stages from investigate to ship, with four gates the user approves, all running above PreToolUse hooks that block unsafe tool calls.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bfc0c0"/></marker><marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f08a59"/></marker></defs>
+<rect width="100%" height="100%" fill="#2d3142"/>
+<text x="96" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">01</text>
+<line x1="156" y1="72" x2="204" y2="72" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="264" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">02</text>
+<line x1="324" y1="72" x2="340" y2="72" stroke="#bfc0c0" stroke-width="1.2"/>
+<line x1="356" y1="72" x2="372" y2="72" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<polygon points="348,65 355,72 348,79 341,72" fill="#2d3142" stroke="#f5f5f5" stroke-width="1.2"/>
+<text x="348" y="100" fill="#f5f5f5" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">spec</text>
+<text x="432" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">03</text>
+<line x1="492" y1="72" x2="508" y2="72" stroke="#bfc0c0" stroke-width="1.2"/>
+<line x1="524" y1="72" x2="540" y2="72" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<polygon points="516,65 523,72 516,79 509,72" fill="#2d3142" stroke="#f5f5f5" stroke-width="1.2"/>
+<text x="516" y="100" fill="#f5f5f5" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">plan</text>
+<text x="600" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">04</text>
+<line x1="660" y1="72" x2="708" y2="72" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<text x="768" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">05</text>
+<line x1="828" y1="72" x2="844" y2="72" stroke="#bfc0c0" stroke-width="1.2"/>
+<line x1="860" y1="72" x2="876" y2="72" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<polygon points="852,65 859,72 852,79 845,72" fill="#2d3142" stroke="#f5f5f5" stroke-width="1.2"/>
+<text x="852" y="100" fill="#f5f5f5" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">review</text>
+<text x="936" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">06</text>
+<line x1="996" y1="72" x2="1012" y2="72" stroke="#bfc0c0" stroke-width="1.2"/>
+<line x1="1028" y1="72" x2="1044" y2="72" stroke="#bfc0c0" stroke-width="1.2" marker-end="url(#arrow)"/>
+<polygon points="1020,65 1027,72 1020,79 1013,72" fill="#2d3142" stroke="#f5f5f5" stroke-width="1.2"/>
+<text x="1020" y="100" fill="#f5f5f5" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.06em">ship</text>
+<text x="1104" y="28" fill="#8e98ac" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle" letter-spacing="0.14em">07</text>
+<rect x="36" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="36" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="96" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Investigate</text>
+<text x="96" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln resolve</text>
+<rect x="204" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="204" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="264" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Spec</text>
+<text x="264" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln-brainstorming</text>
+<rect x="372" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="372" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="432" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Plan</text>
+<text x="432" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln-writing-plans</text>
+<rect x="540" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="540" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="600" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Implement</text>
+<text x="600" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln-implement</text>
+<rect x="708" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="708" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="768" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Review</text>
+<text x="768" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln-review</text>
+<rect x="876" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="876" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="936" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Verify</text>
+<text x="936" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln verify</text>
+<rect x="1044" y="40" width="120" height="64" rx="6" fill="#2d3142"/>
+<rect x="1044" y="40" width="120" height="64" rx="6" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="1104" y="70" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">Ship</text>
+<text x="1104" y="86" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">kiln ship</text>
+<rect x="36" y="136" width="1128" height="52" rx="8" fill="rgba(240,138,89,0.05)" stroke="#f08a59" stroke-opacity="0.8" stroke-width="1" stroke-dasharray="4,4"/>
+<text x="600" y="158" fill="#f5f5f5" font-size="12" font-weight="600" font-family="'Geist', system-ui, sans-serif" text-anchor="middle">PreToolUse hooks judge every Edit, Write and Bash call before it runs</text>
+<text x="600" y="176" fill="#f08a59" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="middle">exit 2 blocks the call · no gate record, no source edit · the verdict is an exit code, never stdout</text>
+<line x1="36" y1="212" x2="1164" y2="212" stroke="rgba(245,245,245,0.10)" stroke-width="0.8"/>
+<text x="36" y="236" fill="#bfc0c0" font-size="8" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start" letter-spacing="0.14em">LEGEND</text>
+<rect x="120" y="228" width="24" height="16" rx="3" fill="#393e53" stroke="#f5f5f5" stroke-width="1"/>
+<text x="152" y="240" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start">stage</text>
+<polygon points="232,229 239,236 232,243 225,236" fill="#2d3142" stroke="#f5f5f5" stroke-width="1.2"/>
+<text x="248" y="240" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start">gate — you approve</text>
+<rect x="400" y="228" width="24" height="16" rx="3" fill="rgba(240,138,89,0.05)" stroke="#f08a59" stroke-dasharray="4,4" stroke-width="1"/>
+<text x="432" y="240" fill="#bfc0c0" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="start">hook — blocks at runtime</text>
+<text x="1164" y="240" fill="#8e98ac" font-size="9" font-weight="400" font-family="'Geist Mono', ui-monospace, monospace" text-anchor="end">the full path · bounded drops spec and the ship gate · spike stops at a probe gate and never ships</text>
+</svg>
+</body>
+</html>
