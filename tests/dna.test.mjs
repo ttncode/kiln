@@ -899,6 +899,26 @@ test("D178: a pin this clone lacks, a module not checked out, and a root citatio
   assert.match(kiln(root, ["dna", "check"]).stdout, /citations resolve at the store's pinned commits — not judged — module admin/);
 });
 
+test("D182: when a round moves the pin, old citations follow their lines through the diff, and one the change rewrote is named", () => {
+  const { root, config } = scanFixture({ "src/price.js": BRANCHY });
+  const cite = (loc) => [{ src: "root", ref: "src/price.js", loc }];
+  const finding = (proposition, loc) => ({ key: loc, category: "CODE_ONLY", proposition, module: "src/price.js", evidence: cite(loc) });
+  applyBatch(root, { batch: { scan: { commits: { root: git(root, ["rev-parse", "HEAD"]) }, files: ["src/price.js"] }, upsert: { findings: [
+    finding("A VIP order ships free", "L2"), finding("Big orders pay less", "L2-L3"), finding("A free line ships free", "L4"), finding("Orders pay 10 otherwise", "L5"), finding("Free lines and the default", "L4-L5"),
+  ] } }, today: TODAY, config });
+  writeFile(join(root, "src/price.js"), `// pricing\n// rules\n${BRANCHY.replace("if (line.free) return 1;", "if (line.free) return 2;")}`);
+  commitAll(root, "moved");
+  const plan = applyBatch(root, { batch: { scan: { commits: { root: git(root, ["rev-parse", "HEAD"]) }, files: ["src/price.js"] }, upsert: { findings: [{ id: "RD-0003", evidence: cite("L6") }] } }, today: TODAY, config });
+  const locs = readStore(root).data.findings.map((row) => row.evidence[0].loc);
+  assert.deepEqual(locs, ["L4", "L4-L5", "L6", "L7", "L4-L5"], "lines above moved down by two; a rewritten line keeps its old citation until it is re-cited");
+  assert.deepEqual(plan.carried, { moved: 3, touched: ["RD-0005"] }, "RD-0003 was re-cited by the batch itself, so only RD-0005 is left to judge");
+  assert.match(kiln(root, ["dna", "check"]).stdout, /RESULT: PASS/);
+  writeFile(join(root, "src/price.js"), `// v3\n${readFileSync(join(root, "src/price.js"), "utf8")}`);
+  commitAll(root, "again");
+  writeFile(join(root, ".kiln/tmp/b.json"), JSON.stringify({ scan: { commits: { root: git(root, ["rev-parse", "HEAD"]) }, files: ["src/price.js"] } }));
+  assert.match(kiln(root, ["dna", "apply", ".kiln/tmp/b.json"]).stdout, /The pin moved: 5 record\(s\) had their citations carried to the new lines\./);
+});
+
 test("kiln dna update: a module's changed file says which repository, path and commit to diff it in", () => {
   const { root, config } = scanFixture({});
   const module = join(root, "mods/sub");

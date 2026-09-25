@@ -51,6 +51,9 @@ Subagent (general-purpose):
 
     - A cited finding whose behavior changed: upsert it by its `id` with the new proposition and
       evidence.
+    - A cited finding whose behavior did not change: leave it. kiln moves its lines with the diff
+      when the round is applied. If the diff rewrote the lines it cites, upsert its `evidence` by
+      its `id` at the lines `<commit>` holds.
     - New behavior: a new finding, as above.
     - A cited finding the change made untrue: do not touch it — list it in your report with the
       diff lines that retire it.
