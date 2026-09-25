@@ -837,7 +837,7 @@ test("D178: citations already in a store are warned about at its pins, and recit
     .replace('"src":"admin","ref":"app/price.php","loc":"L3"', '"src":"Admin","ref":"Admin/app/gone.php","loc":"L3"')).join("\n"));
   const checked = kiln(root, ["dna", "check"]);
   assert.equal(checked.status, 0, "old debt is reported, not blocking");
-  assert.match(checked.stdout, /citations resolve at the store's pinned commits.*2 do not — `kiln dna recite`/);
+  assert.match(checked.stdout, /citations resolve at the store's pinned commits.*2 citation\(s\) in 2 record\(s\) do not — `kiln dna recite`/, "one unit named, so a record count from recite is not read as citations left over");
 
   const dry = kiln(root, ["dna", "recite"]);
   assert.match(dry.stdout, /needs a reader — RD-0002: admin at \w+ has no file app\/gone\.php/);
@@ -847,7 +847,7 @@ test("D178: citations already in a store are warned about at its pins, and recit
   assert.equal(kiln(root, ["dna", "recite", "--apply"]).status, 0);
   assert.equal(readStore(root).data.findings[0].evidence[0].src, "admin");
   assert.deepEqual(readStore(root).data.findings[0].evidence[0], { src: "admin", ref: "app/price.php", loc: "L2-L3" });
-  assert.match(kiln(root, ["dna", "check"]).stdout, /1 do not/, "what needs a reader is still said");
+  assert.match(kiln(root, ["dna", "check"]).stdout, /1 citation\(s\) in 1 record\(s\) do not/, "what needs a reader is still said");
 
   writeFile(join(root, ".kiln/tmp/retire.json"), JSON.stringify({ upsert: { excluded: [{ id: "EXC-RETIRED-UPD-0001", catalog: "RETIRED", name: "Retired", disposition: "the file was deleted", rd_ids: ["RD-0002"] }] } }));
   assert.equal(kiln(root, ["dna", "apply", ".kiln/tmp/retire.json"]).status, 0);
