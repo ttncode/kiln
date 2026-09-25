@@ -28,7 +28,7 @@ no other prerequisite — kiln has zero runtime dependencies and intends to keep
 
 ## Changing behaviour the design already decided
 
-The design lives in [`docs/design/`](docs/design/) and is not decoration: 183 numbered
+The design lives in [`docs/design/`](docs/design/) and is not decoration: 184 numbered
 decisions, each with the reasoning that produced it.
 
 - **Disagreeing with a decision is welcome.** Cite it by number, say what you measured, and
@@ -57,6 +57,25 @@ decisions, each with the reasoning that produced it.
 
 Acceptance runs need a real repository, a real ticket, and a person to grade the result.
 They are the maintainer's job, not a contributor's.
+
+## Cutting a release
+
+```bash
+git switch -c chore/v1.0.0-rc.N
+npm version prerelease --preid rc --no-git-tag-version
+```
+
+`npm version` writes `package.json` and its lock, and its `version` script moves both plugin
+manifests with them (D184). Commit it as `chore: v1.0.0-rc.N` and land it like any other change.
+Once it is merged, tag the commit main holds and publish the release:
+
+```bash
+git tag v1.0.0-rc.N <merged commit> && git push origin v1.0.0-rc.N
+gh release create v1.0.0-rc.N --prerelease --generate-notes
+```
+
+The tag comes after the merge because main takes squash merges only: a tag `npm version`
+made on the branch would name a commit main never holds.
 
 ## Reporting a bug
 
