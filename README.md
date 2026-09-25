@@ -55,13 +55,7 @@ You need Node 20.10 or newer. kiln has **zero runtime dependencies**.
 /plugin install kiln
 /kiln:kiln init
 ```
-
-For local development: `claude --plugin-dir /path/to/kiln`.
-
 </details>
-
-`init` detects your stack, then asks what must never be pushed to and what runs the tests.
-Every question has a default. It never overwrites a file you already have.
 
 **No token. No Docker. No Python. No CI.**
 
@@ -71,26 +65,22 @@ To update, run `/plugin update kiln`, then `/kiln:kiln doctor` in each project.
 
 ## Your first run
 
+A sentence:
+
 ```
 /kiln:kiln "the export button on the reports page does nothing"
 ```
 
-kiln investigates, says which path it picked, and stops at a gate. Before you approve the
-plan, the agent can't edit source, including through the shell:
+JIRA Ticket ID:
 
 ```
-kiln blocked a source edit: the plan gate is not approved.
-Go back to the gate. The block is the message, not an obstacle to route around.
+/kiln:kiln UN-325
 ```
 
-After that, a test that lies about its result still fails, because kiln reads the exit code:
+GitLab URL:
 
 ```
-$ kiln verify 42
-  FAIL  unit       exit 1  160ms
-
-> echo "All tests passed" && exit 1
-All tests passed
+/kiln:kiln https://gitlab/project/-/work_items/1957
 ```
 
 ---
