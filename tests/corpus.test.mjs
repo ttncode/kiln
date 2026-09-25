@@ -293,6 +293,10 @@ const CONTROL_FILES = [
   ["edit", ".kiln/dna/store.previous/domains.jsonl", "deny", DNA],
   ["bash", "cp -r src .kiln/dna/", "deny", DNA],
   ["bash", "echo x > .kiln/dna/store.building/findings.jsonl", "deny", DNA],
+  ["bash", "cd .kiln && cp tmp/notes.md dna/security-and-bugs.md", "deny", DNA],
+  ["bash", "cd .kiln/dna && cp ../tmp/notes.md notes.md", "deny", DNA],
+  ["bash", "rsync .kiln/tmp/notes.md .kiln/dna/notes.md", "deny", DNA],
+  ["bash", "cd .kiln && rm -rf dna", "deny", /DNA store|enforces the run/],
 ];
 
 const NOTHING_OPEN = [
@@ -306,6 +310,9 @@ const NOTHING_OPEN = [
   ["edit", ".kiln/rules/new.md", "allow"],
   ["edit", ".kiln/dna/store/features.jsonl", "deny", DNA],
   ["edit", ".kiln/dna/domain-dictionary-shop.md", "allow"],
+  ["bash", "cd .kiln && cp tmp/notes.md dna/security-and-bugs.md", "deny", DNA],
+  ["bash", "cd .kiln && rm config.json", "deny", CONTROL],
+  ["bash", "cd src && cp app.js app-copy.js", "allow"],
   ["edit", ".kiln/dna/store.previous/domains.jsonl", "deny", DNA],
   ["bash", "rm -rf .kiln/dna", "deny", /DNA store|enforces the run/],
   ["bash", "mv .kiln/dna/store .kiln/dna/old", "deny", /DNA store|enforces the run/],
