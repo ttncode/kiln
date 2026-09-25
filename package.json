@@ -11,7 +11,8 @@
   "scripts": {
     "test": "node --test tests/",
     "lint": "eslint .",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "version": "node scripts/version-sync.mjs && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json"
   },
   "dependencies": {},
   "devDependencies": {

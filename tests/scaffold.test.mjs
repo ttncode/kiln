@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
@@ -30,6 +33,18 @@ test("the marketplace manifest exists and agrees with the plugin", () => {
   assert.equal(entry.name, manifest.name);
   assert.equal(entry.version, manifest.version, "version-sync reaches every manifest, not two of three");
   assert.equal(entry.description, manifest.description);
+});
+
+test("D184: `npm version` moves both plugin manifests with package.json", () => {
+  assert.match(pkg.scripts.version, /^node scripts\/version-sync\.mjs /);
+  const dir = mkdtempSync(join(tmpdir(), "kiln-version-"));
+  cpSync(new URL("../.claude-plugin", import.meta.url), join(dir, ".claude-plugin"), { recursive: true });
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ ...pkg, version: "9.9.9-rc.1" }));
+  const run = spawnSync(process.execPath, [new URL("../scripts/version-sync.mjs", import.meta.url).pathname], { cwd: dir, encoding: "utf8" });
+  assert.equal(run.status, 0, run.stderr);
+  const read = (name) => JSON.parse(readFileSync(join(dir, ".claude-plugin", name), "utf8"));
+  assert.equal(read("plugin.json").version, "9.9.9-rc.1");
+  assert.equal(read("marketplace.json").plugins[0].version, "9.9.9-rc.1");
 });
 
 test("every manifest carries the description the repository advertises", () => {
