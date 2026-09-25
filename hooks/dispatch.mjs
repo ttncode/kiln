@@ -38,14 +38,29 @@ function block(message) {
  * command moves into, and the paths it writes or removes. kiln drives a project when one of
  * them sits under a `.kiln/config.json` — not only when the session happens to stand in one.
  */
+/**
+ * D180: each target is resolved from where its own command runs. `cd .kiln && cp tmp/x dna/y`
+ * writes `.kiln/dna/y`, and resolved from the session's directory it read as a harmless
+ * `dna/y` — the store's guard was walked past that way. cc-safety-net keeps an effective
+ * working directory per segment for the same reason; kiln already had one (`cwdChain`, for
+ * git) and now reads its writes through it too. A `cd` it cannot follow — a variable, a `||`
+ * — leaves the session's directory, as before.
+ */
+function located(command, { cwd, extract }) {
+  const dirs = cwdChain(command, cwd);
+  return segmentsOf(command).flatMap((part, index) => extract(part).map((path) => ({ path, cwd: dirs[index] ?? cwd })));
+}
+
+const allTargets = (part) => [...writeTargets(part), ...removalTargets(part), ...destructiveTargets(part)];
+
 function touchedDirs(payload, cwd) {
   const file = payload.tool_input?.file_path ?? payload.tool_input?.notebook_path;
   const command = payload.tool_input?.command;
   const dirs = [cwd, ...(file ? [dirname(resolve(cwd, file))] : [])];
   if (!command) return dirs;
   const moved = [...cwdChain(command, cwd), ...segmentsOf(command).map((part) => dirOf(part, cwd))];
-  const paths = [...writeTargets(command), ...removalTargets(command), ...destructiveTargets(command)];
-  return [...dirs, ...moved.filter(Boolean), ...paths.map((path) => dirname(resolve(cwd, path))), ...namedDirs(command)];
+  const paths = located(command, { cwd, extract: allTargets });
+  return [...dirs, ...moved.filter(Boolean), ...paths.map((at) => dirname(resolve(at.cwd, at.path))), ...namedDirs(command)];
 }
 
 const MAX_NAMED = 20;
@@ -181,8 +196,8 @@ async function runStackGuards(payload, { phase, stackId }) {
  */
 async function stackGuardsOnBashWrites(payload, ctx) {
   const command = payload.tool_input?.command;
-  for (const path of writeTargets(command)) {
-    const synthetic = { ...payload, tool_input: { file_path: resolveTarget(path, ctx.cwd), content: command } };
+  for (const at of located(command, { cwd: ctx.cwd, extract: writeTargets })) {
+    const synthetic = { ...payload, tool_input: { file_path: resolveTarget(at.path, at.cwd), content: command } };
     const verdict = await runStackGuards(synthetic, { phase: "pre-edit", stackId: ctx.stackId });
     if (verdict === BLOCK) return BLOCK;
   }
@@ -303,8 +318,8 @@ function removedEntry(path, cwd) {
 }
 
 function guardRemovedControlFiles(command, ctx) {
-  const removed = removalTargets(command).map((path) => removedEntry(path, ctx.cwd));
-  const locked = permissionTargets(command).map((path) => resolveEntry(path, ctx.cwd));
+  const removed = located(command, { cwd: ctx.cwd, extract: removalTargets }).map((at) => removedEntry(at.path, at.cwd));
+  const locked = located(command, { cwd: ctx.cwd, extract: permissionTargets }).map((at) => resolveEntry(at.path, at.cwd));
   const hit = removed.find((target) => isControlled(ctx, target) || holdsControl(ctx.root, target)) ?? locked.find((target) => lockedAway(ctx, target));
   return hit ? block(sandboxMessage(ctx.root, { target: hit, activeId: ctx.state?.id, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
 }
@@ -327,8 +342,8 @@ function guardVerification(payload) {
 function guardSandboxBash(payload, ctx) {
   const command = payload.tool_input?.command;
   if (guardRemovedControlFiles(command, ctx) === BLOCK) return BLOCK;
-  const paths = [...destructiveTargets(command), ...writeTargets(command)];
-  return paths.map((path) => checkPath(path, ctx)).find((verdict) => verdict === BLOCK) ?? ALLOW;
+  const paths = located(command, { cwd: ctx.cwd, extract: (part) => [...destructiveTargets(part), ...writeTargets(part)] });
+  return paths.map((at) => checkPath(at.path, { ...ctx, cwd: at.cwd })).find((verdict) => verdict === BLOCK) ?? ALLOW;
 }
 
 function guardGateFile(payload, ctx) {
@@ -350,8 +365,8 @@ function guardGateBash(payload, ctx) {
     const verdict = shipVerdict(ctx.root, ctx.state);
     if (verdict.blocked) return block(gateMessage("opening a pull request", verdict.reason));
   }
-  return writeTargets(command)
-    .map((path) => guardGateFile({ tool_input: { file_path: path } }, ctx))
+  return located(command, { cwd: ctx.cwd, extract: writeTargets })
+    .map((at) => guardGateFile({ tool_input: { file_path: at.path } }, { ...ctx, cwd: at.cwd }))
     .find((verdict) => verdict === BLOCK) ?? ALLOW;
 }
 
