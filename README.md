@@ -240,7 +240,7 @@ hooks make sure a mistake doesn't reach you.
 | **Not done** | one validation run on a production repository |
 
 The design came before the code. The [architecture log](docs/design/2026-09-19-kiln-architecture.md)
-holds 182 decisions, each with its reason.
+holds 183 decisions, each with its reason.
 
 ---
 
