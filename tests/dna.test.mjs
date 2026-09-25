@@ -198,6 +198,18 @@ test("DNA apply: findings are never removed, and a merged node's id is never cou
   assert.equal(plan.assigned[0].id, "DOM-TXT-03");
 });
 
+test("D181: a batch applied twice is refused, because each of its new findings would be recorded again", () => {
+  const root = project();
+  applyBatch(root, { batch: seedBatch(), today: TODAY });
+  assert.throws(() => applyBatch(root, { batch: seedBatch(), today: TODAY }), /RD-0001 already records "slugify lowercases its input".*applied already\? Nothing was written/);
+  assert.equal(readStore(root).data.findings.length, 2);
+  const twice = { category: "behavior", proposition: "slugify trims its input", module: "src/slug.js" };
+  assert.throws(() => applyBatch(root, { batch: { upsert: { findings: [twice, twice] } }, today: TODAY }), /this batch already records "slugify trims its input"/);
+  const elsewhere = { category: "behavior", proposition: "slugify lowercases its input", module: "src/slug.js", evidence: [{ src: "code", ref: "src/slug.js", loc: "L9" }] };
+  assert.equal(applyBatch(root, { batch: { upsert: { findings: [elsewhere] } }, today: TODAY }).assigned[0].id, "RD-0003", "the same words at other lines are another finding");
+  applyBatch(root, { batch: { upsert: { findings: [{ id: "RD-0001", proposition: "slugify lowercases its input" }] } }, today: TODAY });
+});
+
 test("DNA check: a derived field edited by hand is found, and so is a count the manifest does not hold", () => {
   const root = project();
   applyBatch(root, { batch: seedBatch(), today: TODAY });
