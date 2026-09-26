@@ -115,6 +115,8 @@ You MUST complete each phase before proceeding to the next.
    - Keep tracing up until you find the source
    - Fix at source, not at symptom
 
+   See `root-cause-tracing.md` in this directory for the complete backward tracing technique.
+
 ### Phase 2: Pattern Analysis
 
 **Find the pattern before fixing:**
@@ -272,6 +274,15 @@ If systematic investigation reveals issue is truly environmental, timing-depende
 4. Add monitoring/logging for future investigation
 
 **But:** 95% of "no root cause" cases are incomplete investigation.
+
+## Supporting Techniques
+
+These techniques are part of systematic debugging and available in this directory:
+
+- **`root-cause-tracing.md`** - Trace bugs backward through call stack to find original trigger
+- **`defense-in-depth.md`** - Add validation at multiple layers after finding root cause
+- **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
+- **`find-polluter.sh`** - Find which test leaves a file or state behind, one test file at a time
 
 ## Verification
 
