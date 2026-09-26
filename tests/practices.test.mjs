@@ -125,10 +125,10 @@ test("D189: the review gate refuses until the readers were asked for, and until 
   assert.equal(partial.status, 2);
   assert.match(partial.stderr, new RegExp(`does not account for ${named[0]}`));
 
-  const wrapped = `lenses: ${named[0]} failed, ${named.slice(1).map((name) => `${name} reported`).join(", ")}`.replace(/(.{60,79}) /g, "$1\n");
+  const wrapped = `lenses: ${named[0]} failed, ${named.slice(1).map((name) => `${name} reported`).join(", ")}.`.replace(/(.{60,79}) /g, "$1\n");
   writeFile(join(root, ".kiln", "work", "w1", "review.md"), `# review\n\n${wrapped}\n\n## Triage log\n`);
   const passed = kiln(root, ["gate", "w1", "review", "--answer", "yes, approved"]);
-  assert.equal(passed.status, 0, `a failed reader is accounted for, and a line wrapped as markdown is still one line: ${passed.stderr}`);
+  assert.equal(passed.status, 0, `a failed reader is accounted for, and a line wrapped as markdown and ended with a full stop is still read: ${passed.stderr}`);
 });
 
 test("D189: the readers read one diff — untracked files in, kiln's own record out — and the claims and intent beside it", () => {
