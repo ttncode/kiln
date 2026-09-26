@@ -503,6 +503,13 @@ agent-skills' `/ship` decision:
 - **Rollback plan** — the trigger conditions, the exact steps, and the recovery time, from
   shipping-and-launch's template; for a migration, what the down-migration does.
 
+**On `full`, SHIP starts with its own gate.** The review gate closed source; the `ship` gate is
+the one that authorises shipping. Once `kiln verify <id>` is green, render the ship gate — the
+same format as every gate, on `review.md` with the verify rows and anything that changed since
+the review — record the user's answer (`kiln gate <id> ship --answer "<their words>"`, or
+`--auto` where auto mode is on), and only then commit. On `bounded` the review gate already
+authorised shipping, so there is no second gate.
+
 SHIP is the run's **one** commit point. Commit an **explicit path list** — never `git add -A`,
 and never a broad commit because the tree is dirty. `kiln ship <id>` prints that list on its
 `stage:` lines, one per repository, the work's own record included where the project keeps it:
