@@ -345,5 +345,29 @@
       "glob:**/templates/**",
       "glob:**/components/**"
     ]
+  },
+  {
+    "id": "interview-me",
+    "stage": "investigate",
+    "file": "skills/kiln-orchestrator/interview-me.md",
+    "when": [
+      "path:full"
+    ]
+  },
+  {
+    "id": "idea-refine",
+    "stage": "investigate",
+    "file": "skills/kiln-brainstorming/idea-refine.md",
+    "when": [
+      "path:spike"
+    ]
+  },
+  {
+    "id": "spec-driven-development",
+    "stage": "investigate",
+    "file": "skills/kiln-brainstorming/spec-driven-development.md",
+    "when": [
+      "path:full"
+    ]
   }
 ]
