@@ -452,5 +452,18 @@
     "kind": "verbatim",
     "upstream_sha256": "8b736cb9e55b82b265ab6ff78349c0e826e8a6df550deddf665b7fb3ff858b63",
     "kiln_sha256": "8b736cb9e55b82b265ab6ff78349c0e826e8a6df550deddf665b7fb3ff858b63"
+  },
+  {
+    "path": "skills/kiln-orchestrator/git-workflow-and-versioning.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/git-workflow-and-versioning/SKILL.md",
+    "kind": "excerpt",
+    "edits": [
+      "the overview and six sections only: Descriptive Messages, Keep Concerns Separate, Size Your Changes, Change Summaries, Pre-Commit Hygiene, Handling Generated Files",
+      "commit cadence, atomic commits, branching, worktrees, the save point, bisect and releases are not taken (D142, D66)"
+    ],
+    "upstream_sha256": "b7465d187935c52546d39fdc7bd6ac36d94eda25a9500ef8c18b767d2eb116ea",
+    "kiln_sha256": "64bbf1798879ccb16ba5cb9980d9db716e7cc160a82cd8ee193d08567d075cc1"
   }
 ]

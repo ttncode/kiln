@@ -1,4 +1,4 @@
-> **In kiln:** agent-skills' skills/shipping-and-launch/SKILL.md, verbatim (D189). A skill it names is the file of that name in kiln's skills; a path it gives (references/…) is the file of that name there too. What kiln overrides in it is said where kiln routes it.
+> **In kiln:** agent-skills' skills/shipping-and-launch/SKILL.md, verbatim (D193). kiln ends at the pull request: the pre-launch checklist and the Rollback Plan template go into its body at SHIP; the deploys, rollout stages, flag operations and reverts are the user's, after it merges.
 
 ---
 name: shipping-and-launch
