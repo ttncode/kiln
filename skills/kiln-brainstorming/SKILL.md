@@ -265,7 +265,13 @@ After writing the spec document, look at it with fresh eyes:
 1. **Placeholder scan:** Any "TBD", "TODO", incomplete sections, or vague requirements? Fix them.
 2. **Internal consistency:** Do any sections contradict each other? Does the architecture match the feature descriptions?
 3. **Scope check:** Is this focused enough for a single implementation plan, or does it need decomposition?
-4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit.
+4. **Ambiguity check:** Could any requirement be interpreted two different ways? If so, pick one and make it explicit. Under `--auto` there is nobody to see which you picked: do not pick one — halt with `kiln halt <id> --kind blocking_unknown` and name the readings (BMAD build-auto: "do not resolve one by picking a reading").
+5. **Non-goals are explicit** (BMAD's spec kernel): at least one. Absence means downstream work fills the vacuum.
+6. **Success signal is concrete** enough to test or demonstrate against. "Users love it" doesn't qualify.
+7. **Preservation:** walk the request — the ticket, the user's words — claim by claim, and confirm each load-bearing claim landed in the spec. A drop is written down, not silent.
+8. **Domain gaps:** a recognised domain implication the request leaves unaddressed (health data silent on privacy, payments silent on PCI, control systems silent on fail-safe) is an open question in the spec. Flag it; never invent the answer.
+
+[spec-driven-development.md](spec-driven-development.md) beside this skill is agent-skills' method for the spec itself — assumptions first, six core areas, Always / Ask first / Never boundaries, requirements reframed as success criteria; `kiln practices <id> --stage investigate` names it on `full`.
 
 Fix any issues inline. No need to re-review — just fix and move on.
 
@@ -280,6 +286,12 @@ Wait for the user's response. If they request changes, make them and re-run the 
 
 - Invoke the kiln-writing-plans skill to create a detailed implementation plan
 - Do NOT invoke any other skill. kiln-writing-plans is the next step.
+
+## Exploring an idea first
+
+On `spike`, or when the idea itself is still vague, [idea-refine.md](idea-refine.md) is
+agent-skills' divergent-then-convergent method, with [frameworks.md](frameworks.md),
+[refinement-criteria.md](refinement-criteria.md) and [examples.md](examples.md).
 
 ## Visual Companion
 

@@ -23,6 +23,9 @@ Subagent (general-purpose):
     | Clarity | Requirements ambiguous enough to cause someone to build the wrong thing |
     | Scope | Focused enough for a single plan — not covering multiple independent subsystems |
     | YAGNI | Unrequested features, over-engineering |
+    | Non-goals | At least one; none means downstream work fills the gap |
+    | Success signal | Concrete enough to test or demonstrate against |
+    | Decisions that bind | Construct two parts that each obey every decision in the spec to the letter yet still build incompatibly; if you can, name the gap that allows it (BMAD's architecture adversary) |
 
     ## Calibration
 

@@ -377,5 +377,80 @@
     "kind": "verbatim",
     "upstream_sha256": "1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c",
     "kiln_sha256": "1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c"
+  },
+  {
+    "path": "skills/kiln-orchestrator/interview-me.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/interview-me/SKILL.md",
+    "kind": "edited",
+    "edits": [
+      "the confirmed intent is written into the brief instead of offered for docs/intent/",
+      "the \"offer downstream paths\" step is replaced: kiln's path is already chosen"
+    ],
+    "upstream_sha256": "ace4b675999bb504593d572e0f73f3d7e803ad6fddf318445598c82c11939db2",
+    "kiln_sha256": "4fa2e622a7b4757178f5340a3469b2cb9033be9c861459c40600e69d8e89e012"
+  },
+  {
+    "path": "skills/kiln-brainstorming/idea-refine.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/idea-refine/SKILL.md",
+    "kind": "edited",
+    "edits": [
+      "the idea-refine.sh call removed (it writes docs/ideas/ before any gate)",
+      "the one-pager is saved to .kiln/work/<id>/idea.md"
+    ],
+    "upstream_sha256": "79e773058963adc7646b0115b4f8a4afc974c5ff95843e4ef1cafff3cb51899e",
+    "kiln_sha256": "ad077af7e64f08c8df3923cbe430bce97e8201d1353846abb77c93a426d90077"
+  },
+  {
+    "path": "skills/kiln-brainstorming/frameworks.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/idea-refine/frameworks.md",
+    "kind": "verbatim",
+    "upstream_sha256": "161ebc18fdf2d996bc62a87a2d747cf1bf53548354f8925de25c732c27f00309",
+    "kiln_sha256": "161ebc18fdf2d996bc62a87a2d747cf1bf53548354f8925de25c732c27f00309"
+  },
+  {
+    "path": "skills/kiln-brainstorming/refinement-criteria.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/idea-refine/refinement-criteria.md",
+    "kind": "verbatim",
+    "upstream_sha256": "1ca2973a4d01b5cb37ab7ddb2eff77fa4e792634a33d0ce44961c068fc88d51a",
+    "kiln_sha256": "1ca2973a4d01b5cb37ab7ddb2eff77fa4e792634a33d0ce44961c068fc88d51a"
+  },
+  {
+    "path": "skills/kiln-brainstorming/examples.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/idea-refine/examples.md",
+    "kind": "verbatim",
+    "upstream_sha256": "563204bfbf2f80a444151695205af4cb759e722b3d1e5460e08f278a69c89ba1",
+    "kiln_sha256": "563204bfbf2f80a444151695205af4cb759e722b3d1e5460e08f278a69c89ba1"
+  },
+  {
+    "path": "skills/kiln-brainstorming/spec-driven-development.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/spec-driven-development/SKILL.md",
+    "kind": "excerpt",
+    "edits": [
+      "the title, Overview, When to Use and Phase 1 (Specify) only",
+      "the External spec tools paragraph removed: it makes this skill the owner of the approval gates, which are kiln's"
+    ],
+    "upstream_sha256": "f7129bca8742bad73f60209bd237e8b10dab6f1fae8576dc552fb1923bc1e721",
+    "kiln_sha256": "91b746a8bf6c9809c36825fea3d309a9157cd8bc9825cb40cc42abd04d28db87"
+  },
+  {
+    "path": "skills/kiln-orchestrator/context-engineering.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/context-engineering/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "8b736cb9e55b82b265ab6ff78349c0e826e8a6df550deddf665b7fb3ff858b63",
+    "kiln_sha256": "8b736cb9e55b82b265ab6ff78349c0e826e8a6df550deddf665b7fb3ff858b63"
   }
 ]
