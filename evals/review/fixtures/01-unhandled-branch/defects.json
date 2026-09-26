@@ -1,0 +1,1 @@
+[{"id":"green-undefined","where":"src/status.js statusBadge / src/dashboard.js renderRow","what":"statusBadge has no branch for GREEN (or any other status) and returns undefined, so destructuring it in renderRow throws and the dashboard fails for every on-track project"}]

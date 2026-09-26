@@ -1,0 +1,1 @@
+[{"id":"sql-injection","where":"application/models/Products_model.php find_by_genre","what":"the genre name from the query string is concatenated into the SQL string, so ?genre= can inject SQL (read other stores' data, bypass the store scope)"}]

@@ -1,0 +1,1 @@
+[{"id":"ownership-check-dropped","where":"src/routes/invoices.js PUT /invoices/:id","what":"the ownership check (invoice.ownerId !== req.user.id → 403) was removed in the refactor and not moved into the service, so any signed-in user can edit anyone's invoice"}]

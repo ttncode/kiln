@@ -1,0 +1,1 @@
+[{"id":"wrong-surface","where":"src/routes/orders.js GET /me/orders","what":"the filter was added to the admin CSV export, not to the customer's order history endpoint (GET /me/orders), so customers still see archived orders — the change implements a different reading of the request"}]
