@@ -17,7 +17,7 @@ import { mkdirSync, symlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { cleanupFixtures, git, tempRoot, writeFile } from "./helpers/fixture.mjs";
-import { SESSION, nodeProject, ok } from "./helpers/journey.mjs";
+import { SESSION, nodeProject, ok, writeReview } from "./helpers/journey.mjs";
 import { judge } from "./helpers/hook.mjs";
 
 after(cleanupFixtures);
@@ -26,7 +26,7 @@ const ID = "w1";
 const DENY = 2;
 const ALLOW = 0;
 
-function project({ open = true, approved = false } = {}) {
+function project({ open = true, approved = false, reviewed = false } = {}) {
   const root = nodeProject({ name: "corpus" });
   git(root, ["checkout", "-q", "-b", "feature/work"]);
   const outside = tempRoot("kiln-outside-");
@@ -37,9 +37,13 @@ function project({ open = true, approved = false } = {}) {
     ok(root, ["open", ID, "--session", SESSION]);
     ok(root, ["open", "other", "--session", "another-session"]);
   }
-  if (approved) {
+  if (approved || reviewed) {
     writeFile(join(root, ".kiln", "work", ID, "plan.md"), "# plan\n\n## Risk flags\n- none\n");
     ok(root, ["gate", ID, "plan", "--artifact", `.kiln/work/${ID}/plan.md`, "--answer", "Approve this plan as written", "--predicted", "src/app.js"]);
+  }
+  if (reviewed) {
+    writeReview(root, ID);
+    ok(root, ["gate", ID, "review", "--answer", "1. Approve this as written (recommended)"]);
   }
   return { root, outside };
 }
@@ -78,6 +82,7 @@ const CONTROL = /enforces the run|control files|kiln cannot read what an inline 
 const SANDBOX = /outside the project root|another work's directory|symlink/;
 const GATE = /plan gate is not approved|gate is not approved/;
 const DNA = /DNA store is written only by `kiln dna apply/;
+const COMMIT = /kiln blocked a commit: [\s\S]*one commit point/;
 const DISCARD = /throws away uncommitted work, and work w1 \(in_progress\)[\s\S]*edit the file back/;
 
 // ------------------------------------------------------------- D7 item 1
@@ -108,7 +113,6 @@ const BRANCHES = [
   ["bash", "sudo -u deploy git push origin main", "deny", PROTECTED],
   ["bash", "env GIT_DIR=.git git push origin main", "deny", PROTECTED],
   ["bash", "git -c 'alias.x=!git push origin main' x", "deny", PROTECTED],
-  ["bash", "FOO=1 git commit -m x", "allow"],
   ["bash", "sudo git push origin feature/work", "allow"],
   ["bash", "git -c alias.st=status st", "allow"],
   ["bash", "env | grep git", "allow"],
@@ -118,16 +122,12 @@ const BRANCHES = [
   ["bash", "git push -u origin HEAD", "allow"],
   ["bash", "git push", "allow"],
   ["bash", "git push origin HEAD:refs/heads/feature/work", "allow"],
-  ["bash", "git commit -m x", "allow"],
   ["bash", "git merge main", "allow"],
   ["bash", "git rebase main", "allow"],
   ["bash", "git fetch origin && git pull", "allow"],
   ["bash", "git checkout main", "allow"],
   ["bash", "git status && git log --oneline && git diff", "allow"],
-  ["bash", "git checkout -b fix/y && git commit -m y", "allow"],
-  ["bash", "git commit -m \"$(cat <<'EOF'\nfix: the thing\n\ngit push origin main is what we avoid\nEOF\n)\"", "allow"],
   ["bash", "cat > .kiln/tmp/{id}/note.md <<'EOF'\ncd /elsewhere && git commit -m x\nEOF", "allow"],
-  ["bash", "cd \"$SOMEWHERE\" && git commit -m x", "allow"],
 ];
 
 const DISARMING = [
@@ -151,10 +151,6 @@ const DISARMING = [
   ["bash", "bash <<'EOF'\ngit commit --no-verify -m x\nEOF", "deny", DISARM],
   ["bash", "bash -c \"git commit --no-verify -m x\"", "deny", DISARM],
   ["bash", "git push -n origin feature/work", "allow"],
-  ["bash", "git commit -m \"fix -n handling\"", "allow"],
-  ["bash", "git commit -m \"mention --no-verify in a message\"", "allow"],
-  ["bash", "git commit -mn", "allow"],
-  ["bash", "git commit --no-edit --amend", "allow"],
   ["bash", "git log --no-walk", "allow"],
 ];
 
@@ -402,7 +398,41 @@ const DISCARDING = [
   ["bash", "git merge feature/work", "allow"],
 ];
 
+// ------------------------------------------------------------- D206: the one commit point
+
+const COMMITTING = [
+  ["bash", "git commit -m x", "deny", COMMIT],
+  ["bash", "git add src/app.js && git commit -m x", "deny", COMMIT],
+  ["bash", "FOO=1 git commit -m x", "deny", COMMIT],
+  ["bash", "sudo git commit -m x", "deny", COMMIT],
+  ["bash", "git -c alias.ci=commit ci -m x", "deny", COMMIT],
+  ["bash", "bash -c 'git commit -m x'", "deny", COMMIT],
+  ["bash", "git commit --amend --no-edit", "deny", COMMIT],
+  ["bash", "git status", "allow"],
+  ["bash", "git log --oneline", "allow"],
+];
+
+const AT_SHIP = [
+  ["bash", "git add src/app.js && git commit -m x", "allow"],
+  ["bash", "git commit -m x -- src/app.js", "allow"],
+  ["bash", "git commit -m -a", "allow"],
+  ["bash", "git commit --message --all", "allow"],
+  ["bash", "git commit -am x", "deny", /never every tracked change/],
+  ["bash", "git commit -a -m x", "deny", /never every tracked change/],
+  ["bash", "git commit --all -m x", "deny", /never every tracked change/],
+  ["bash", "git commit -qam x", "deny", /never every tracked change/],
+];
+
 const NOTHING_OPEN = [
+  ["bash", "FOO=1 git commit -m x", "allow"],
+  ["bash", "git commit -m x", "allow"],
+  ["bash", "git checkout -b fix/y && git commit -m y", "allow"],
+  ["bash", "cd \"$SOMEWHERE\" && git commit -m x", "allow"],
+  ["bash", "git commit -m \"fix -n handling\"", "allow"],
+  ["bash", "git commit -m \"mention --no-verify in a message\"", "allow"],
+  ["bash", "git commit -mn", "allow"],
+  ["bash", "git commit --no-edit --amend", "allow"],
+  ["bash", "git commit -m \"$(cat <<'EOF'\nfix: the thing\n\ngit push origin main is what we avoid\nEOF\n)\"", "allow"],
   ["bash", "git checkout main -- src/app.js && git commit -m x", "allow"],
   ["bash", "git clean -fdx src", "allow"],
   ["bash", "git clean -fd -e {outside} src", "allow"],
@@ -441,4 +471,6 @@ table("D7 item 4: before the plan gate", BEFORE_THE_GATE, () => project());
 table("D7 item 4: after the plan gate", AFTER_THE_GATE, () => project({ approved: true }));
 table("D7 item 7: the files the run is judged by", CONTROL_FILES, () => project());
 table("D205: uncommitted work, while a work is open", DISCARDING, () => project());
+table("D206: before the gate that authorises shipping", COMMITTING, () => project());
+table("D206: at SHIP, after the review gate", AT_SHIP, () => project({ reviewed: true }));
 table("with no work open, only what does not depend on a run holds", NOTHING_OPEN, () => project({ open: false }));
