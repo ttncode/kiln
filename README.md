@@ -103,6 +103,74 @@ The orchestrator calls each stage's skill itself. Five are forked from
 
 ---
 
+## Practices at every stage
+
+Each stage also reads practices taken from [agent-skills](https://github.com/addyosmani/agent-skills),
+[Superpowers](https://github.com/obra/superpowers) and [BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD),
+copied as their authors wrote them and changed only where kiln works differently —
+every copy and edit is in [skills/copies.json](skills/copies.json). They are not skills of
+their own: `kiln practices <id> --stage <stage>` decides in code which apply to the work, and
+the review gate checks the review's readers were run.
+
+### Define
+
+| Practice | What It Does | Read When |
+|---|---|---|
+| [interview-me](skills/kiln-orchestrator/interview-me.md) (agent-skills) | One question at a time, each with a guess, until the intent is confirmed with an explicit yes | `full`, or the request cannot say who, why, success and constraint |
+| [idea-refine](skills/kiln-brainstorming/idea-refine.md) (agent-skills) | Divergent then convergent thinking to turn a vague idea into a concrete one | `spike` |
+| [spec-driven-development](skills/kiln-brainstorming/spec-driven-development.md) (agent-skills, excerpt) | Assumptions first, six core areas, Always / Ask first / Never boundaries, success criteria | `full` |
+| spec kernel and architecture adversary (BMAD) | Explicit non-goals, a testable success signal, a claim-by-claim preservation pass, domain gaps as open questions | `full`, in the spec review |
+
+### Plan
+
+| Practice | What It Does | Read When |
+|---|---|---|
+| [planning-and-task-breakdown](skills/kiln-writing-plans/planning-and-task-breakdown.md) (agent-skills) | Vertical slices, dependency order, task sizing, checkpoints | always |
+| I/O & edge-case matrix (BMAD) | One row per input the change must handle, each pinned by a test and audited at handover | `bounded`, `full` |
+| [api-and-interface-design](skills/kiln-writing-plans/api-and-interface-design.md) (agent-skills) | Contract first, Hyrum's Law, error semantics, boundary validation | the plan flags a public API, or the change reaches an API surface |
+| [deprecation-and-migration](skills/kiln-writing-plans/deprecation-and-migration.md) (agent-skills) | Expand/contract schema changes, tested down-migrations, strangler and adapter patterns | migrations, SQL, or entity changes |
+| [documentation-and-adrs](skills/kiln-writing-plans/documentation-and-adrs.md) (agent-skills) | Decision records for what is expensive to reverse | `full`, or a public API change |
+| [observability-and-instrumentation](skills/kiln-writing-plans/observability-and-instrumentation.md) (agent-skills) | Structured logs, RED metrics, tracing, symptom-based alerts | an endpoint or a batch job |
+| [security-and-hardening](skills/kiln-review/security-and-hardening.md) (agent-skills) | Threat model first: trust boundaries, assets, abuse cases | the plan flags security, or auth, session, payment, token or upload files |
+| [frontend-ui-engineering](skills/kiln-writing-plans/frontend-ui-engineering.md) + [accessibility checklist](skills/kiln-writing-plans/accessibility-checklist.md) (agent-skills) | Component architecture, state, WCAG 2.1 AA | UI files, or a screen |
+
+### Build
+
+| Practice | What It Does | Read When |
+|---|---|---|
+| [incremental-implementation](skills/kiln-implement/incremental-implementation.md) (agent-skills) | Thin slices, one thing at a time, safe defaults, rollback-friendly steps | always |
+| [test-driven-development](skills/kiln-tdd/test-driven-development.md) (agent-skills) | Test sizes, the pyramid, Prove-It; Superpowers' Iron Law governs | always |
+| [source-driven-development](skills/kiln-implement/source-driven-development.md) (agent-skills) | Framework code grounded in the official docs for the version in use | third-party imports, dependency files, `spike` |
+| [doubt-driven-development](skills/kiln-implement/doubt-driven-development.md) (agent-skills) | A fresh-context reviewer for each non-trivial decision, in flight | security or migration flags, destructive operations |
+| [ci-cd-and-automation](skills/kiln-implement/ci-cd-and-automation.md) (agent-skills) | Quality gates in the pipeline, fast feedback | CI or deploy files |
+| [browser-testing-with-devtools](skills/kiln-implement/browser-testing-with-devtools.md) (agent-skills) | Live DOM, console, network and performance checks | UI files, with the DevTools MCP server |
+| [code-simplification](skills/kiln-implement/code-simplification.md), [verification-before-completion](skills/kiln-implement/verification-before-completion.md), [definition-of-done](skills/kiln-implement/definition-of-done.md) | Simplify the diff, prove every claim, meet the standing bar | at every handover to REVIEW |
+| [root-cause-tracing and three more](skills/kiln-debugging/SKILL.md) (Superpowers), [debugging-and-error-recovery](skills/kiln-debugging/debugging-and-error-recovery.md), [dispatching-parallel-agents](skills/kiln-debugging/dispatching-parallel-agents.md) | Trace backward, defend in depth, bisect a polluting test, one agent per independent failure | any failure |
+
+### Review — readers launched in parallel
+
+| Reader | What It Does | Runs |
+|---|---|---|
+| reviewer (Superpowers + agent-skills' [five axes](skills/kiln-review/code-review-and-quality.md)) | Plan alignment, correctness, readability, architecture, security, performance | always |
+| [blind hunter](skills/kiln-review/lenses/blind-hunter.md) (BMAD) | Reads only the diff, and looks for what is missing | always |
+| [edge-case hunter](skills/kiln-review/lenses/edge-case-hunter.md) (BMAD) | Walks every branch; checks what deleted code carried; tries to falsify the author's claims | always |
+| [verification gap](skills/kiln-review/lenses/verification-gap.md) (BMAD) | Would the tests fail if this broke where it is used? | always |
+| [intent alignment](skills/kiln-review/lenses/intent-alignment.md) (BMAD) | Which reading of the request the diff implements | always |
+| [code-reviewer](skills/kiln-review/personas/code-reviewer.md), [security-auditor](skills/kiln-review/personas/security-auditor.md), [test-engineer](skills/kiln-review/personas/test-engineer.md) (agent-skills) | `/ship`'s three specialists | unless the change is two files or fewer, under 50 lines, and touches nothing sensitive |
+| [performance](skills/kiln-review/performance-optimization.md) (agent-skills) | Measure-first performance review | the plan flags performance, or the diff reads in a loop or without a limit |
+
+Every finding is checked at its line and graded by kiln on severity and likelihood; one fix
+pass follows, each fix proved by a test that failed first.
+
+### Ship
+
+| Practice | What It Does | Read When |
+|---|---|---|
+| [git-workflow-and-versioning](skills/kiln-orchestrator/git-workflow-and-versioning.md) (agent-skills, excerpt) | Descriptive messages, the change summary, pre-commit hygiene | always |
+| [shipping-and-launch](skills/kiln-orchestrator/shipping-and-launch.md) (agent-skills) | Pre-launch checklist and the rollback plan in the pull request, with a GO / NO-GO | always |
+
+---
+
 ## The three paths
 
 kiln picks a path after investigating, and you can override it. A path only moves up.
