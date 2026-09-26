@@ -369,5 +369,21 @@
     "when": [
       "path:full"
     ]
+  },
+  {
+    "id": "git-workflow-and-versioning",
+    "stage": "ship",
+    "file": "skills/kiln-orchestrator/git-workflow-and-versioning.md",
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "shipping-and-launch",
+    "stage": "ship",
+    "file": "skills/kiln-orchestrator/shipping-and-launch.md",
+    "when": [
+      "always"
+    ]
   }
 ]

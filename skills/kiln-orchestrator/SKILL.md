@@ -483,6 +483,20 @@ belongs in a new work.
 
 ### 9. SHIP
 
+Before committing, run `node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" practices <id> --stage ship` and
+read what it names: [git-workflow-and-versioning.md](git-workflow-and-versioning.md) for the
+message and the change summary, [shipping-and-launch.md](shipping-and-launch.md) for the
+pre-launch checklist and the rollback plan.
+
+The pull request's body carries, besides the change summary and the verify rows,
+agent-skills' `/ship` decision:
+
+- **Ship decision: GO or NO-GO.** A Critical finding the review did not fix is NO-GO unless
+  your human partner accepted it at the review gate; say which.
+- **Things I didn't touch** — what the change deliberately leaves alone.
+- **Rollback plan** — the trigger conditions, the exact steps, and the recovery time, from
+  shipping-and-launch's template; for a migration, what the down-migration does.
+
 SHIP is the run's **one** commit point. Commit an **explicit path list** — never `git add -A`,
 and never a broad commit because the tree is dirty. `kiln ship <id>` prints that list on its
 `stage:` lines, one per repository, the work's own record included where the project keeps it:
