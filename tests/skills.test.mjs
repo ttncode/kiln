@@ -407,3 +407,9 @@ test("D47: INVESTIGATE asks the knowledge tier, recorded against the work", () =
   const { body } = frontmatter("kiln-orchestrator");
   assert.match(body, /blast --for <id>/, "a knowledge port nothing calls at investigation cannot be measured");
 });
+
+test("D202: on full, SHIP renders and records the ship gate before the commit", () => {
+  const body = readFileSync(join(SKILLS, "kiln-orchestrator", "SKILL.md"), "utf8");
+  assert.match(body, /On `full`, SHIP starts with its own gate/, "nothing told the agent the ship gate exists");
+  assert.match(body, /kiln gate <id> ship --answer/);
+});

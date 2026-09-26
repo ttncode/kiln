@@ -64,7 +64,8 @@ function workChecks(repo, { work, expect }) {
   const stages = (work.state.practices ?? []).map((row) => row.stage);
   const results = [check("kiln practices ran at each stage it reached", { ok: stages.length > 0, detail: stages.join(", ") || "none" })];
   if (expect.path) results.push(check(`path is ${expect.path}`, { ok: work.state.path === expect.path, detail: work.state.path }));
-  return [...results, ...flagChecks(work, expect), ...(expect.ships ? reviewChecks(work, expect) : [])];
+  const gates = (expect.gates ?? []).map((key) => check(`${key} gate approved`, { ok: work.state.gates?.[key]?.decision === "approved", detail: work.state.gates?.[key]?.by ?? "not recorded" }));
+  return [...results, ...flagChecks(work, expect), ...gates, ...(expect.ships ? reviewChecks(work, expect) : [])];
 }
 
 function shipChecks(repo, { base, expect }) {

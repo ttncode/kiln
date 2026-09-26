@@ -50,5 +50,21 @@
         "src/orders.js": "archiv"
       }
     }
+  },
+  {
+    "id": "feature-export-full",
+    "ticket": "/kiln:kiln --auto Use the full path. Customers need to download their whole order history as a CSV from My Page (id, date, total, archived or not). It is a new endpoint and a new file format other teams will import.",
+    "persona": "You are the product owner. The CSV is UTF-8 with a header row; dates are ISO 8601. You want the full path because other teams depend on the format.",
+    "expect": {
+      "ships": true,
+      "tests_pass": true,
+      "path": "full",
+      "gates": [
+        "spec",
+        "plan",
+        "review",
+        "ship"
+      ]
+    }
   }
 ]
