@@ -497,7 +497,8 @@ A rule reaching a file the plan never predicted is the case this catches, and it
  */
 function lensesListed(text) {
   const line = (/^lenses:\s*([\s\S]*?)(?:\n\s*\n|$(?![\s\S]))/im.exec(text)?.[1] ?? "").replace(/\s+/g, " ");
-  return new Set(line.split(",").map((entry) => entry.trim().split(/\s+/)).filter(([, how]) => how === "reported" || how === "failed").map(([name]) => name));
+  const entries = line.split(/[,;]/).map((entry) => entry.trim().replace(/[.;:!]+$/, "").split(/\s+/));
+  return new Set(entries.filter(([, how]) => /^(?:reported|failed)$/i.test(how ?? "")).map(([name]) => name));
 }
 
 /**
