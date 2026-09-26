@@ -1218,8 +1218,18 @@ function autoLine(path, { config, state }) {
  * launder pre-plan code past a gate record for a different artifact (D78).
  */
 /** Nothing to launder past a gate: no gate, and no change attributable to this work. */
+/**
+ * D194: what the earlier path changed, not what was already dirty when the work opened. A real
+ * run halted on the `.gitignore` kiln init had left untracked, and asked the user whether the
+ * spike should keep a file the spike never touched. `kiln scope` already sets these aside.
+ */
+function pathChanges(root, state) {
+  const before = new Set(state.dirty_at_open ?? []);
+  return actualChanged(root, state.base).filter((path) => !before.has(path));
+}
+
 function nothingRecorded(root, state) {
-  return Object.keys(state.gates ?? {}).length === 0 && actualChanged(root, state.base).length === 0;
+  return Object.keys(state.gates ?? {}).length === 0 && pathChanges(root, state).length === 0;
 }
 
 function runRatchet(argv) {
@@ -1238,7 +1248,7 @@ function runRatchet(argv) {
     return out("Nothing was recorded or changed yet, so there is nothing to decide.") ?? 0;
   }
   writeState(root, { ...moved, status: WORK_STATUS.halted });
-  return out(ratchetMenu(root, id)) ?? 0;
+  return out(ratchetMenu(root, { id, before: new Set(state.dirty_at_open ?? []) })) ?? 0;
 }
 
 /**
@@ -1250,9 +1260,10 @@ function runRatchet(argv) {
  * `git status` alone lists untracked files, which is what a spike usually leaves; `--stat`
  * says how much each tracked change is. `.kiln/` is kiln's own record, not the spike's work.
  */
-function ratchetMenu(root, id) {
-  const stat = gitOutput(root, ["diff", "--stat", "HEAD", "--", ".", ":(exclude).kiln"]) || "(no tracked file changed)";
-  const untracked = statusPaths(root).filter((path) => !path.startsWith(".kiln/") && !stat.includes(path));
+function ratchetMenu(root, { id, before }) {
+  const excluded = [":(exclude).kiln", ...[...before].map((path) => `:(exclude)${path}`)];
+  const stat = gitOutput(root, ["diff", "--stat", "HEAD", "--", ".", ...excluded]) || "(no tracked file changed)";
+  const untracked = statusPaths(root).filter((path) => !path.startsWith(".kiln/") && !before.has(path) && !stat.includes(path));
   return [
     "What the earlier path left in the tree — kiln will not touch any of it:",
     stat,

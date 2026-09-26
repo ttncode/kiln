@@ -172,6 +172,20 @@ test("D78: the ratchet reports untracked work, because a spike's output is usual
   assert.doesNotMatch(run.stdout, /\.kiln\//, "kiln's own record is not the spike's work");
 });
 
+test("D194: files already dirty when the work opened are not the earlier path's work", () => {
+  const root = spikeProject();
+  writeFile(join(root, ".gitignore"), ".kiln/tmp/\n");
+  writeState(root, newWork({ id: "42", sessionId: "s", base: "aaa", path: "spike", dirtyAtOpen: [".gitignore"] }));
+  const free = kiln(root, ["ratchet", "42", "bounded"]);
+  assert.match(free.stdout, /Nothing was recorded or changed yet/, "the file kiln init left untracked is not something the spike did");
+
+  writeState(root, { ...newWork({ id: "43", sessionId: "s", base: "aaa", path: "spike", dirtyAtOpen: [".gitignore"] }), gates: { probe: { decision: "approved" } } });
+  writeFile(join(root, "spike-scratch.js"), "// probe\n");
+  const menu = kiln(root, ["ratchet", "43", "bounded"]).stdout;
+  assert.match(menu, /spike-scratch\.js/);
+  assert.doesNotMatch(menu, /\.gitignore/, "a file dirty before the work opened is not offered as the spike's to keep or set aside");
+});
+
 test("D78: the ratchet leaves the working tree exactly as it found it", () => {
   const root = spikeProject();
   const scratch = writeFile(join(root, "spike-scratch.js"), "// probe\n");
