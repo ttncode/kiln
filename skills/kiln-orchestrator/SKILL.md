@@ -75,6 +75,16 @@ Option 3 is the user's to take, not yours — closing a work and opening another
 decision about their time, and `spike` is the only path whose output is allowed to be a
 question.
 
+**A work that will not ship ends with `kiln close`** — a spike once `findings.md` is delivered,
+or a work the user abandons. Until then it gates this session's edits and claims its files.
+Closing is the user's call: ask, and record their words:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" close <id> --answer "<their words>"
+```
+
+It touches no file. Follow-up work opens as a new work with `--follows <id>`.
+
 ## When to Use
 
 - `/kiln:kiln <anything>` — always start here, before reading any file.
