@@ -1,6 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { symlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
   actualChanged,
@@ -63,6 +64,20 @@ test("the walk skips what a blast radius must never include", () => {
   });
 
   assert.deepEqual(grepBlastRadius(root, ["needle"]).map((r) => r.path), ["src/a.ts"]);
+});
+
+/**
+ * D197: measured on a real PHP project — a leftover `debug_helper.php -> debug_helper.php`,
+ * untracked and gitignored, made `kiln blast` die with ELOOP before INVESTIGATE had searched
+ * anything. ripgrep and `git grep` do not follow symbolic links by default, and a file that
+ * cannot be read is skipped, not fatal.
+ */
+test("D197: a symbolic link is not followed, so a loop or a dangling link cannot stop the search", () => {
+  const { root } = project({ "src/real.php": "needle\n" });
+  symlinkSync("loop.php", join(root, "src", "loop.php"));
+  symlinkSync("gone.php", join(root, "src", "dangling.php"));
+  symlinkSync("real.php", join(root, "src", "alias.php"));
+  assert.deepEqual(grepBlastRadius(root, ["needle"]).map((r) => r.path), ["src/real.php"], "the file is found at its real path, once");
 });
 
 test("no terms yields nothing rather than everything", () => {
