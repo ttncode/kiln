@@ -11,6 +11,7 @@ import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { sweptPaths } from "../lib/guards/git-sweeps.mjs";
 import { discardIn } from "../lib/guards/discard.mjs";
+import { commitIn } from "../lib/guards/commit.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { interpreterMessage, interpreterReach, shellPrograms } from "../lib/guards/interpreter.mjs";
 import { holdsControl, isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
@@ -359,8 +360,28 @@ function guardGateFile(payload, ctx) {
   return verdict.blocked ? block(gateMessage("a source edit", verdict.reason)) : ALLOW;
 }
 
+/**
+ * D206: a commit waits for the gate that authorises shipping, as `gh pr create` does, and a
+ * displaced or halted session commits nothing. Another session's commit is D66's business.
+ */
+function commitRefusal(ctx, commit) {
+  if (ctx.takenOver) return `work ${ctx.takenOver.id} was taken over by another session`;
+  if (!ctx.state) return null;
+  if (ctx.state.status === "halted") return `work ${ctx.state.id} is halted`;
+  const verdict = shipVerdict(ctx.root, ctx.state);
+  if (verdict.blocked) return `${verdict.reason} — SHIP is the run's one commit point, after the gate that authorises it`;
+  return commit.all ? "SHIP commits the paths `kiln ship` prints, never every tracked change (`-a`)" : null;
+}
+
+function guardCommit(command, ctx) {
+  const commit = commitIn(command);
+  const refusal = commit && commitRefusal(ctx, commit);
+  return refusal ? block(gateMessage("a commit", refusal)) : ALLOW;
+}
+
 function guardGateBash(payload, ctx) {
   const command = payload.tool_input?.command;
+  if (guardCommit(command, ctx) === BLOCK) return BLOCK;
   if (ctx.state && stagesEverything(command)) {
     return block(gateMessage("a broad `git add`", "this run stages its own files by name, never the whole tree"));
   }

@@ -521,7 +521,8 @@ the review — record the user's answer (`kiln gate <id> ship --answer "<their w
 authorised shipping, so there is no second gate.
 
 SHIP is the run's **one** commit point. Commit an **explicit path list** — never `git add -A`,
-and never a broad commit because the tree is dirty. `kiln ship <id>` prints that list on its
+and never a broad commit because the tree is dirty. kiln refuses a commit before the gate that
+authorises shipping, and `git commit -a` at any point. `kiln ship <id>` prints that list on its
 `stage:` lines, one per repository, the work's own record included where the project keeps it:
 stage exactly those. Open the PR with your own `gh`/`glab`. The body carries the change summary and
 the verify rows; **no log content goes to the remote**.
