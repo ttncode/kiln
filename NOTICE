@@ -151,3 +151,25 @@ lib/dna/secrets.mjs (D175). Translated to JavaScript syntax: the inline (?i)
 became the i flag, and the trailing delimiter group of the stripe and gcp rules
 became a lookahead. The aws-access-token rule's allowlist (.+EXAMPLE$) was taken
 with it; entropy thresholds, keywords and the other allowlists were not.
+
+--------------------------------------------------------------------------------
+Copies from superpowers, agent-skills and BMAD-METHOD (D186)
+
+agent-skills — https://github.com/addyosmani/agent-skills
+Copyright (c) 2025 Addy Osmani. Licensed under the MIT License.
+
+BMAD-METHOD — https://github.com/bmad-code-org/BMAD-METHOD
+Copyright (c) 2025 BMad Code, LLC. Licensed under the MIT License. The BMad
+names and marks are not licensed under MIT (TRADEMARK.md); kiln uses no BMad
+name or mark for its own product and names BMAD only to credit it.
+
+Superpowers — as above; files taken after the v6.4.1 fork are recorded here.
+
+Every file kiln copies from these projects opens with a kiln note (a block of
+lines beginning "> **In kiln:**") and is listed in skills/copies.json with the
+source, the commit it was taken at, the upstream path, whether it is verbatim,
+edited or an excerpt, each edit in words, and two sha256 hashes: the upstream
+file at that commit and kiln's text under the note. tests/copies.test.mjs checks
+every listed copy against its hashes and fails on an unlisted one.
+`node scripts/upstream.mjs report <checkouts>` says what upstream has changed
+since each copy was taken.
