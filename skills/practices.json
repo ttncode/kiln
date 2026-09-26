@@ -1,1 +1,170 @@
-[]
+[
+  {
+    "id": "reviewer",
+    "stage": "review",
+    "file": "skills/kiln-review/code-reviewer.md",
+    "reader": true,
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "blind-hunter",
+    "stage": "review",
+    "file": "skills/kiln-review/lenses/blind-hunter.md",
+    "reader": true,
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "edge-case-hunter",
+    "stage": "review",
+    "file": "skills/kiln-review/lenses/edge-case-hunter.md",
+    "reader": true,
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "verification-gap",
+    "stage": "review",
+    "file": "skills/kiln-review/lenses/verification-gap.md",
+    "reader": true,
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "intent-alignment",
+    "stage": "review",
+    "file": "skills/kiln-review/lenses/intent-alignment.md",
+    "reader": true,
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "code-review-specialist",
+    "stage": "review",
+    "file": "skills/kiln-review/personas/code-reviewer.md",
+    "reader": true,
+    "when": [
+      "always"
+    ],
+    "skip": {
+      "files_at_most": 2,
+      "lines_below": 50,
+      "unless": [
+        "glob:**/*auth*",
+        "glob:**/*auth*/**",
+        "glob:**/*login*",
+        "glob:**/*session*",
+        "glob:**/*payment*",
+        "glob:**/*payment*/**",
+        "glob:**/*billing*",
+        "glob:**/config/**",
+        "glob:**/*config*",
+        "glob:**/.env*",
+        "glob:**/*.env",
+        "glob:**/*.sql",
+        "glob:**/migrations/**",
+        "glob:**/models/**",
+        "glob:**/*model*",
+        "glob:**/*repository*",
+        "glob:**/db/**",
+        "content:(?:password|passwd|secret|token|api[_-]?key|credential|private[_-]?key)",
+        "content:(?:auth|login|logout|session|jwt|oauth|permission|role|admin)",
+        "content:(?:payment|charge|refund|invoice|billing|card)",
+        "content:(?:SELECT|INSERT|UPDATE|DELETE)\\s|\\.query\\s*\\(|->db->|\\bexecute\\s*\\(|\\bprisma\\.|\\bknex\\b|\\bsequelize\\b",
+        "content:process\\.env|getenv\\s*\\(|\\$_ENV|\\$_SERVER"
+      ]
+    }
+  },
+  {
+    "id": "security-auditor",
+    "stage": "review",
+    "file": "skills/kiln-review/personas/security-auditor.md",
+    "reader": true,
+    "when": [
+      "always"
+    ],
+    "skip": {
+      "files_at_most": 2,
+      "lines_below": 50,
+      "unless": [
+        "glob:**/*auth*",
+        "glob:**/*auth*/**",
+        "glob:**/*login*",
+        "glob:**/*session*",
+        "glob:**/*payment*",
+        "glob:**/*payment*/**",
+        "glob:**/*billing*",
+        "glob:**/config/**",
+        "glob:**/*config*",
+        "glob:**/.env*",
+        "glob:**/*.env",
+        "glob:**/*.sql",
+        "glob:**/migrations/**",
+        "glob:**/models/**",
+        "glob:**/*model*",
+        "glob:**/*repository*",
+        "glob:**/db/**",
+        "content:(?:password|passwd|secret|token|api[_-]?key|credential|private[_-]?key)",
+        "content:(?:auth|login|logout|session|jwt|oauth|permission|role|admin)",
+        "content:(?:payment|charge|refund|invoice|billing|card)",
+        "content:(?:SELECT|INSERT|UPDATE|DELETE)\\s|\\.query\\s*\\(|->db->|\\bexecute\\s*\\(|\\bprisma\\.|\\bknex\\b|\\bsequelize\\b",
+        "content:process\\.env|getenv\\s*\\(|\\$_ENV|\\$_SERVER"
+      ]
+    }
+  },
+  {
+    "id": "test-engineer",
+    "stage": "review",
+    "file": "skills/kiln-review/personas/test-engineer.md",
+    "reader": true,
+    "when": [
+      "always"
+    ],
+    "skip": {
+      "files_at_most": 2,
+      "lines_below": 50,
+      "unless": [
+        "glob:**/*auth*",
+        "glob:**/*auth*/**",
+        "glob:**/*login*",
+        "glob:**/*session*",
+        "glob:**/*payment*",
+        "glob:**/*payment*/**",
+        "glob:**/*billing*",
+        "glob:**/config/**",
+        "glob:**/*config*",
+        "glob:**/.env*",
+        "glob:**/*.env",
+        "glob:**/*.sql",
+        "glob:**/migrations/**",
+        "glob:**/models/**",
+        "glob:**/*model*",
+        "glob:**/*repository*",
+        "glob:**/db/**",
+        "content:(?:password|passwd|secret|token|api[_-]?key|credential|private[_-]?key)",
+        "content:(?:auth|login|logout|session|jwt|oauth|permission|role|admin)",
+        "content:(?:payment|charge|refund|invoice|billing|card)",
+        "content:(?:SELECT|INSERT|UPDATE|DELETE)\\s|\\.query\\s*\\(|->db->|\\bexecute\\s*\\(|\\bprisma\\.|\\bknex\\b|\\bsequelize\\b",
+        "content:process\\.env|getenv\\s*\\(|\\$_ENV|\\$_SERVER"
+      ]
+    }
+  },
+  {
+    "id": "performance",
+    "stage": "review",
+    "file": "skills/kiln-review/performance-optimization.md",
+    "reader": true,
+    "when": [
+      "flag:performance",
+      "content:(?:for|while|forEach|map|each)\\b[^\\n]*\\n(?:[^\\n]*\\n){0,8}?[^\\n]*(?:\\.query|\\.find|findOne|findAll|->get|->query|await\\s+db\\b|fetch)\\s*\\(",
+      "content:\\bfindAll\\s*\\(\\s*\\)|SELECT\\s+\\*\\s+FROM(?![^\\n]*\\b(?:LIMIT|WHERE)\\b)",
+      "content:\\.sort\\s*\\([^\\n]*\\n?[^\\n]*\\bfor\\b|\\bfor\\b[^\\n]*\\n(?:[^\\n]*\\n){0,4}?[^\\n]*\\.sort\\s*\\("
+    ]
+  }
+]

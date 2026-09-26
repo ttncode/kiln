@@ -50,5 +50,183 @@
     ],
     "upstream_sha256": "dd7b8f13c4cc2a24b33ff87b18da9248f3e1c80a085c3316224f69ff0fa5c43c",
     "kiln_sha256": "fba6115e4afd64748bb6727ef7bcfff01585e8d79acd62da7446cc678fadc6ef"
+  },
+  {
+    "path": "skills/kiln-review/lenses/edge-case-hunter.md",
+    "source": "bmad",
+    "commit": "5e33d3c03ba53187a40ab679d5479cdd4b6ac2fb",
+    "from": "skills/bmad-code-review/review-prompts/edge-case-hunter.md",
+    "kind": "verbatim",
+    "upstream_sha256": "5f4572d57340b4c0d155f33454d644a44af101cd7fd02a01591be68a4ebb8b7f",
+    "kiln_sha256": "5f4572d57340b4c0d155f33454d644a44af101cd7fd02a01591be68a4ebb8b7f"
+  },
+  {
+    "path": "skills/kiln-review/lenses/verification-gap.md",
+    "source": "bmad",
+    "commit": "5e33d3c03ba53187a40ab679d5479cdd4b6ac2fb",
+    "from": "skills/bmad-code-review/review-prompts/verification-gap.md",
+    "kind": "verbatim",
+    "upstream_sha256": "06f6184d7d94c808970d0146cdc4585dfd66b94a7b7ab2988277fb6fc4208508",
+    "kiln_sha256": "06f6184d7d94c808970d0146cdc4585dfd66b94a7b7ab2988277fb6fc4208508"
+  },
+  {
+    "path": "skills/kiln-review/lenses/blind-hunter.md",
+    "source": "bmad",
+    "commit": "5e33d3c03ba53187a40ab679d5479cdd4b6ac2fb",
+    "from": "skills/bmad-code-review/customize.toml",
+    "kind": "excerpt",
+    "edits": [
+      "the blind-hunter lens instruction only, without its launch line",
+      "the finding-floor line and \"do not stop with an empty list\" removed (D75: no quota)"
+    ],
+    "upstream_sha256": "7607bb8fabb996d72deb0e8548b1e57de69b874a1dd1e4ec9680240a5ad692d2",
+    "kiln_sha256": "54d20bbdcc45cccd26edda347c4f8976b76b8166b91c0343e0339d26d6cd11af"
+  },
+  {
+    "path": "skills/kiln-review/lenses/intent-alignment.md",
+    "source": "bmad",
+    "commit": "5e33d3c03ba53187a40ab679d5479cdd4b6ac2fb",
+    "from": "skills/bmad-code-review/customize.toml",
+    "kind": "excerpt",
+    "edits": [
+      "the intent-alignment lens instruction only, without its launch line"
+    ],
+    "upstream_sha256": "7607bb8fabb996d72deb0e8548b1e57de69b874a1dd1e4ec9680240a5ad692d2",
+    "kiln_sha256": "390b3b8be1d75ecac233cc31bdb209a181c45b2810b8c66f1fa2b0c793d94d75"
+  },
+  {
+    "path": "skills/kiln-review/personas/code-reviewer.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "agents/code-reviewer.md",
+    "kind": "verbatim",
+    "upstream_sha256": "2d02acb9db1c37521d676587d2e0afb713c8983de957a78efdfa82d27e5fc3da",
+    "kiln_sha256": "2d02acb9db1c37521d676587d2e0afb713c8983de957a78efdfa82d27e5fc3da"
+  },
+  {
+    "path": "skills/kiln-review/personas/security-auditor.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "agents/security-auditor.md",
+    "kind": "verbatim",
+    "upstream_sha256": "66a3f68f1c691b600ddb44e88afb138e239d0572df37be84e1f9a427c887dd0a",
+    "kiln_sha256": "66a3f68f1c691b600ddb44e88afb138e239d0572df37be84e1f9a427c887dd0a"
+  },
+  {
+    "path": "skills/kiln-review/personas/test-engineer.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "agents/test-engineer.md",
+    "kind": "verbatim",
+    "upstream_sha256": "c4acde91d6307d88515387344a129a2d0679134e587596c3517d73faffcd5aa6",
+    "kiln_sha256": "c4acde91d6307d88515387344a129a2d0679134e587596c3517d73faffcd5aa6"
+  },
+  {
+    "path": "skills/kiln-review/personas/web-performance-auditor.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "agents/web-performance-auditor.md",
+    "kind": "verbatim",
+    "upstream_sha256": "0928b1cf8103262a364bce0c1fc689a918852e2275441f1b2e687adfa1e607e9",
+    "kiln_sha256": "0928b1cf8103262a364bce0c1fc689a918852e2275441f1b2e687adfa1e607e9"
+  },
+  {
+    "path": "skills/kiln-review/code-review-and-quality.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/code-review-and-quality/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "d4ec6843e78a8ab2049185d7c2742e2f1e343143c6c915eb5b4f9a3a00a44f94",
+    "kiln_sha256": "d4ec6843e78a8ab2049185d7c2742e2f1e343143c6c915eb5b4f9a3a00a44f94"
+  },
+  {
+    "path": "skills/kiln-review/security-and-hardening.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/security-and-hardening/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "2e3fc60eed5aba97fe416f3f3c9317fdb014a682925ec70a733c3ff99e4b9858",
+    "kiln_sha256": "2e3fc60eed5aba97fe416f3f3c9317fdb014a682925ec70a733c3ff99e4b9858"
+  },
+  {
+    "path": "skills/kiln-review/performance-optimization.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/performance-optimization/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "00694d0c69bbde674d0e39de24052d90afea32d9fef9553eaee21a50a7e9b8cf",
+    "kiln_sha256": "00694d0c69bbde674d0e39de24052d90afea32d9fef9553eaee21a50a7e9b8cf"
+  },
+  {
+    "path": "skills/kiln-review/hardening-patterns.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/security-and-hardening/references/hardening-patterns.md",
+    "kind": "verbatim",
+    "upstream_sha256": "d8ba58cad151aeca4804e48fc768240af0dd6b0ecddd07fbf24a1562140ba97a",
+    "kiln_sha256": "d8ba58cad151aeca4804e48fc768240af0dd6b0ecddd07fbf24a1562140ba97a"
+  },
+  {
+    "path": "skills/kiln-review/security-checklist.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "references/security-checklist.md",
+    "kind": "verbatim",
+    "upstream_sha256": "37774056502fe8970dcd2fd27dca5fa31f2a55232649fc3056c89c3af7d62755",
+    "kiln_sha256": "37774056502fe8970dcd2fd27dca5fa31f2a55232649fc3056c89c3af7d62755"
+  },
+  {
+    "path": "skills/kiln-review/performance-checklist.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "references/performance-checklist.md",
+    "kind": "verbatim",
+    "upstream_sha256": "40f564d1e62341e277c01ba42c42d95264b9ef3b8e5a23249dc6e121a7e70067",
+    "kiln_sha256": "40f564d1e62341e277c01ba42c42d95264b9ef3b8e5a23249dc6e121a7e70067"
+  },
+  {
+    "path": "skills/kiln-debugging/debugging-and-error-recovery.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/debugging-and-error-recovery/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "21f3960f5d7ae2cc95c40896545004dbbcbbd752ea65fc2d53962554d4174220",
+    "kiln_sha256": "21f3960f5d7ae2cc95c40896545004dbbcbbd752ea65fc2d53962554d4174220"
+  },
+  {
+    "path": "skills/kiln-writing-plans/observability-and-instrumentation.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/observability-and-instrumentation/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "e7fcb0820306d46268de9594d676ad98e35040858926c412b7000faa52a61f87",
+    "kiln_sha256": "e7fcb0820306d46268de9594d676ad98e35040858926c412b7000faa52a61f87"
+  },
+  {
+    "path": "skills/kiln-implement/browser-testing-with-devtools.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/browser-testing-with-devtools/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "4e3aacd6a380cd25bc6c2d67fdd1c926a9b22535b8a62109ecd33cefd909e3d9",
+    "kiln_sha256": "4e3aacd6a380cd25bc6c2d67fdd1c926a9b22535b8a62109ecd33cefd909e3d9"
+  },
+  {
+    "path": "skills/kiln-tdd/test-driven-development.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/test-driven-development/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "7c0c6ac057c19d7f8be65d9f49c3a638703b868f4625c78b70da5439d5d74fca",
+    "kiln_sha256": "7c0c6ac057c19d7f8be65d9f49c3a638703b868f4625c78b70da5439d5d74fca"
+  },
+  {
+    "path": "skills/kiln-orchestrator/shipping-and-launch.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/shipping-and-launch/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "af610cf4892db7eab2e91c899e33feba90e1000bac4528b2f8dde930816ac125",
+    "kiln_sha256": "af610cf4892db7eab2e91c899e33feba90e1000bac4528b2f8dde930816ac125"
   }
 ]

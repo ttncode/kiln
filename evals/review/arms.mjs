@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { kilnReaders } from "./kiln-arm.mjs";
 
 /**
  * Each arm is the set of readers one reviewer design would dispatch for a change. A reader is
@@ -70,4 +71,5 @@ function kilnRc40(ctx) {
 export const ARMS = {
   "kiln-rc40": kilnRc40,
   sources: (ctx) => [...bmadThorough(ctx), ...shipPersonas(ctx)],
+  kiln: kilnReaders,
 };

@@ -49,6 +49,8 @@ that norms say you ask about first (a merge, a push to a shared branch, a
 publish); and a plan so broken that every path forward is a guess. For
 those, stop and ask.
 
+Files `kiln practices` may name from here: [browser-testing-with-devtools.md](browser-testing-with-devtools.md).
+
 ## When to Use
 
 - The plan gate is approved and `plan.md` is the document it was approved against.

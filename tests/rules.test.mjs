@@ -7,7 +7,7 @@ import { newWork, recordRules } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 import { loadConfig } from "../lib/config.mjs";
 import { runChecks } from "../lib/doctor.mjs";
-import { kiln, nodeProject, ok, state } from "./helpers/journey.mjs";
+import { kiln, nodeProject, ok, state, writeReview } from "./helpers/journey.mjs";
 
 after(cleanupFixtures);
 
@@ -477,7 +477,7 @@ test("a submodule's files are not invisible to the router's checks", () => {
 function atReview(rows, files) {
   const root = routed(nodeProject({ name: `gate-${Object.keys(files).join("-") || "bare"}` }), rows, files);
   ok(root, ["open", "w1", "--session", "s"]);
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
   return root;
 }
 

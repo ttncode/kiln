@@ -8,7 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanupFixtures, commitAll, writeConfig, writeFile } from "./helpers/fixture.mjs";
 import { DEFAULTS } from "../lib/config.mjs";
-import { SESSION, kiln, monorepo, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
+import { SESSION, kiln, monorepo, nodeProject, ok, state, throughPlanGate, writeReview } from "./helpers/journey.mjs";
 import { judge } from "./helpers/hook.mjs";
 
 after(cleanupFixtures);
@@ -19,7 +19,7 @@ const APPROVE = "1. Approve this as written (recommended)";
 const edit = (root, file) => judge("pre-edit", { session_id: SESSION, cwd: root, tool_input: { file_path: join(root, file) } });
 
 function reviewed(root, id) {
-  writeFile(join(root, ".kiln", "work", id, "review.md"), "# review\n");
+  writeReview(root, id);
   return ok(root, ["gate", id, "review", "--answer", APPROVE]);
 }
 

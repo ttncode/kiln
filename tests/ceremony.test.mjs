@@ -1,3 +1,4 @@
+import { writeReview } from "./helpers/journey.mjs";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -243,7 +244,7 @@ function autoProject(auto) {
   commitAll(root, "init");
   writeConfig(root, { ...DEFAULTS, auto });
   writeFile(join(root, ".kiln", "rules", "index.md"), "# rules\n");
-  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   writeState(root, newWork({ id: "42", sessionId: "s", base: "aaa", path: "bounded" }));
   return root;
 }
@@ -494,7 +495,9 @@ test("the position is read from the caller and the next move is printed, not nar
  */
 function autoRun() {
   const root = autoProject({ bounded: true });
-  writeFile(join(root, ".kiln", "work", "42", "review.md"), "# review\n");
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  writeState(root, { ...readState(root, "42"), base: head });
+  writeReview(root, "42");
   return root;
 }
 

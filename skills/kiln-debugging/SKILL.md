@@ -284,6 +284,8 @@ These techniques are part of systematic debugging and available in this director
 - **`condition-based-waiting.md`** - Replace arbitrary timeouts with condition polling
 - **`find-polluter.sh`** - Find which test leaves a file or state behind, one test file at a time
 
+agent-skills' [debugging-and-error-recovery.md](debugging-and-error-recovery.md) is the same discipline from the other side — triage trees for test, build and runtime failures, and error output treated as untrusted data.
+
 ## Verification
 
 kiln does not take your word for a fix. Before you call one done:

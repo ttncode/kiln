@@ -14,7 +14,7 @@ import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ALLOW, BLOCK } from "./helpers/verdict.mjs";
-import { SESSION, bash, config, edit, kiln, monorepo, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
+import { SESSION, bash, config, edit, kiln, monorepo, nodeProject, ok, state, throughPlanGate, writeReview } from "./helpers/journey.mjs";
 import { spawnSync } from "node:child_process";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeFile } from "./helpers/fixture.mjs";
 
@@ -80,7 +80,7 @@ test("J2.1 a bounded change runs stage by stage and ships as one repository", as
   const scope = ok(root, ["scope", "w1"]);
   assert.match(scope.stdout, /predicted 1 · actual 1/);
 
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
   ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "approve"]);
   ok(root, ["verify", "w1"]);
 
@@ -113,7 +113,7 @@ test("J2.4 opening a pull request before the review gate is blocked", async () =
   throughPlanGate(root, "w1");
   assert.equal(await bash(root, "gh pr create --fill"), BLOCK);
 
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
   ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "approve"]);
   assert.equal(await bash(root, "gh pr create --fill"), ALLOW);
 });
@@ -276,7 +276,7 @@ test("J6.3/J6.4/J6.5 a phase that verified nothing refuses, and doctor said so f
 test("J6.6 shipping unverified is allowed, and the report says it happened", () => {
   const root = nodeProject({ name: "j66" });
   throughPlanGate(root, "w1");
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
   ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "Approve -> no need to run the suite -> ship locally"]);
 
   assert.match(ok(root, ["report", "w1"]).stdout, /Verified: never/);
@@ -379,7 +379,8 @@ test("J9.1 an auto run on full reaches a pull request with no human gate, as des
   ok(root, ["open", "w1", "--path", "full", "--session", SESSION, "--auto"]);
 
   for (const key of ["spec", "plan", "review", "ship"]) {
-    if (key !== "ship") writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
+    if (key === "review") writeReview(root, "w1");
+    else if (key !== "ship") writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
     assert.equal(ok(root, ["gate", "w1", key, "--auto"]).status, 0, key);
   }
   assert.equal(await bash(root, "gh pr create --fill"), ALLOW, "the design says the PR becomes the gate");

@@ -32,6 +32,16 @@ export function state(root, id) {
   return JSON.parse(readFileSync(join(root, ".kiln", "work", id, "state.json"), "utf8"));
 }
 
+/**
+ * What kiln-review does before its gate (D189): ask which readers the change gets, then write
+ * review.md accounting for each one. A test that is not about the readers takes this route.
+ */
+export function writeReview(root, id) {
+  ok(root, ["practices", id, "--stage", "review"]);
+  const readers = state(root, id).practices.find((row) => row.stage === "review").ids;
+  writeFile(join(root, ".kiln", "work", id, "review.md"), `# review\n\nlenses: ${readers.map((name) => `${name} reported`).join(", ")}\n`);
+}
+
 export function config(root) {
   return JSON.parse(readFileSync(join(root, ".kiln", "config.json"), "utf8"));
 }

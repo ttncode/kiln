@@ -5,7 +5,7 @@
 //
 // Usage: node evals/review/run.mjs --arms kiln-rc40,sources --reps 5 --model claude-sonnet-5
 //          [--fixtures 01,05] [--oss ~/.cache/kiln-oss] [--out evals/review/results/<name>]
-//          [--concurrency 4]
+//          [--concurrency 4] [--kiln <checkout whose kiln-review the kiln arm reads>]
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -34,6 +34,7 @@ function optionsFrom(argv) {
     oss: resolve(option(argv, { name: "oss", fallback: join(homedir(), ".cache", "kiln-oss") })),
     out: resolve(option(argv, { name: "out", fallback: join(HERE, "results", stamp) })),
     concurrency: Number(option(argv, { name: "concurrency", fallback: "4" })),
+    kiln: resolve(option(argv, { name: "kiln", fallback: join(HERE, "..", "..") })),
   };
 }
 
@@ -74,11 +75,11 @@ function limiter(limit) {
 function contextFor(job, opts) {
   const work = join(opts.out, "work", job.fixture.name, job.arm, String(job.rep));
   const ctx = materialize(job.fixture.dir, work);
-  return { ...ctx, bmadSkill: join(opts.oss, "BMAD-METHOD", "skills", "bmad-code-review"), agentSkills: join(opts.oss, "agent-skills") };
+  return { ...ctx, bmadSkill: join(opts.oss, "BMAD-METHOD", "skills", "bmad-code-review"), agentSkills: join(opts.oss, "agent-skills"), kilnRoot: opts.kiln };
 }
 
 async function readReports(job, env) {
-  const readers = ARMS[job.arm](job.ctx);
+  const readers = await ARMS[job.arm](job.ctx);
   return Promise.all(readers.map(async (reader) => {
     const result = await env.limit(() => runClaude({ ...reader, cwd: job.ctx.repo, model: env.opts.model }));
     return { id: reader.id, ...result };

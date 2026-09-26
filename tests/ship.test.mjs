@@ -8,7 +8,7 @@ import { branchName, isBranchName, renderShipPlan, shipPlan } from "../lib/ship.
 import { refOfId, slugOfId } from "../lib/resolve.mjs";
 import { newWork } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, git, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
-import { kiln, nodeProject, ok, state, throughPlanGate } from "./helpers/journey.mjs";
+import { kiln, nodeProject, ok, state, throughPlanGate, writeReview } from "./helpers/journey.mjs";
 
 after(cleanupFixtures);
 
@@ -203,7 +203,7 @@ test("approving the gate that authorises shipping leaves the work reviewed", () 
   const root = nodeProject({ name: "reviewed" });
   ok(root, ["init"]);
   ok(root, ["open", "w1", "--session", "s", "--path", "bounded"]);
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
 
   ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "1. Approve this review (recommended)"]);
   assert.equal(state(root, "w1").status, "reviewed", "on bounded, accept is accept-and-ship");
@@ -222,7 +222,7 @@ test("a work stops claiming its files once the pull requests exist", () => {
   assert.equal(blocked.status, 2, "D72: two works cannot claim one path");
   assert.match(blocked.stderr, /w1/, "and the conflict names the owner");
 
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
   ok(root, ["gate", "w1", "review", "--answer", "1. Approve this review as written (recommended)"]);
   const shipped = ok(root, ["ship", "w1", "--opened", "https://example.invalid/mr/1"]);
   assert.match(shipped.stdout, /claims no files now/);
@@ -251,10 +251,10 @@ test("shipping removes the scratch tree the sandbox told the run to use", () => 
   ok(root, ["init"]);
   ok(root, ["open", "w1", "--session", "s"]);
   writeFile(join(root, ".kiln", "tmp", "w1", "steps", "1.log"), "output\n");
-  for (const key of ["plan", "review"]) {
-    writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
-    ok(root, ["gate", "w1", key, "--answer", "yes, approved"]);
-  }
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  ok(root, ["gate", "w1", "plan", "--answer", "yes, approved"]);
+  writeReview(root, "w1");
+  ok(root, ["gate", "w1", "review", "--answer", "yes, approved"]);
 
   ok(root, ["ship", "w1", "--opened", "https://example.invalid/mr/1"]);
   assert.equal(existsSync(join(root, ".kiln", "tmp", "w1")), false);
@@ -292,7 +292,7 @@ test("a reviewed work has already stopped claiming, before any URL is recorded",
   const blocked = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
   assert.equal(blocked.status, 2, "while w1 is in progress the claim is real");
 
-  writeFile(join(root, ".kiln", "work", "w1", "review.md"), "# review\n");
+  writeReview(root, "w1");
   ok(root, ["gate", "w1", "review", "--artifact", ".kiln/work/w1/review.md", "--answer", "1. Approve this review (recommended)"]);
   assert.equal(state(root, "w1").status, "reviewed");
 
