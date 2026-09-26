@@ -93,6 +93,11 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
   kiln resume <id> --answer "<what you decided>"
       End a halt. The answer is recorded beside the question it answers.
 
+  kiln close <id> --answer "<the user's words>"
+      End a work that will not ship: a spike whose answer is delivered, or work
+      the user abandons. It stops claiming files and gating edits; the working
+      tree is not touched. A closed work is not reopened — use --follows.
+
   kiln ratchet <id> <spike|bounded|full>
       Move this work up a rung. Prints the uncommitted diff it found and stops;
       it never touches the working tree.
@@ -1126,9 +1131,12 @@ function refuseOpen(reason) {
  * as new work with its own approval, and BMAD reads a done story as context for a new spec —
  * so a follow-up is a new work that names the one it follows.
  */
+const FINISHED = new Set([WORK_STATUS.shipped, WORK_STATUS.closed]);
+
 function shippedRefusal(root, { id, rest }) {
-  if (existsSync(statePath(root, id)) && readState(root, id).status === WORK_STATUS.shipped) {
-    return `work ${id} has shipped, and a shipped work is not reopened. Follow-up work is a new work:\n  kiln open ${followUpId(root, id)} --follows ${id}`;
+  const status = existsSync(statePath(root, id)) ? readState(root, id).status : null;
+  if (FINISHED.has(status)) {
+    return `work ${id} is ${status}, and a ${status} work is not reopened. Follow-up work is a new work:\n  kiln open ${followUpId(root, id)} --follows ${id}`;
   }
   const follows = flag(rest, "--follows");
   if (follows && !existsSync(statePath(root, follows))) return `--follows names ${follows}, and there is no such work here.`;
@@ -1335,6 +1343,35 @@ function runResume(argv) {
   return 0;
 }
 
+/**
+ * Nothing ended a work but a shipped pull request, so a spike — which never ships — and a
+ * work the user abandoned stayed open for good, and the orchestrator's "close this work and
+ * open a spike" named a verb that did not exist. Closing is the user's decision about their
+ * time, so it takes their words, recorded as a halt's answer is; and it frees the work's temp
+ * directory as a ship does. A closed work is finished: a follow-up is a new work.
+ */
+function closeRefusal(id, { answer, state }) {
+  if (!answer) return `closing ends this work for good, and that is the user's call. Record their words: --answer "<their words>".`;
+  return FINISHED.has(state.status) ? `work ${id} is already ${state.status}.` : null;
+}
+
+function runClose(argv) {
+  const [id, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  const answer = flag(rest, "--answer") ?? "";
+  const state = readState(root, id);
+  const refusal = closeRefusal(id, { answer, state });
+  if (refusal) return process.stderr.write(`${refusal}\n`) && 1;
+  writeState(root, {
+    ...state,
+    status: WORK_STATUS.closed,
+    carry_over: [...state.carry_over, { from_pass: state.pass, kind: "close", text: answer }],
+  });
+  rmSync(join(root, ".kiln", "tmp", id), { recursive: true, force: true });
+  out(`closed ${id}: ${answer}\nIt claims no files and gates nothing now. Follow-up work opens as a new work with --follows ${id}.`);
+  return 0;
+}
+
 /** Prints; writes nothing. What the run has to open, and what kiln cannot promise about it. */
 /**
  * `--opened` records what exists. kiln cannot see a pull request — the agent opens it with
@@ -1440,6 +1477,7 @@ const COMMANDS = {
   ratchet: runRatchet,
   halt: runHalt,
   resume: runResume,
+  close: runClose,
   report: runReport,
   ship: runShip,
   blast: runBlast,
