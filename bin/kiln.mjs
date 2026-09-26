@@ -13,7 +13,9 @@ import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, next
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
-import { GATE_KEYS, artifactPath, isStaleVerify, recordFullVerified, recordRules, recordVerify } from "../lib/state.mjs";
+import { GATE_KEYS, artifactPath, isStaleVerify, recordFullVerified, recordPractices, recordRules, recordVerify } from "../lib/state.mjs";
+import { PRACTICE_STAGES, loadPractices, selectPractices } from "../lib/practices.mjs";
+import { gatherFacts } from "../lib/practices-facts.mjs";
 import { shipVerdict } from "../lib/guards/gate.mjs";
 import { join, relative, resolve } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
@@ -76,6 +78,10 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       Print the project rules routed to the files this stage names, and record
       which ones the run was handed. At --stage plan the files are the ones
       you pass: the approved claim does not exist until the gate.
+
+  kiln practices <id> --stage <investigate|plan|implement|review|ship> [--predicted <a,b,c>]
+      Print the practices this stage must read for this work, each with what
+      selected it, and record them. Read every file it prints.
 
   kiln scope <id>
       Reconcile what the plan predicted against what the diff actually touched.
@@ -940,6 +946,38 @@ function runRules(argv) {
 }
 
 /**
+ * D188: the practices copied from superpowers, agent-skills and BMAD are routed in code, as
+ * rules are (D101): a model matching descriptions is what did not fire for kiln's own skills.
+ */
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const CHANGE_STAGES = new Set(["implement", "review", "ship"]);
+
+function practicesText({ id, stage, selected }) {
+  const head = `Practices — ${stage} · ${id}`;
+  if (selected.length === 0) return `${head}\nNone applies at this stage.`;
+  const rows = selected.map((practice) => `  ${practice.file}\n      ${practice.id} — ${practice.why}`);
+  return [head, `Read each of these before you go on:`, ...rows].join("\n");
+}
+
+function runPractices(argv) {
+  const [id, ...rest] = argv;
+  const stage = flag(rest, "--stage");
+  if (!id || !PRACTICE_STAGES.includes(stage)) {
+    process.stderr.write(`usage: kiln practices <id> --stage <${PRACTICE_STAGES.join("|")}> [--predicted <a,b,c>]\n`);
+    return 1;
+  }
+  const { root, config } = loadConfig(process.cwd());
+  const state = readState(root, id);
+  const anchor = CHANGE_STAGES.has(stage) ? anchorVerdict(root, state.base) : { ok: true };
+  if (!anchor.ok) return process.stderr.write(`${offBranchMessage(id, { base: state.base, reason: anchor.reason })}\n`) && 1;
+  const facts = gatherFacts(root, { config, state, stage, predicted: claimedPaths(rest) });
+  const selected = selectPractices(loadPractices(PLUGIN_ROOT), { stage, facts });
+  out(practicesText({ id: state.id, stage, selected }));
+  writeState(root, recordPractices(state, { stage, ids: selected.map((practice) => practice.id) }));
+  return 0;
+}
+
+/**
  * Opening a work that already exists is a handover, not a mistake: this session takes
  * over, and says so. The session it replaced is recorded, so its next guarded write is
  * blocked rather than allowed by a guard that could not tell it had been replaced.
@@ -1345,6 +1383,7 @@ const COMMANDS = {
   ship: runShip,
   blast: runBlast,
   rules: runRules,
+  practices: runPractices,
   scope: runScope,
   verify: runVerify,
   doctor: runDoctor,
@@ -1355,7 +1394,7 @@ const COMMANDS = {
  * kiln's own errors are answers to the user, so they print as a sentence. Anything
  * else is a bug in kiln, and a stack trace is the only useful thing to hand over.
  */
-const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError", "RulesError", "DnaError"]);
+const EXPECTED = new Set(["ConfigError", "StateError", "StackError", "StepError", "ResolveError", "CeremonyError", "RulesError", "DnaError", "PracticesError"]);
 
 function reportFailure(error) {
   const named = error instanceof Error && EXPECTED.has(error.constructor.name);

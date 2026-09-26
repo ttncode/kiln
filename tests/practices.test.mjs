@@ -1,0 +1,105 @@
+import { test, after } from "node:test";
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { evaluateTrigger, loadPractices, riskFlags, selectPractices, PRACTICE_STAGES } from "../lib/practices.mjs";
+import { gatherFacts } from "../lib/practices-facts.mjs";
+import { loadConfig } from "../lib/config.mjs";
+import { readState } from "../lib/state.mjs";
+import { cleanupFixtures, writeFile } from "./helpers/fixture.mjs";
+import { kiln, nodeProject, ok } from "./helpers/journey.mjs";
+
+after(cleanupFixtures);
+
+const ROOT = new URL("..", import.meta.url).pathname;
+const NOTHING = { path: "bounded", auto: false, flags: null, files: null, lines: null, added: null, kinds: null };
+
+test("D188: the plan's Risk flags — named, none, absent, misspelt or left empty", () => {
+  assert.deepEqual([...riskFlags("# P\n\n## Risk flags\n- security: takes a URL from the user\n- performance: runs per row\n\n## Tasks\n")], ["security", "performance"]);
+  assert.deepEqual([...riskFlags("## Risk flags\n- none\n")], []);
+  assert.equal(riskFlags("# P\n\n## Tasks\n"), null, "no section is unknown, not none");
+  assert.throws(() => riskFlags("## Risk flags\n- secruity: typo\n"), /name secruity; the flags are security, performance/);
+  assert.throws(() => riskFlags("## Risk flags\n\n## Tasks\n"), /section is empty/);
+});
+
+test("D188: each trigger answers true, false, or unknown when code cannot tell", () => {
+  const facts = { ...NOTHING, path: "full", flags: new Set(["migration"]), files: ["src/db/orders.sql", "src/app.js"], lines: 40, added: new Map([["src/app.js", "db.query(`SELECT * FROM t WHERE id = ${id}`)\n"]]), kinds: new Map([["src/app.js", "API"]]) };
+  const answers = ["always", "path:full", "path:bounded", "auto", "flag:migration", "flag:security", "glob:**/*.sql", "glob:**/*.php", "content:\\$\\{", "content:eval\\(", "surface:API", "surface:SCREEN", "route:quick"].map((trigger) => evaluateTrigger(trigger, facts));
+  assert.deepEqual(answers, [true, true, false, false, true, false, true, false, true, false, true, false, true]);
+  assert.deepEqual(["flag:security", "glob:**/*.sql", "content:x", "surface:API", "route:quick"].map((trigger) => evaluateTrigger(trigger, NOTHING)), [null, null, null, null, null]);
+  assert.throws(() => evaluateTrigger("keyword:auth", facts), /"keyword:auth" is not a trigger/);
+});
+
+test("D188: a practice is read when a trigger holds or when nothing can be decided — fire, don't skip", () => {
+  const registry = [
+    { id: "api", stage: "plan", file: "a.md", when: ["flag:public-api", "surface:API"] },
+    { id: "ui", stage: "plan", file: "u.md", when: ["flag:ui", "glob:**/*.vue"] },
+    { id: "review-only", stage: "review", file: "r.md", when: ["always"] },
+  ];
+  const decidedNo = { ...NOTHING, flags: new Set(), files: ["src/app.js"], kinds: new Map() };
+  assert.deepEqual(selectPractices(registry, { stage: "plan", facts: decidedNo }), [], "flags say none and the files are no UI: nothing is read");
+  const unknown = selectPractices(registry, { stage: "plan", facts: NOTHING }).map((practice) => practice.id);
+  assert.deepEqual(unknown, ["api", "ui"], "with no plan, no files and no stack, both are read rather than skipped");
+  const flagged = selectPractices(registry, { stage: "plan", facts: { ...decidedNo, flags: new Set(["public-api"]) } });
+  assert.deepEqual(flagged.map((practice) => [practice.id, practice.why]), [["api", "flag:public-api"]]);
+});
+
+test("D188: agent-skills' /ship rule skips a specialist only on a small change that touches nothing sensitive", () => {
+  const security = { id: "security", stage: "review", file: "s.md", when: ["always"], skip: { files_at_most: 2, lines_below: 50, unless: ["glob:**/auth/**", "content:password|token|secret"] } };
+  const small = { ...NOTHING, files: ["src/format.js"], lines: 12, added: new Map([["src/format.js", "return x.trim();\n"]]) };
+  assert.deepEqual(selectPractices([security], { stage: "review", facts: small }), []);
+  assert.equal(selectPractices([security], { stage: "review", facts: { ...small, files: ["src/auth/login.js"] } }).length, 1, "a small change to auth is reviewed");
+  assert.equal(selectPractices([security], { stage: "review", facts: { ...small, added: new Map([["src/format.js", "const token = x;\n"]]) } }).length, 1);
+  assert.equal(selectPractices([security], { stage: "review", facts: { ...small, lines: 50 } }).length, 1, "50 lines is not under 50");
+  assert.equal(selectPractices([security], { stage: "review", facts: { ...small, added: null } }).length, 1, "an unless code cannot decide keeps the review");
+});
+
+test("D188: the facts at REVIEW are the diff's files, its changed lines counting untracked ones, and what the lines add", () => {
+  const root = nodeProject({ name: "practices" });
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, "src", "app.js"), "console.log('app');\nconst query = `SELECT * FROM t WHERE id = ${id}`;\n");
+  writeFile(join(root, "src", "new.js"), "one\ntwo\nthree\n");
+  const facts = gatherFacts(root, { config: loadConfig(root).config, state: readState(root, "w1"), stage: "review" });
+  assert.deepEqual(facts.files, ["src/app.js", "src/new.js"]);
+  assert.equal(facts.lines, 6, "app.js: one line out and two in; new.js, untracked: three");
+  assert.match(facts.added.get("src/app.js"), /SELECT \* FROM t WHERE id = \$\{id\}/);
+  assert.equal(facts.added.get("src/new.js"), "one\ntwo\nthree\n");
+});
+
+test("D188: kiln practices refuses a plan still being written without its Risk flags, and records what it printed", () => {
+  const root = nodeProject({ name: "practices-cli" });
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Tasks\n");
+  const refused = kiln(root, ["practices", "w1", "--stage", "plan", "--predicted", "src/app.js"]);
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /plan\.md has no "## Risk flags" section/);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Risk flags\n- none\n");
+  const ran = kiln(root, ["practices", "w1", "--stage", "plan", "--predicted", "src/app.js"]);
+  assert.equal(ran.status, 0, ran.stderr);
+  assert.match(ran.stdout, /Practices — plan · w1/);
+  assert.deepEqual(readState(root, "w1").practices.map((row) => row.stage), ["plan"]);
+  assert.match(kiln(root, ["practices", "w1", "--stage", "deploy"]).stderr, /usage: kiln practices <id> --stage/);
+});
+
+test("D188: every practice kiln ships names a stage, a file that exists and triggers that parse", () => {
+  const practices = loadPractices(ROOT);
+  assert.equal(new Set(practices.map((practice) => practice.id)).size, practices.length, "ids are unique");
+  for (const practice of practices) {
+    assert.ok(PRACTICE_STAGES.includes(practice.stage), `${practice.id}: stage ${practice.stage}`);
+    assert.ok(existsSync(join(ROOT, practice.file)), `${practice.id}: ${practice.file} exists`);
+    assert.ok(practice.when?.length > 0, `${practice.id}: has a trigger`);
+    for (const trigger of [...practice.when, ...(practice.skip?.unless ?? [])]) evaluateTrigger(trigger, NOTHING);
+  }
+  assert.ok(Array.isArray(JSON.parse(readFileSync(join(ROOT, "skills", "practices.json"), "utf8"))));
+});
+
+test("D188: at IMPLEMENT the plan's approved files count before anything has changed", () => {
+  const root = nodeProject({ name: "practices-implement" });
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Risk flags\n- none\n");
+  ok(root, ["gate", "w1", "plan", "--answer", "yes, approved", "--predicted", "src/app.js"]);
+  const facts = gatherFacts(root, { config: loadConfig(root).config, state: readState(root, "w1"), stage: "implement" });
+  assert.deepEqual(facts.files, ["src/app.js"], "nothing changed yet, so the approved prediction is what the stage works on");
+  const ci = { id: "ci", stage: "implement", file: "c.md", when: ["glob:.github/workflows/**"] };
+  assert.deepEqual(selectPractices([ci], { stage: "implement", facts }), [], "a decided no, not an unknown that fires");
+});
