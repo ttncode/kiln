@@ -1,0 +1,1 @@
+[{"id":"hardcoded-secret","where":"src/payments/client.js API_KEY","what":"a live payment-provider API key is hard-coded in source and will be committed; it must come from configuration/environment and the key should be rotated"}]

@@ -1,0 +1,1 @@
+[{"id":"unbounded-query","where":"src/routes/admin.js GET /admin/audit-events","what":"selects every row of audit_events (millions, never pruned) with no LIMIT or pagination and returns them in one response — memory and response-time blow-up, effectively a denial of service"}]

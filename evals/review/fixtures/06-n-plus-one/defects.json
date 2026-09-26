@@ -1,0 +1,1 @@
+[{"id":"n-plus-one","where":"src/routes/reports.js GET /reports/orders","what":"one customers query per order inside the loop (N+1): tens of thousands of sequential queries for the monthly report; should be a JOIN or one IN query"}]
