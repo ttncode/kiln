@@ -245,6 +245,13 @@ your ledger, in the same turn:
 
 A failing run is recorded as a failure; the task is not complete.
 
+A passing run also takes a **snapshot** of the tree (`task/<N>`); the plan gate took
+`task/0`. If a later task breaks what an earlier one had passing and editing forward is not
+the fix, go back with `kiln restore <id> --to task/<N>` — never `git checkout`, `restore` or
+`reset`, which kiln refuses while the work is open. The restore takes an undo snapshot first
+and prints how to return. If the project has no fast phase, record each task with
+`--phase full --task <N>/<total>` instead.
+
 `--task <N>/<total>` is not decoration. kiln records the position and its last
 line tells you what to do next. **Read that line and do it in the same turn.**
 It is the instruction; this document is five hours behind it.

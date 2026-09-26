@@ -402,7 +402,7 @@ function guardGateBash(payload, ctx) {
  */
 function discardRemedy(ctx, work) {
   if (work.id === ctx.state?.id && work.status === "in_progress") {
-    return "If one of your changes is wrong, edit the file back — that edit is gated and recorded like any other.";
+    return `If one of your changes is wrong, edit the file back, or return to a task's snapshot with \`kiln restore ${work.id} --to task/<n>\` — both are recorded like any other edit.`;
   }
   return "Discarding it is the user's decision, in their own terminal. kiln will not run it, and neither should you.";
 }
