@@ -7,7 +7,8 @@ import { STATUS, repairs, runChecks, worstStatus } from "../lib/doctor.mjs";
 import { floorStatus, installFloor } from "../lib/floor.mjs";
 import { renderShipPlan, shipPlan } from "../lib/ship.mjs";
 import { applyInit, ensureIgnored, planInit, proposeConfig, stepsFor, unsatisfiedSteps } from "../lib/init.mjs";
-import { actualChanged, anchorVerdict, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict, worktreeTree } from "../lib/blast.mjs";
+import { actualChanged, anchorVerdict, checkoutTrees, grepBlastRadius, offBranchMessage, pathsOf, statusPaths, reconcile, reconciliationLine, reconcileVerdict, worktreeTree } from "../lib/blast.mjs";
+import { dropSnapshots, restoreSnapshot, takeSnapshot } from "../lib/snapshots.mjs";
 import { STAGES, addRoute, readRoutes, rulesReport } from "../lib/rules.mjs";
 import { DEFAULT_TYPE, PATHS, TYPES, autoEligible, canRatchet, ceremonyFor, nextMove, ratchetRefusal, renderAutoRuled, taskPosition } from "../lib/ceremony.mjs";
 import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
@@ -17,11 +18,11 @@ import { GATE_KEYS, artifactPath, isStaleVerify, recordFullVerified, recordPract
 import { PRACTICE_STAGES, PracticesError, RISK_FLAGS, loadPractices, riskFlags, selectPractices } from "../lib/practices.mjs";
 import { gatherFacts } from "../lib/practices-facts.mjs";
 import { writeReviewInputs } from "../lib/review-inputs.mjs";
-import { shipVerdict } from "../lib/guards/gate.mjs";
+import { shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { join, relative, resolve } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
 import { followUpId, resolveArgument } from "../lib/resolve.mjs";
-import { SHIP_AUTHORIZING, STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
+import { AUTHORIZING, SHIP_AUTHORIZING, STATUS as WORK_STATUS, adoptSession, newWork, readState, recordGate, statePath, writeState } from "../lib/state.mjs";
 import { gitOutput } from "../lib/init.mjs";
 import { listWork } from "../lib/work.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
@@ -98,6 +99,11 @@ const USAGE = `kiln — one unit of work to a reviewed pull request
       End a work that will not ship: a spike whose answer is delivered, or work
       the user abandons. It stops claiming files and gating edits; the working
       tree is not touched. A closed work is not reopened — use --follows.
+
+  kiln restore <id> --to <task/<n>|undo/<k>>
+      Put the work's files back as they were at a snapshot: one is taken when
+      source opens (task/0) and after each task whose \`verify --task\` passed.
+      Takes an undo snapshot first. Never after the review gate.
 
   kiln ratchet <id> <spike|bounded|full>
       Move this work up a rung. Prints the uncommitted diff it found and stops;
@@ -609,6 +615,7 @@ function writeGate(root, { id, key, decision, answer, claimed, rest, artifact })
   // the count reported is what the work now claims, not what this call passed in.
   const next = claimed.length > 0 ? { ...recorded, predicted: claimed.map((path) => ({ path })) } : recorded;
   writeState(root, next);
+  if (decision === DECISION.approved && key === AUTHORIZING[next.path]) snapshotBaseline(root, next);
   out(JSON.stringify({ recorded: true, gate: key, claimed: next.predicted.length, ...next.gates[key] }, null, 2));
   reportAutoRulings(next, { key, by });
   // A rejection is evidence and is kept, but it is not a gate that opened. Exit 0 made it
@@ -693,9 +700,38 @@ function runVerify(argv) {
     tmpDir: join(root, ".kiln", "tmp", id, "steps"),
     range: `${state.base}..${head}`,
   });
-  const tree = worktreeTree(root);
+  return recordMeasured({ root, state: { ...state, step }, phase, head, result });
+}
+
+/** The run is recorded against the tree it ran on, and a passing task is snapshotted from it. */
+function recordMeasured({ root, state, phase, head, result }) {
+  const trees = checkoutTrees(root);
+  const tree = worktreeTree(root, trees);
   const measured = { ...result, entries: result.entries.map((entry) => ({ ...entry, phase, tree })) };
-  return recordRun({ root, state: { ...state, step }, phase, head, result: measured });
+  const code = recordRun({ root, state, phase, head, result: measured });
+  if (code === 0 && state.step) snapshotTask(root, { id: state.id, name: `task/${state.step.task}`, trees });
+  return code;
+}
+
+/**
+ * D208: a snapshot after each task whose run passed, and one at the gate that opens source.
+ * A failed run takes none: the save point is the last state a test run passed on.
+ */
+function recordSnapshot(root, { id, name, trees }) {
+  const state = readState(root, id);
+  const taken = takeSnapshot(root, { state, name, trees });
+  if (taken.error) return process.stderr.write(`No snapshot was taken (${taken.error}).\n`) && null;
+  writeState(root, { ...state, snapshots: [...(state.snapshots ?? []), { ...taken.entry, at: new Date().toISOString() }] });
+  return taken.entry;
+}
+
+function snapshotTask(root, { id, name, trees }) {
+  if (recordSnapshot(root, { id, name, trees })) out(`Snapshot ${name} taken: \`kiln restore ${id} --to ${name}\` returns here.`);
+}
+
+function snapshotBaseline(root, state) {
+  if ((state.snapshots ?? []).some((entry) => entry.name === "task/0")) return;
+  if (recordSnapshot(root, { id: state.id, name: "task/0" })) process.stderr.write(`Snapshot task/0 taken: the tree the plan starts from.\n`);
 }
 
 /** The refusal still says what comes next: a phase kiln cannot run is not a reason to stop. */
@@ -1384,8 +1420,46 @@ function runClose(argv) {
     carry_over: [...state.carry_over, { from_pass: state.pass, kind: "close", text: answer }],
   });
   rmSync(join(root, ".kiln", "tmp", id), { recursive: true, force: true });
+  dropSnapshots(root, state);
   out(`closed ${id}: ${answer}\nIt claims no files and gates nothing now. Follow-up work opens as a new work with --follows ${id}.`);
   return 0;
+}
+
+function restoreRefusal(root, { id, to, state }) {
+  if (!to) return `name the snapshot: --to task/<n> or --to undo/<k>. Taken so far: ${(state.snapshots ?? []).map((entry) => entry.name).join(", ") || "none"}.`;
+  if (!(state.snapshots ?? []).some((entry) => entry.name === to)) return `work ${id} has no snapshot ${to}.`;
+  const verdict = sourceEditVerdict(root, { state, target: join(root, ".") });
+  return verdict.blocked ? `a restore is a source edit, and ${verdict.reason}.` : null;
+}
+
+/**
+ * D208: back to a task's snapshot. It takes an undo snapshot first, and writes back only what
+ * this work may touch — never \`.kiln/\`, the files dirty before it opened, or another work's claims.
+ */
+function runRestore(argv) {
+  const [id, ...rest] = argv;
+  const { root } = loadConfig(process.cwd());
+  const state = readState(root, id);
+  const to = flag(rest, "--to");
+  const refusal = restoreRefusal(root, { id, to, state });
+  if (refusal) return process.stderr.write(`kiln will not restore: ${refusal}\n`) && 2;
+  const trees = checkoutTrees(root);
+  const undo = `undo/${(state.snapshots ?? []).filter((entry) => entry.name.startsWith("undo/")).length + 1}`;
+  if (!recordSnapshot(root, { id, name: undo, trees })) return process.stderr.write("kiln will not restore without an undo snapshot to come back to.\n") && 1;
+  const result = restoreSnapshot(root, { state, entry: state.snapshots.find((entry) => entry.name === to), trees });
+  const after = readState(root, id);
+  writeState(root, { ...after, carry_over: [...after.carry_over, { from_pass: after.pass, kind: "restore", text: `to ${to}; undo with ${undo}` }] });
+  return out(restoreReport({ id, to, undo, result })) ?? 0;
+}
+
+function restoreReport({ id, to, undo, result }) {
+  return [
+    `Restored ${id} to ${to}:`,
+    ...(result.written.length > 0 ? result.written.map((path) => `  ${path}`) : ["  (nothing differed)"]),
+    ...result.skipped.map((path) => `  left as it is: ${path}`),
+    `Undo with \`kiln restore ${id} --to ${undo}\`.`,
+    "Ignored files and external state were not restored — rerun install and generators if the change touched them.",
+  ].join("\n");
 }
 
 /** Prints; writes nothing. What the run has to open, and what kiln cannot promise about it. */
@@ -1435,6 +1509,7 @@ function shipRefusal(root, state) {
 
 function recordShipped(root, { state, opened }) {
   writeState(root, { ...state, status: WORK_STATUS.shipped, opened });
+  dropSnapshots(root, state);
   // The sandbox tells every run its temp files are "removed when kiln ship records the work
   // shipped". Nothing removed them, so the promise was a sentence; this is the sentence.
   rmSync(join(root, ".kiln", "tmp", state.id), { recursive: true, force: true });
@@ -1494,6 +1569,7 @@ const COMMANDS = {
   halt: runHalt,
   resume: runResume,
   close: runClose,
+  restore: runRestore,
   report: runReport,
   ship: runShip,
   blast: runBlast,
