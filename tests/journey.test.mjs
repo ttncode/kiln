@@ -337,7 +337,7 @@ test("J8.1/J8.2/J8.5 the guards hold against the spellings a blocked agent reach
     assert.equal(await bash(root, command), BLOCK, `J8.1 ALLOWED: ${command}`);
   }
   assert.equal(await bash(root, "rm -rf /tmp/not-my-repo"), BLOCK, "J8.2");
-  assert.equal(await bash(root, "git clean -xfd src"), ALLOW, "inside the repo is the user's own tree — away from .kiln/, which D204 guards");
+  assert.equal(await bash(root, "git clean -xfd src"), BLOCK, "D205: with a work open, what clean removes is that work's new files");
   assert.equal(await edit(root, "../outside.js"), BLOCK, "J8.5");
 });
 

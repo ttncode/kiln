@@ -78,6 +78,7 @@ const CONTROL = /enforces the run|control files|kiln cannot read what an inline 
 const SANDBOX = /outside the project root|another work's directory|symlink/;
 const GATE = /plan gate is not approved|gate is not approved/;
 const DNA = /DNA store is written only by `kiln dna apply/;
+const DISCARD = /throws away uncommitted work, and work w1 \(in_progress\)[\s\S]*edit the file back/;
 
 // ------------------------------------------------------------- D7 item 1
 
@@ -113,7 +114,6 @@ const BRANCHES = [
   ["bash", "env | grep git", "allow"],
   ["bash", "git switch main && git commit -m x", "deny", PROTECTED],
   ["bash", "git checkout -b main && git commit -m x", "deny", PROTECTED],
-  ["bash", "git checkout main -- src/app.js && git commit -m x", "allow"],
   ["bash", "git push origin feature/work", "allow"],
   ["bash", "git push -u origin HEAD", "allow"],
   ["bash", "git push", "allow"],
@@ -177,9 +177,7 @@ const DESTROYING = [
   ["bash", "git -C {outside} clean -xfd", "deny", SANDBOX],
   ["bash", "git clean -f -d -x {outside}", "deny", SANDBOX],
   ["bash", "git clean --force -d -x {outside}", "deny", SANDBOX],
-  ["bash", "git clean -fdx src", "allow"],
   ["bash", "git clean -n -fdx {outside}", "allow"],
-  ["bash", "git clean -fd -e {outside} src", "allow"],
   ["bash", "git clean -fd -e -n {outside}", "deny", SANDBOX],
   ["bash", "git clean -fd --exclude -n {outside}", "deny", SANDBOX],
   ["bash", "git clean -fd --exclude=-n {outside}", "deny", SANDBOX],
@@ -256,7 +254,6 @@ const CONTROL_FILES = [
   ["bash", "git clean -fdx", "deny", CONTROL],
   ["bash", "git -C {root} clean --force -d", "deny", CONTROL],
   ["bash", "cd {root} && git clean -f -d .kiln", "deny", CONTROL],
-  ["bash", "git clean -fd -e .kiln", "allow"],
   ["bash", "git clean -n -fd", "allow"],
   ["bash", "git stash -u", "deny", CONTROL],
   ["bash", "git stash push --include-untracked", "deny", CONTROL],
@@ -346,7 +343,73 @@ const CONTROL_FILES = [
   ["bash", "rm .kiln/dna/*", "deny", /DNA store|enforces the run/],
 ];
 
+// ------------------------------------------------------------- D205: uncommitted work
+
+const DISCARDING = [
+  ["bash", "git reset --hard", "deny", DISCARD],
+  ["bash", "git reset --hard HEAD~1", "deny", DISCARD],
+  ["bash", "git reset --merge", "deny", DISCARD],
+  ["bash", "git merge --abort", "deny", DISCARD],
+  ["bash", "git rebase --abort", "deny", DISCARD],
+  ["bash", "git checkout .", "deny", DISCARD],
+  ["bash", "git checkout -- src/app.js", "deny", DISCARD],
+  ["bash", "git checkout HEAD -- src/app.js", "deny", DISCARD],
+  ["bash", "git checkout src/app.js", "deny", DISCARD],
+  ["bash", "git checkout HEAD src/app.js", "deny", DISCARD],
+  ["bash", "git checkout -f feature/work", "deny", DISCARD],
+  ["bash", "git checkout -p", "deny", DISCARD],
+  ["bash", "git checkout --pathspec-from-file=list.txt", "deny", DISCARD],
+  ["bash", "git switch --discard-changes feature/work", "deny", DISCARD],
+  ["bash", "git switch -f feature/work", "deny", DISCARD],
+  ["bash", "git restore src/app.js", "deny", DISCARD],
+  ["bash", "git restore .", "deny", DISCARD],
+  ["bash", "git restore -p src/app.js", "deny", DISCARD],
+  ["bash", "git restore --staged --worktree src/app.js", "deny", DISCARD],
+  ["bash", "git restore -SW src/app.js", "deny", DISCARD],
+  ["bash", "git clean -fd src", "deny", DISCARD],
+  ["bash", "git stash drop", "deny", DISCARD],
+  ["bash", "git stash clear", "deny", DISCARD],
+  ["bash", "git mv -f src/app.js package.json", "deny", DISCARD],
+  ["bash", "git read-tree --reset -u HEAD", "deny", DISCARD],
+  ["bash", "git read-tree -m -u HEAD", "deny", DISCARD],
+  ["bash", "git worktree remove --force .", "deny", DISCARD],
+  ["bash", "git submodule deinit -f --all", "deny", DISCARD],
+  ["bash", "git submodule update --force", "deny", DISCARD],
+  ["bash", "git show HEAD:src/app.js > src/app.js", "deny", DISCARD],
+  ["bash", "sudo git reset --hard", "deny", DISCARD],
+  ["bash", "git -C {root} checkout .", "deny", DISCARD],
+  ["bash", "cd src && git checkout app.js", "deny", DISCARD],
+  ["bash", "git-checkout .", "deny", DISCARD],
+  ["bash", "git -c alias.co=checkout co .", "deny", DISCARD],
+  ["bash", "bash -c 'git reset --hard'", "deny", DISCARD],
+  ["bash", "git status && git reset --hard", "deny", DISCARD],
+  ["bash", "git reset --soft HEAD~1", "allow"],
+  ["bash", "git reset src/app.js", "allow"],
+  ["bash", "git reset --keep HEAD", "allow"],
+  ["bash", "git restore --staged src/app.js", "allow"],
+  ["bash", "git checkout -b feature/next", "allow"],
+  ["bash", "git checkout -b feature/next HEAD", "allow"],
+  ["bash", "git checkout feature/work", "allow"],
+  ["bash", "git switch feature/work", "allow"],
+  ["bash", "git stash", "allow"],
+  ["bash", "git stash pop", "allow"],
+  ["bash", "git clean -n -fd", "allow"],
+  ["bash", "git mv src/app.js src/main.js", "allow"],
+  ["bash", "git show HEAD:src/app.js", "allow"],
+  ["bash", "git show HEAD:src/app.js > .kiln/tmp/w1/old-app.js", "allow"],
+  ["bash", "git worktree remove --force /tmp/review-abc", "allow"],
+  ["bash", "git -C {outside} reset --hard", "allow"],
+  ["bash", "git merge feature/work", "allow"],
+];
+
 const NOTHING_OPEN = [
+  ["bash", "git checkout main -- src/app.js && git commit -m x", "allow"],
+  ["bash", "git clean -fdx src", "allow"],
+  ["bash", "git clean -fd -e {outside} src", "allow"],
+  ["bash", "git clean -fd -e .kiln", "allow"],
+  ["bash", "git reset --hard", "allow"],
+  ["bash", "git checkout .", "allow"],
+  ["bash", "git restore src/app.js", "allow"],
   ["bash", "git clean -fd", "deny", CONTROL],
   ["bash", "git stash -u", "deny", CONTROL],
   ["edit", ".kiln/config.json", "deny", CONTROL],
@@ -377,4 +440,5 @@ table("D7 item 5: the sandbox", SANDBOXED, () => project());
 table("D7 item 4: before the plan gate", BEFORE_THE_GATE, () => project());
 table("D7 item 4: after the plan gate", AFTER_THE_GATE, () => project({ approved: true }));
 table("D7 item 7: the files the run is judged by", CONTROL_FILES, () => project());
+table("D205: uncommitted work, while a work is open", DISCARDING, () => project());
 table("with no work open, only what does not depend on a run holds", NOTHING_OPEN, () => project({ open: false }));
