@@ -1,6 +1,6 @@
 ---
 name: kiln-orchestrator
-description: Use when the user runs /kiln:kiln with a sentence, a ticket reference, or a URL, and for every stage of that work until a pull request exists. Drives investigate, plan, implement, review, verify and ship, renders every gate, and is the only component that creates todos.
+description: Use when the user runs /kiln:kiln with a sentence, a ticket reference, or a URL, and for every stage of that work until a pull request exists.
 ---
 
 # kiln Orchestrator

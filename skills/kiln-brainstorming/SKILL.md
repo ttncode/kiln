@@ -1,6 +1,6 @@
 ---
 name: kiln-brainstorming
-description: "Use when starting any creative work — a feature, a component, new functionality, a change in behaviour — before implementation. Explores intent and design, and classifies how much ceremony the work needs."
+description: "Use when starting any creative work — a feature, a component, new functionality, a change in behaviour — before implementation."
 ---
 
 # Brainstorming Ideas Into Designs

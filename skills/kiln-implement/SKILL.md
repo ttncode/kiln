@@ -1,6 +1,6 @@
 ---
 name: kiln-implement
-description: Use when the plan gate is approved and the plan is ready to work task by task. Implements every task in this session under TDD, recording each step's exit code as it goes.
+description: Use when the plan gate is approved and the plan's tasks are ready to be worked in this session.
 ---
 
 # Executing Plans

@@ -413,3 +413,15 @@ test("D202: on full, SHIP renders and records the ship gate before the commit", 
   assert.match(body, /On `full`, SHIP starts with its own gate/, "nothing told the agent the ship gate exists");
   assert.match(body, /kiln gate <id> ship --answer/);
 });
+
+/**
+ * D209: superpowers' writing-skills measured that "when a description summarizes the skill's
+ * workflow, an agent may follow the description instead of reading the full skill content".
+ * One "Use when …" sentence: the conditions, never the process.
+ */
+test("D209: a description is one sentence of trigger conditions, not a summary of the process", () => {
+  for (const name of skillNames()) {
+    const { description } = frontmatter(name);
+    assert.match(description.replace(/^"|"$/g, ""), /^Use when [^.]+(?:\.[a-z/][^.]*)*\.$/, `${name}: ${description}`);
+  }
+});

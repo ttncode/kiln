@@ -1,6 +1,6 @@
 ---
 name: kiln-review
-description: Use when implementation is finished and the change needs judging before it ships. Reviews the whole diff against the plan, grades findings by severity and likelihood, and reconciles what the plan predicted against what was touched.
+description: Use when implementation is finished and the change needs judging before it ships.
 ---
 
 # kiln Review
