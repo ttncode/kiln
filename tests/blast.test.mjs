@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { symlinkSync } from "node:fs";
+import { chmodSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import {
   actualChanged,
@@ -78,6 +78,16 @@ test("D197: a symbolic link is not followed, so a loop or a dangling link cannot
   symlinkSync("gone.php", join(root, "src", "dangling.php"));
   symlinkSync("real.php", join(root, "src", "alias.php"));
   assert.deepEqual(grepBlastRadius(root, ["needle"]).map((r) => r.path), ["src/real.php"], "the file is found at its real path, once");
+});
+
+test("D197: a directory the walk may not list is skipped, not fatal", { skip: process.getuid?.() === 0 && "root can list anything" }, () => {
+  const { root } = project({ "src/real.php": "needle\n", "volumes/db/data.sql": "needle\n" });
+  chmodSync(join(root, "volumes", "db"), 0o000);
+  try {
+    assert.deepEqual(grepBlastRadius(root, ["needle"]).map((r) => r.path), ["src/real.php"]);
+  } finally {
+    chmodSync(join(root, "volumes", "db"), 0o755);
+  }
 });
 
 test("no terms yields nothing rather than everything", () => {
