@@ -112,6 +112,12 @@ reached PHPUnit as a filter that matches nearly every test. Offer only kiln's ow
 command you have just run and seen pass, and mark nothing else `(Recommended)`. When the fast
 subset needs a per-task argument, the recommended answer is blank.
 
+Then say what init wrote — `.kiln/config.json`, `.kiln/rules/`, `.kiln/hooks/` and a line in
+`.gitignore` — and that it is the project's kiln setup and belongs in the repository, committed
+through a pull request like any change (kiln refuses a commit on the integration branch). Until
+it is, every work opens with those files already dirty: kiln sets them aside (D194), but a
+teammate's clone has no kiln setup at all.
+
 ## The skills that do the stages
 
 You drive the run. **Each stage is done by its own skill, and you invoke it** — none of them
