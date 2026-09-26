@@ -271,5 +271,79 @@
       "glob:**/templates/**",
       "glob:**/components/**"
     ]
+  },
+  {
+    "id": "incremental-implementation",
+    "stage": "implement",
+    "file": "skills/kiln-implement/incremental-implementation.md",
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "test-driven-development",
+    "stage": "implement",
+    "file": "skills/kiln-tdd/test-driven-development.md",
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "source-driven-development",
+    "stage": "implement",
+    "file": "skills/kiln-implement/source-driven-development.md",
+    "when": [
+      "path:spike",
+      "content:^\\s*import\\s[^\\n]*from\\s+['\"][^.\\/][^'\"]*['\"]",
+      "content:require\\(\\s*['\"][^.\\/][^'\"]*['\"]\\s*\\)",
+      "content:^\\s*use\\s+[A-Z][\\w\\\\]+;",
+      "glob:**/package.json",
+      "glob:**/composer.json",
+      "glob:**/requirements*.txt",
+      "glob:**/pyproject.toml",
+      "glob:**/go.mod",
+      "glob:**/Cargo.toml"
+    ]
+  },
+  {
+    "id": "doubt-driven-development",
+    "stage": "implement",
+    "file": "skills/kiln-implement/doubt-driven-development.md",
+    "when": [
+      "flag:security",
+      "flag:migration",
+      "content:\\b(?:DROP\\s+(?:TABLE|COLUMN|INDEX)|TRUNCATE|DELETE\\s+FROM|ALTER\\s+TABLE)\\b",
+      "content:\\b(?:rm\\s+-rf|unlink|rmSync|fs\\.rm|shutil\\.rmtree)\\b"
+    ]
+  },
+  {
+    "id": "ci-cd-and-automation",
+    "stage": "implement",
+    "file": "skills/kiln-implement/ci-cd-and-automation.md",
+    "when": [
+      "glob:.github/workflows/**",
+      "glob:.gitlab-ci.yml",
+      "glob:**/Dockerfile",
+      "glob:**/docker-compose*.yml",
+      "glob:**/Jenkinsfile",
+      "glob:**/.circleci/**"
+    ]
+  },
+  {
+    "id": "browser-testing-with-devtools",
+    "stage": "implement",
+    "file": "skills/kiln-implement/browser-testing-with-devtools.md",
+    "when": [
+      "flag:ui",
+      "glob:**/*.tsx",
+      "glob:**/*.jsx",
+      "glob:**/*.vue",
+      "glob:**/*.svelte",
+      "glob:**/*.css",
+      "glob:**/*.scss",
+      "glob:**/views/**",
+      "glob:**/templates/**",
+      "glob:**/components/**"
+    ]
   }
 ]

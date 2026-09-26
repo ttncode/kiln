@@ -311,5 +311,71 @@
     ],
     "upstream_sha256": "df66536610071727feae1ca95f3c391c248ad828041750ccd3699cce763aa00b",
     "kiln_sha256": "cb80dce6b154391fb5b261ba3fb5de981ef6656dc371fc26ac2dec8b8513c6bb"
+  },
+  {
+    "path": "skills/kiln-implement/doubt-driven-development.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/doubt-driven-development/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "6fa1fcd8420c28daf7e53c5b08b0f20b907911efd2a6d9bce0b9740da20a4008",
+    "kiln_sha256": "6fa1fcd8420c28daf7e53c5b08b0f20b907911efd2a6d9bce0b9740da20a4008"
+  },
+  {
+    "path": "skills/kiln-implement/source-driven-development.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/source-driven-development/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "c59faf851377f0eeda45306398d16eb96d77ab1c2fd3e1a7fb58e9a0af33c1e9",
+    "kiln_sha256": "c59faf851377f0eeda45306398d16eb96d77ab1c2fd3e1a7fb58e9a0af33c1e9"
+  },
+  {
+    "path": "skills/kiln-implement/ci-cd-and-automation.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/ci-cd-and-automation/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "a6ed8ed56456b01ff8314c44eefc69897d9905ae4e06bb2b7036286efb79b5f0",
+    "kiln_sha256": "a6ed8ed56456b01ff8314c44eefc69897d9905ae4e06bb2b7036286efb79b5f0"
+  },
+  {
+    "path": "skills/kiln-implement/definition-of-done.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "references/definition-of-done.md",
+    "kind": "verbatim",
+    "upstream_sha256": "d1c75d2ae65d2c7a9cd01f93fa8de63e00e75f2fe5d08be224d576157054dcee",
+    "kiln_sha256": "d1c75d2ae65d2c7a9cd01f93fa8de63e00e75f2fe5d08be224d576157054dcee"
+  },
+  {
+    "path": "skills/kiln-implement/code-simplification.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/code-simplification/SKILL.md",
+    "kind": "edited",
+    "edits": [
+      "\"If tests pass → commit\" becomes \"continue to the next simplification\"; a red flag says change for commit (kiln commits once, at SHIP)"
+    ],
+    "upstream_sha256": "f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d",
+    "kiln_sha256": "b5f604843766a6a39947a66abadbf0a217b09b1d1a7c186671a9bf330e75f5fa"
+  },
+  {
+    "path": "skills/kiln-implement/verification-before-completion.md",
+    "source": "superpowers",
+    "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+    "from": "skills/verification-before-completion/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+    "kiln_sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3"
+  },
+  {
+    "path": "skills/kiln-debugging/dispatching-parallel-agents.md",
+    "source": "superpowers",
+    "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+    "from": "skills/dispatching-parallel-agents/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c",
+    "kiln_sha256": "1968923066f3b707eb01d1992cdf4c42284c3855f70253b9cd5000ff45fca13c"
   }
 ]
