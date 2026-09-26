@@ -130,6 +130,17 @@ and the other six sat unread while their stages were improvised here.
 Invoke the skill, then follow it. Do not restate its contents here or paraphrase what it
 would have said — that is the same rule as never describing a command you could run.
 
+**Each stage also has practices** — files kiln copied from superpowers, agent-skills and
+BMAD (security, API design, migrations, simplification, the review lenses…). Code decides
+which apply to this work (D188); at the start of every stage, run
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" practices <id> --stage <investigate|plan|implement|review|ship>
+```
+
+and read every file it prints before doing the stage's work. What it did not print does not
+apply; what it printed is not optional.
+
 ## Process
 
 ### 1. Resolve the argument before interpreting it

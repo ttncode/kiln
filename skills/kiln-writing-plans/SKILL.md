@@ -73,6 +73,14 @@ naming and copy rules, platform requirements — one line each, with exact
 values copied verbatim from the spec. Every task's requirements implicitly
 include this section.]
 
+## Risk flags
+
+[One line per flag this change carries — `- security: <why>`, `- performance:
+<why>`, `- migration: <why>`, `- public-api: <why>`, `- ui: <why>` — or
+`- none`. Write this section first: `kiln practices <id> --stage plan` reads
+it to choose the practices this plan must follow, and refuses a plan still
+being written without it. A flag you are unsure of is a flag.]
+
 ## Review Focus
 
 [The five input classes or failure modes the spec implies but no task's
@@ -153,6 +161,15 @@ decide nothing ("TBD", "handle edge cases", "add appropriate validation",
 "write tests for the above", a type or function no task defines) are the
 opposite failure, and the self-review catches both.
 
+## Practices
+
+Once the header's Risk flags are written, run
+`node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" practices <id> --stage plan --predicted <the files the plan will touch>`
+and read every file it prints before you write the tasks. Each is a practice from
+superpowers, agent-skills or BMAD that applies to this change — API design, migrations,
+security, observability, frontend — chosen in code from the flags and the files, not by
+you. A practice it did not print does not apply; one it printed is not optional.
+
 ## Self-Review
 
 After writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.
@@ -201,6 +218,8 @@ invoked, and offering a choice here would be a second gate nobody asked for.
 
 Before handing back:
 
+- [ ] The Risk flags section names each flag with its reason, or says `- none`.
+- [ ] `kiln practices --stage plan` ran after the flags were written, and every file it printed was read.
 - [ ] Every spec requirement maps to a task, or the gap is stated.
 - [ ] Every step lets the implementer write exactly one reasonable thing: no TBD, no "add appropriate error handling", no body the signature and its test already determine.
 - [ ] The plan is not a transcript of the program: its length is in proportion to the spec's.
