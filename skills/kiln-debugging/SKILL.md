@@ -1,6 +1,6 @@
 ---
 name: kiln-debugging
-description: Use when encountering any bug, test failure, or unexpected behavior, before proposing a fix. Find the root cause first; a symptom fix is a failure.
+description: Use when encountering any bug, test failure, or unexpected behavior, before proposing a fix.
 ---
 
 # Systematic Debugging

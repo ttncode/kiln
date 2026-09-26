@@ -1,6 +1,6 @@
 ---
 name: kiln-tdd
-description: Use when implementing any feature or bugfix, before writing implementation code. Write the test first, watch it fail, then write the minimal code that makes it pass.
+description: Use when implementing any feature or bugfix, before writing implementation code.
 ---
 
 # Test-Driven Development (TDD)

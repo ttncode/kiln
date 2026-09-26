@@ -1,6 +1,6 @@
 ---
 name: kiln-dna
-description: Use when the user asks to build, catch up or inspect the project's DNA — the evidence-linked business map of the codebase (/kiln dna init, /kiln dna update) — and whenever a batch has to go into .kiln/dna/store/. Drives the bootstrap and update playbooks through kiln dna's gated commands, fanning scans out to subagents.
+description: Use when the user asks to build, catch up or inspect the project's DNA — the evidence-linked business map of the codebase (/kiln dna init, /kiln dna update) — and whenever a batch has to go into .kiln/dna/store/.
 ---
 
 # kiln DNA

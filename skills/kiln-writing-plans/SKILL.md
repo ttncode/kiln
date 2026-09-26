@@ -1,6 +1,6 @@
 ---
 name: kiln-writing-plans
-description: Use when a spec or a brief describes a multi-step task and the plan gate has not been given yet, before touching code. Writes the plan the gate approves.
+description: Use when a spec or a brief describes a multi-step task and the plan gate has not been given yet, before touching code.
 ---
 
 # Writing Plans
