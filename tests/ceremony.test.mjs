@@ -1,4 +1,4 @@
-import { writeReview } from "./helpers/journey.mjs";
+import { monorepo, writeReview } from "./helpers/journey.mjs";
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { DEFAULTS } from "../lib/config.mjs";
 import { readState, writeState } from "../lib/state.mjs";
 import { cleanupFixtures, commitAll, initRepo, tempRoot, writeConfig, writeFile } from "./helpers/fixture.mjs";
+import { judge } from "./helpers/hook.mjs";
 
 after(cleanupFixtures);
 
@@ -183,7 +184,21 @@ test("D194: files already dirty when the work opened are not the earlier path's 
   writeFile(join(root, "spike-scratch.js"), "// probe\n");
   const menu = kiln(root, ["ratchet", "43", "bounded"]).stdout;
   assert.match(menu, /spike-scratch\.js/);
-  assert.doesNotMatch(menu, /\.gitignore/, "a file dirty before the work opened is not offered as the spike's to keep or set aside");
+  const listing = menu.split("\n1. Keep")[0];
+  assert.doesNotMatch(listing, /\.gitignore/, "a file dirty before the work opened is not offered as the spike's to keep or set aside");
+  assert.match(menu, /':\(exclude\)\.gitignore'/, "and the stash the menu prints leaves it where it is");
+});
+
+test("D204: the stash the ratchet menu prints is one the removal guard lets through", async () => {
+  const root = spikeProject();
+  writeState(root, { ...newWork({ id: "43", sessionId: "s", base: "aaa", path: "spike" }), gates: { probe: { decision: "approved" } } });
+  writeFile(join(root, "spike-scratch.js"), "// probe\n");
+  const menu = kiln(root, ["ratchet", "43", "bounded"]).stdout;
+  const printed = /2\. Set it aside yourself first, then continue: `([^`]+)`/.exec(menu)?.[1];
+  assert.ok(printed, menu);
+  const verdict = (command) => judge("pre-bash", { session_id: "s", cwd: root, tool_input: { command } });
+  assert.equal((await verdict(printed)).status, 0, printed);
+  assert.equal((await verdict("git stash -u")).status, 2, "the bare spelling takes .kiln/ with it");
 });
 
 test("D78: the ratchet leaves the working tree exactly as it found it", () => {
@@ -537,4 +552,13 @@ test("B58: a gate the user gave prints nothing about auto mode", () => {
   const run = kiln(root, ["gate", "42", "plan", "--artifact", ".kiln/work/42/plan.md", "--answer", "1. Approve this plan as written (recommended)"]);
   assert.equal(run.status, 0, run.stderr);
   assert.doesNotMatch(run.stderr, /on your behalf/);
+});
+
+test("D204: a superproject's stash does not recurse, so the menu names each changed submodule", () => {
+  const root = monorepo();
+  writeConfig(root, DEFAULTS);
+  writeState(root, { ...newWork({ id: "43", sessionId: "s", base: "aaa", path: "spike" }), gates: { probe: { decision: "approved" } } });
+  writeFile(join(root, "AdminPage", "src", "User.php"), "<?php // probe\n");
+  const menu = kiln(root, ["ratchet", "43", "bounded"]).stdout;
+  assert.match(menu, /then `git -C AdminPage stash push -u`/);
 });

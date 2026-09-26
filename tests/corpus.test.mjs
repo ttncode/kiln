@@ -177,9 +177,9 @@ const DESTROYING = [
   ["bash", "git -C {outside} clean -xfd", "deny", SANDBOX],
   ["bash", "git clean -f -d -x {outside}", "deny", SANDBOX],
   ["bash", "git clean --force -d -x {outside}", "deny", SANDBOX],
-  ["bash", "git clean -fdx", "allow"],
+  ["bash", "git clean -fdx src", "allow"],
   ["bash", "git clean -n -fdx {outside}", "allow"],
-  ["bash", "git clean -fd -e {outside}", "allow"],
+  ["bash", "git clean -fd -e {outside} src", "allow"],
   ["bash", "git clean -fd -e -n {outside}", "deny", SANDBOX],
   ["bash", "git clean -fd --exclude -n {outside}", "deny", SANDBOX],
   ["bash", "git clean -fd --exclude=-n {outside}", "deny", SANDBOX],
@@ -252,6 +252,23 @@ const AFTER_THE_GATE = [
 // ------------------------------------------------------------- D7 item 7
 
 const CONTROL_FILES = [
+  ["bash", "git clean -fd", "deny", CONTROL],
+  ["bash", "git clean -fdx", "deny", CONTROL],
+  ["bash", "git -C {root} clean --force -d", "deny", CONTROL],
+  ["bash", "cd {root} && git clean -f -d .kiln", "deny", CONTROL],
+  ["bash", "git clean -fd -e .kiln", "allow"],
+  ["bash", "git clean -n -fd", "allow"],
+  ["bash", "git stash -u", "deny", CONTROL],
+  ["bash", "git stash push --include-untracked", "deny", CONTROL],
+  ["bash", "git stash -a", "deny", CONTROL],
+  ["bash", "git stash push -um wip", "deny", CONTROL],
+  ["bash", "git stash save -u wip", "deny", CONTROL],
+  ["bash", "sudo git stash -u", "deny", CONTROL],
+  ["bash", "git stash push -u -- . ':(exclude).kiln'", "allow"],
+  ["bash", "git stash push -u -- src", "allow"],
+  ["bash", "git stash push -m -u", "allow"],
+  ["bash", "git stash", "allow"],
+  ["bash", "git stash pop", "allow"],
   ["edit", ".kiln/config.json", "deny", CONTROL],
   ["edit", ".kiln/work/{id}/state.json", "deny", CONTROL],
   ["edit", ".kiln/hooks/pre-push.mjs", "deny", CONTROL],
@@ -330,6 +347,8 @@ const CONTROL_FILES = [
 ];
 
 const NOTHING_OPEN = [
+  ["bash", "git clean -fd", "deny", CONTROL],
+  ["bash", "git stash -u", "deny", CONTROL],
   ["edit", ".kiln/config.json", "deny", CONTROL],
   ["bash", "rm .kiln/config.json", "deny", CONTROL],
   ["bash", "mv .kiln/config.json /tmp/c.json", "deny", CONTROL],
