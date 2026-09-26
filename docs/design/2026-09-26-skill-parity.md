@@ -1,9 +1,13 @@
 # Skill parity with superpowers, agent-skills and BMAD
 
-> **Status: plan, revised twice after adversarial reviews; not yet built.** Written 2026-09-26
-> after the owner asked why agent-skills lists four skills for REVIEW and kiln has one. Every
-> claim was read in the sources at the commits below. The last section lists what the two
-> reviews found and how each finding was answered.
+> **Status: Phase A built** — D185 to D193, pull requests #222 to #230. Measured: the new REVIEW
+> catches 80 of 80 planted defects, against 76 for the old one and 80 for the sources' readers
+> (`2026-09-26-review-baseline.md`). Four things were decided differently while building, each
+> in its decision entry: REVIEW runs thorough by default, as bmad-code-review does, instead of a
+> quick route for small diffs (D189); readers' severities are disregarded at triage rather than
+> edited out of the copies (D189); constraint-driven-development moved to Phase B with the bar
+> guard (D192); and the plan gate requires the Risk flags after the first end-to-end run showed
+> a plan written without them (D190). Phase B is not started.
 
 ## The owner's terms
 
