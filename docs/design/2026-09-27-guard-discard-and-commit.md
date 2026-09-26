@@ -1,6 +1,7 @@
 # Guarding uncommitted work, and the one commit at SHIP
 
-> **Status: design, revised twice after adversarial reviews.** Phase B, item 1 of the
+> **Status: built** as D203 (`kiln close`), D204 (clean and stash), D205 (the discard guard) and
+> D206 (the commit guard). Designed, then revised twice after adversarial reviews. Phase B, item 1 of the
 > skill-parity plan. The reviews' findings and the answers are the last section.
 
 ## The problem
