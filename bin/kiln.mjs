@@ -27,6 +27,7 @@ import { listWork } from "../lib/work.mjs";
 import { protectedBranchesFor } from "../lib/modules.mjs";
 import { DNA_USAGE, runDnaCommand } from "../lib/dna/cli.mjs";
 import { dnaBlastRadius } from "../lib/dna/blast.mjs";
+import { checkoutsUnder } from "../lib/guards/git-repo.mjs";
 import { DnaError, hasStore, readStore } from "../lib/dna/store.mjs";
 
 const USAGE = `kiln — one unit of work to a reviewed pull request
@@ -1269,6 +1270,21 @@ function runRatchet(argv) {
  * `git status` alone lists untracked files, which is what a spike usually leaves; `--stat`
  * says how much each tracked change is. `.kiln/` is kiln's own record, not the spike's work.
  */
+/**
+ * D204: a bare `git stash -u` takes `.kiln/` with it — the work record, and on a fresh init the
+ * config and hooks — so the menu prints the spelling the removal guard lets through, with the
+ * same excludes the listing above uses (D194). A superproject's stash does not recurse, so
+ * each changed submodule gets its own line.
+ */
+function stashSpelling(root, excluded) {
+  const own = `git stash push -u -- . ${excluded.map((spec) => `'${spec}'`).join(" ")}`;
+  const modules = checkoutsUnder(root)
+    .slice(1)
+    .filter((dir) => gitOutput(dir, ["status", "--porcelain"]))
+    .map((dir) => `git -C ${relative(root, dir)} stash push -u`);
+  return [own, ...modules].map((line) => `\`${line}\``).join(", then ");
+}
+
 function ratchetMenu(root, { id, before }) {
   const excluded = [":(exclude).kiln", ...[...before].map((path) => `:(exclude)${path}`)];
   const stat = gitOutput(root, ["diff", "--stat", "HEAD", "--", ".", ...excluded]) || "(no tracked file changed)";
@@ -1279,7 +1295,7 @@ function ratchetMenu(root, { id, before }) {
     ...untracked.map((path) => ` ${path} (untracked)`),
     "",
     "1. Keep it, and plan the work around it — anything kept surfaces at REVIEW as beyond prediction (recommended)",
-    "2. Set it aside yourself first (for example `git stash -u`), then continue",
+    `2. Set it aside yourself first, then continue: ${stashSpelling(root, excluded)}`,
     "3. Stop here",
     "",
     `The work is halted until the answer is recorded: kiln resume ${id} --answer "<their choice>"`,

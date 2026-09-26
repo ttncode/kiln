@@ -9,6 +9,7 @@ import { destructiveTargets, opensPullRequest, permissionTargets, removalTargets
 import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
+import { sweptPaths } from "../lib/guards/git-sweeps.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { interpreterMessage, interpreterReach, shellPrograms } from "../lib/guards/interpreter.mjs";
 import { holdsControl, isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
@@ -318,7 +319,8 @@ function removedEntry(path, cwd) {
 }
 
 function guardRemovedControlFiles(command, ctx) {
-  const removed = located(command, { cwd: ctx.cwd, extract: removalTargets }).map((at) => removedEntry(at.path, at.cwd));
+  const swept = located(command, { cwd: ctx.cwd, extract: (part) => [part] }).flatMap((at) => sweptPaths(at.path, at.cwd));
+  const removed = [...located(command, { cwd: ctx.cwd, extract: removalTargets }).map((at) => removedEntry(at.path, at.cwd)), ...swept];
   const locked = located(command, { cwd: ctx.cwd, extract: permissionTargets }).map((at) => resolveEntry(at.path, at.cwd));
   const hit = removed.find((target) => isControlled(ctx, target) || holdsControl(ctx.root, target)) ?? locked.find((target) => lockedAway(ctx, target));
   return hit ? block(sandboxMessage(ctx.root, { target: hit, activeId: ctx.state?.id, reason: "this file is part of what enforces the run; deleting one is not an edit you get to make" })) : ALLOW;
