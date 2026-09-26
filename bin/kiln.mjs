@@ -14,7 +14,7 @@ import { activeWorks, claimConflicts } from "../lib/guards/context.mjs";
 import { effectiveSteps, loadStack } from "../lib/stack.mjs";
 import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
 import { GATE_KEYS, artifactPath, isStaleVerify, recordFullVerified, recordPractices, recordRules, recordVerify } from "../lib/state.mjs";
-import { PRACTICE_STAGES, loadPractices, selectPractices } from "../lib/practices.mjs";
+import { PRACTICE_STAGES, PracticesError, RISK_FLAGS, loadPractices, riskFlags, selectPractices } from "../lib/practices.mjs";
 import { gatherFacts } from "../lib/practices-facts.mjs";
 import { writeReviewInputs } from "../lib/review-inputs.mjs";
 import { shipVerdict } from "../lib/guards/gate.mjs";
@@ -454,7 +454,7 @@ function gateArtifact(root, { id, key, rest }) {
 function gateOrRefuse(root, { id, key, decision, answer, rest }) {
   const artifact = gateArtifact(root, { id, key, rest });
   if (artifact.refusal) return process.stderr.write(`kiln refused the ${key} gate: ${artifact.refusal}\n`) && 2;
-  const unread = unreadRules(root, { id, key }) ?? unlistedReaders(root, { id, key, artifact: artifact.path });
+  const unread = flaglessPlan({ key, artifact: artifact.path }) ?? unreadRules(root, { id, key }) ?? unlistedReaders(root, { id, key, artifact: artifact.path });
   if (unread) return process.stderr.write(`${unread}\n`) && 2;
 
   const claimed = claimedPaths(rest);
@@ -516,6 +516,22 @@ function unlistedReaders(root, { id, key, artifact }) {
   const missing = record.ids.filter((name) => readers.has(name) && !listed.has(name));
   if (missing.length === 0) return null;
   return `kiln refused the review gate: review.md's lenses: line does not account for ${missing.join(", ")}.\nEvery reader \`kiln practices\` named is there, marked reported or failed.`;
+}
+
+/**
+ * D190: the plan gate approves a plan that says its Risk flags. `kiln practices` chooses a
+ * stage's practices from them, and a first real run wrote its plan in another template, left
+ * the section out, and was approved with every flagged practice decided by nothing.
+ */
+function flaglessPlan({ key, artifact }) {
+  if (key !== "plan") return null;
+  try {
+    if (riskFlags(readFileSync(artifact, "utf8")) !== null) return null;
+    return `kiln refused the plan gate: plan.md has no "## Risk flags" section.\nAdd it — one "- <flag>: <why>" line per flag (${RISK_FLAGS.join(", ")}), or "- none" — show the plan again, then record the gate.`;
+  } catch (error) {
+    if (!(error instanceof PracticesError)) throw error;
+    return `kiln refused the plan gate: ${error.message}`;
+  }
 }
 
 function refuseAuto(key, refusal) {

@@ -38,7 +38,7 @@ function project({ open = true, approved = false } = {}) {
     ok(root, ["open", "other", "--session", "another-session"]);
   }
   if (approved) {
-    writeFile(join(root, ".kiln", "work", ID, "plan.md"), "# plan\n");
+    writeFile(join(root, ".kiln", "work", ID, "plan.md"), "# plan\n\n## Risk flags\n- none\n");
     ok(root, ["gate", ID, "plan", "--artifact", `.kiln/work/${ID}/plan.md`, "--answer", "Approve this plan as written", "--predicted", "src/app.js"]);
   }
   return { root, outside };

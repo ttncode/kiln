@@ -49,7 +49,7 @@ that norms say you ask about first (a merge, a push to a shared branch, a
 publish); and a plan so broken that every path forward is a guess. For
 those, stop and ask.
 
-Files `kiln practices` may name from here: [browser-testing-with-devtools.md](browser-testing-with-devtools.md).
+Files `kiln practices` may name from here — agent-skills' own: [incremental-implementation.md](incremental-implementation.md) (always: thin slices, one thing at a time, safe defaults, rollback-friendly steps) and [browser-testing-with-devtools.md](browser-testing-with-devtools.md).
 
 ## When to Use
 
@@ -240,6 +240,15 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" scope <id>
 and read the `Scope —` line. Divergence is reported, not blocked — discovery during
 implementation is legitimate. A diff of **zero files** halts, and its usual cause is a
 commit on another branch.
+
+**The Matrix Test Audit** (BMAD). If the plan has an I/O & Edge-Case Matrix, verify every
+matrix row is covered by at least one test that verifies its expected behavior, and that
+each covering test ran and passed in the verification output. A covering test that exists
+but did not run — unregistered, filtered out, skipped, or disabled — counts as missing. If a
+test disagrees with the matrix, never edit the expectation to match the code: fix the code,
+or if the matrix row itself is ambiguous, halt and ask your human partner
+(`kiln halt <id> --kind blocking_unknown --reason "<the row>"`). Fix any other audit
+failure before handing over.
 
 Collect every `Ruling:` you made into your handover, in the order you made them, each
 with what it costs if wrong. Your handover is the only place decisions you took on your

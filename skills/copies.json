@@ -228,5 +228,88 @@
     "kind": "verbatim",
     "upstream_sha256": "af610cf4892db7eab2e91c899e33feba90e1000bac4528b2f8dde930816ac125",
     "kiln_sha256": "af610cf4892db7eab2e91c899e33feba90e1000bac4528b2f8dde930816ac125"
+  },
+  {
+    "path": "skills/kiln-writing-plans/planning-and-task-breakdown.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/planning-and-task-breakdown/SKILL.md",
+    "kind": "edited",
+    "edits": [
+      "tasks/plan.md and tasks/todo.md become .kiln/work/<id>/plan.md; Output Files rewritten to that one file; the task-list-target and tracker paragraphs removed (D13)",
+      "\"Review with human before proceeding\" removed from checkpoints; the verification item says the plan gate is where the human approves",
+      "the rationalization and red flags about overwriting tasks/ files removed with the files",
+      "its Plan Document Template is replaced by a pointer to kiln-writing-plans' template: a first real run wrote its plan in this one and left the Risk flags out (D190)"
+    ],
+    "upstream_sha256": "ed0f90cc5951ddd4bcab7f871f64efec93a49af9279ef93bc470da77ad8da3f7",
+    "kiln_sha256": "252d8c28ec88268730ed7c2dbbbc404bd4b5c8dc26fc539c27d08c24be631ca3"
+  },
+  {
+    "path": "skills/kiln-writing-plans/api-and-interface-design.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/api-and-interface-design/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "5dafd0c44a3aabf11cae5bcb34f6fcc24dfa5c01ba6e0d3176bce997f4d68bc8",
+    "kiln_sha256": "5dafd0c44a3aabf11cae5bcb34f6fcc24dfa5c01ba6e0d3176bce997f4d68bc8"
+  },
+  {
+    "path": "skills/kiln-writing-plans/deprecation-and-migration.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/deprecation-and-migration/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "6a624f942e09c69863a4219b9bd5d56975026b67b0c70bc83385ffd2120b6142",
+    "kiln_sha256": "6a624f942e09c69863a4219b9bd5d56975026b67b0c70bc83385ffd2120b6142"
+  },
+  {
+    "path": "skills/kiln-writing-plans/documentation-and-adrs.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/documentation-and-adrs/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "87ae44a0c7bb3eefc2131a9d11caabcc14e4d8dcb27d66a3a675551ee2ce1671",
+    "kiln_sha256": "87ae44a0c7bb3eefc2131a9d11caabcc14e4d8dcb27d66a3a675551ee2ce1671"
+  },
+  {
+    "path": "skills/kiln-writing-plans/frontend-ui-engineering.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/frontend-ui-engineering/SKILL.md",
+    "kind": "verbatim",
+    "upstream_sha256": "549044e9bd8d7fe993ce8e5c0d2b0f5465650676dc15805329973f936179eb1e",
+    "kiln_sha256": "549044e9bd8d7fe993ce8e5c0d2b0f5465650676dc15805329973f936179eb1e"
+  },
+  {
+    "path": "skills/kiln-writing-plans/accessibility-checklist.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "references/accessibility-checklist.md",
+    "kind": "verbatim",
+    "upstream_sha256": "61c759d94d52296231f5f310b92b401f56c44e4430dc3cc95ebac5d7b1d5ffac",
+    "kiln_sha256": "61c759d94d52296231f5f310b92b401f56c44e4430dc3cc95ebac5d7b1d5ffac"
+  },
+  {
+    "path": "skills/kiln-writing-plans/observability-checklist.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "references/observability-checklist.md",
+    "kind": "verbatim",
+    "upstream_sha256": "25fcd0e854596a5ab6f11b002050d245bf78f5ae0fcbd1df699b89451ae0e1e8",
+    "kiln_sha256": "25fcd0e854596a5ab6f11b002050d245bf78f5ae0fcbd1df699b89451ae0e1e8"
+  },
+  {
+    "path": "skills/kiln-implement/incremental-implementation.md",
+    "source": "agent-skills",
+    "commit": "2686b620fc1fed2e8f60c704839c766b8594c6b6",
+    "from": "skills/incremental-implementation/SKILL.md",
+    "kind": "edited",
+    "edits": [
+      "each slice ends recorded green by kiln verify --task instead of committed (diagram, step 4, Rule 1, Rule 5, checklist, a rationalization, a red flag, verification)",
+      "\"Want me to create tasks for these?\" becomes a ledgered follow-up",
+      "\"No uncommitted changes remain\" removed: kiln commits once, at SHIP"
+    ],
+    "upstream_sha256": "df66536610071727feae1ca95f3c391c248ad828041750ccd3699cce763aa00b",
+    "kiln_sha256": "cb80dce6b154391fb5b261ba3fb5de981ef6656dc371fc26ac2dec8b8513c6bb"
   }
 ]

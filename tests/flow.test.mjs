@@ -31,7 +31,7 @@ test("the gate hashes the document its key names, whether or not the caller name
   assert.equal(missing.status, 2);
   assert.match(missing.stderr, /plan\.md, which does not exist yet/);
 
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   const elsewhere = kiln(root, ["gate", "w1", "plan", "--artifact", "README.md", "--answer", APPROVE]);
   assert.equal(elsewhere.status, 2, "a record hashed from another file would bind to the wrong document");
 
@@ -54,7 +54,7 @@ test("a pull request is recorded only when the ship-authorising gate allows one"
   assert.equal(spike.status, 2);
   assert.match(spike.stderr, /does not ship/);
 
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   ok(root, ["gate", "w1", "plan", "--answer", APPROVE, "--predicted", "src/app.js"]);
   assert.equal(kiln(root, ["ship", "w1", "--opened", "https://example.invalid/pr/1"]).status, 2, "a plan is not a review");
   reviewed(root, "w1");
@@ -178,7 +178,7 @@ test("on the full path too, the review gate closes source and a failed VERIFY re
   const root = nodeProject({ name: "full-reopen", cmd: { test: "exit 1" } });
   ok(root, ["open", "w1", "--path", "full", "--session", SESSION]);
   for (const key of ["spec", "plan"]) {
-    writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
+    writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), key === "plan" ? "# plan\n\n## Risk flags\n- none\n" : `# ${key}\n`);
     ok(root, ["gate", "w1", key, "--answer", APPROVE, ...(key === "plan" ? ["--predicted", "src/app.js"] : [])]);
   }
   reviewed(root, "w1");
