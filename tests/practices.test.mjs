@@ -6,8 +6,8 @@ import { evaluateTrigger, loadPractices, riskFlags, selectPractices, PRACTICE_ST
 import { gatherFacts } from "../lib/practices-facts.mjs";
 import { loadConfig } from "../lib/config.mjs";
 import { readState } from "../lib/state.mjs";
-import { cleanupFixtures, writeFile } from "./helpers/fixture.mjs";
-import { kiln, nodeProject, ok } from "./helpers/journey.mjs";
+import { cleanupFixtures, git, writeFile } from "./helpers/fixture.mjs";
+import { kiln, monorepo, nodeProject, ok } from "./helpers/journey.mjs";
 
 after(cleanupFixtures);
 
@@ -159,4 +159,20 @@ test("D190: the plan gate refuses a plan that does not say its Risk flags", () =
   assert.match(kiln(root, ["gate", "w1", "plan", "--answer", "yes, approved"]).stderr, /name scurity/);
   writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Risk flags\n- security: takes a query from the user\n");
   assert.equal(kiln(root, ["gate", "w1", "plan", "--answer", "yes, approved", "--predicted", "src/app.js"]).status, 0);
+});
+
+test("D199: the readers' diff holds what changed inside a submodule, and nothing that was dirty before the work opened", () => {
+  const root = monorepo();
+  ok(root, ["init"]);
+  writeFile(join(root, "notes.txt"), "a transcript left in the tree before the work\n");
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, "AdminPage", "src", "User.php"), "<?php\n// committed inside the submodule\n");
+  git(join(root, "AdminPage"), ["commit", "-q", "-am", "work"]);
+  writeFile(join(root, "AdminPage", "src", "Invoice.php"), "<?php\n// new, untracked\n");
+  ok(root, ["practices", "w1", "--stage", "review"]);
+  const diff = readFileSync(join(root, ".kiln", "tmp", "w1", "review", "diff.patch"), "utf8");
+  assert.match(diff, /AdminPage\/src\/User\.php[\s\S]*\+\/\/ committed inside the submodule/, "a commit made inside the submodule is part of the change");
+  assert.match(diff, /AdminPage\/src\/Invoice\.php[\s\S]*\+\/\/ new, untracked/, "so is a file added inside it");
+  assert.doesNotMatch(diff, /Subproject commit/, "the gitlink is not the change; what it points at is");
+  assert.doesNotMatch(diff, /notes\.txt/, "dirty before the work opened, as kiln scope sets aside");
 });
