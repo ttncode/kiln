@@ -7,9 +7,7 @@ description: Use when a spec or a brief describes a multi-step task and the plan
 
 ## Overview
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. No commits: SHIP commits the reviewed change once, by named paths.
-
-Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+Write implementation plans for an engineer who has not seen this codebase or this spec. Assume they write idiomatic code in the project's language once they know the exact interface and the exact test, and that they will make a reasonable choice wherever the plan leaves one open. What they cannot know is what you decided: which files, which names and signatures, which values from the spec, which tests prove each task. Document those. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. No commits: SHIP commits the reviewed change once, by named paths.
 
 **Announce at start:** "I'm using the kiln-writing-plans skill to create the implementation plan."
 
@@ -40,9 +38,9 @@ deliverable needs them; split only where a reviewer could meaningfully
 reject one task while approving its neighbor. Each task ends with an
 independently testable deliverable.
 
-## Bite-Sized Task Granularity
+## Step Granularity
 
-**Each step is one action (2-5 minutes):**
+**Each step is one action with a checkable result:**
 - "Write the failing test" - step
 - "Run it to make sure it fails" - step
 - "Implement the minimal code to make the test pass" - step
@@ -119,12 +117,11 @@ def test_specific_behavior():
 Run: `pytest tests/path/test.py::test_name -v`
 Expected: FAIL with "function not defined"
 
-- [ ] **Step 3: Write minimal implementation**
+- [ ] **Step 3: Implement `function(input: InputType) -> ResultType` in `exact/path/to/file.py`**
 
-```python
-def function(input):
-    return expected
-```
+One line on the approach when the signature and the test leave a choice
+(which library call, which data structure); a code block only for an
+algorithm they do not determine.
 
 - [ ] **Step 4: Run test to verify it passes**
 
@@ -133,15 +130,28 @@ Expected: PASS
 
 ````
 
-## No Placeholders
+## What a Step Contains
 
-Every step must contain the actual content an engineer needs. These are **plan failures** — never write them:
-- "TBD", "TODO", "implement later", "fill in details"
-- "Add appropriate error handling" / "add validation" / "handle edge cases"
-- "Write tests for the above" (without actual test code)
-- "Similar to Task N" (repeat the code — the engineer may be reading tasks out of order)
-- Steps that describe what to do without showing how (code blocks required for code steps)
-- References to types, functions, or methods not defined in any task
+A step is done when the implementer can write exactly one reasonable thing
+from it. That is the whole requirement: unambiguous, not complete. Each kind
+of step carries what makes it unambiguous and nothing more:
+
+- **A test step:** the test's name and its assertions, as code, with the
+  spec's exact values in them.
+- **A code step:** the exact signature (name, parameters, return type), the
+  file it lives in, and the specific values the spec pins. The implementer
+  writes the body. A body appears only for an algorithm the signature and
+  tests do not determine, or for exact copy the spec fixes.
+- **A verification step:** the command to run and the output that means it
+  passed.
+- **A reference to another task:** that task's Interfaces block says what
+  to use; the plan does not repeat that task's code.
+
+A plan is the set of decisions the implementer cannot make alone. A plan
+longer than the code it describes has written the code instead. Lines that
+decide nothing ("TBD", "handle edge cases", "add appropriate validation",
+"write tests for the above", a type or function no task defines) are the
+opposite failure, and the self-review catches both.
 
 ## Self-Review
 
@@ -149,11 +159,13 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 
 **1. Spec coverage:** Skim each section/requirement in the spec. Can you point to a task that implements it? List any gaps.
 
-**2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
+**2. Step scan:** Every step must let the implementer write exactly one reasonable thing, and no step may carry more than that: a line that decides nothing is a gap, a function body the signature and tests already determine is a transcript. Fix both.
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
 
 **4. Review Focus:** For each input class or failure mode the spec implies, is there a task whose tests exercise it? The five uncovered ones most likely to bite a person go in the Review Focus section, and each line there gets its test added to the owning task. An empty section means you checked and found none, not that you skipped the check.
+
+**5. Proportion:** Compare the plan's length to the spec's. A plan several times longer than the spec it implements is a transcript of the program, not a plan. If code blocks are most of the document, replace bodies with signatures, test names and assertions, and check that each step is still unambiguous.
 
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
@@ -173,7 +185,8 @@ invoked, and offering a choice here would be a second gate nobody asked for.
 | "I'll fill in the details during implementation" | A step without its exact values is a decision deferred to whoever is most tired. |
 | "Review Focus is empty because the spec was thorough" | Empty means you checked and found none. Write that, or write the five. |
 | "I'll tidy the plan after approval" | The approval is bound to the file's hash. Editing it afterwards blocks the next source write. |
-| "Two tasks are similar, I'll write 'same as Task 3'" | The implementer may read them out of order. Repeat the code. |
+| "Two tasks are similar, I'll repeat Task 3's code" | The later task's Interfaces block names what it uses from Task 3. A repeated body is a transcript, and it drifts from the one it copied. |
+| "Writing the whole body is clearer than a signature" | A body the signature and the test determine is the implementation written twice. Upstream measured the leaner plan at a quarter of the time and a third of the tokens, with no loss on planted defects. |
 
 ## Red Flags
 
@@ -181,14 +194,16 @@ invoked, and offering a choice here would be a second gate nobody asked for.
 - The plan names a type, function or file that no task defines.
 - A task's Interfaces block consumes something no earlier task produces.
 - You are about to save the plan anywhere but `.kiln/work/<id>/plan.md`.
-- You are describing what to do without showing how.
+- A code step carries a body the signature and its test already determine.
+- The plan is several times longer than the spec it implements.
 
 ## Verification
 
 Before handing back:
 
 - [ ] Every spec requirement maps to a task, or the gap is stated.
-- [ ] No placeholders: no TBD, no "add appropriate error handling", no "similar to Task N".
+- [ ] Every step lets the implementer write exactly one reasonable thing: no TBD, no "add appropriate error handling", no body the signature and its test already determine.
+- [ ] The plan is not a transcript of the program: its length is in proportion to the spec's.
 - [ ] Types and signatures agree across tasks.
 - [ ] Review Focus lists up to five spec-implied inputs no task exercises, each pinned by a test in the task that owns the code — or says it found none.
 - [ ] The plan is at `.kiln/work/<id>/plan.md` and its absolute path was printed.

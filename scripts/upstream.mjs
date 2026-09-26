@@ -10,7 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { SOURCES, copyBody, sha256 } from "../lib/copies.mjs";
+import { SOURCES, copyBody, isPage, sha256 } from "../lib/copies.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const MANIFEST = join(ROOT, "skills", "copies.json");
@@ -29,7 +29,8 @@ function upstreamAt(oss, { entry, commit }) {
 
 function recorded(oss, entry) {
   const upstream = sha256(upstreamAt(oss, { entry, commit: entry.commit }));
-  const kiln = sha256(copyBody(readFileSync(join(ROOT, entry.path), "utf8")));
+  const text = readFileSync(join(ROOT, entry.path), "utf8");
+  const kiln = sha256(isPage(entry.path) ? copyBody(text) : text);
   if (entry.kind === "verbatim" && kiln !== upstream) throw new Error(`${entry.path} is recorded as verbatim but its body differs from ${entry.source}:${entry.from}`);
   return { ...entry, upstream_sha256: upstream, kiln_sha256: kiln };
 }

@@ -91,12 +91,18 @@ Forked files, and what changed in each:
       reference file under kiln's own review skill rather than a skill of its
       own, so it costs no always-on description.
 
-      Not carried: root-cause-tracing.md, defense-in-depth.md,
-      condition-based-waiting.md and find-polluter.sh. The first was pointed at
-      from the middle of Phase 1, and the method it holds is restated inline
-      where that pointer was; the other three were reachable only from a
-      trailing list. Recorded here rather than dropped quietly, which is the
-      distinction that matters.
+      root-cause-tracing.md, defense-in-depth.md, condition-based-waiting.md
+      (with its example) and find-polluter.sh were not carried at the fork, and
+      this file said the first one's method was "restated inline". It was not:
+      only the four-line quick version stayed. All five were restored from
+      v6.4.2 under skills/kiln-debugging/ (D187) and are listed, with their
+      edits, in skills/copies.json.
+
+  skills/kiln-writing-plans/SKILL.md was re-taken from v6.4.2 (commit
+      8ca22dba9a94f28898bbce59f2537ff4d87c747d, upstream #2333) with the edits
+      recorded above carried over (D187). The v6.4.1 text asked for full code
+      bodies and "repeat the code" between similar tasks; v6.4.2 asks for
+      signatures, tests and values, and adds a proportion check.
 
 MIT grants copyright rights, not trademark rights. The Superpowers name and
 brand marks are not used, and the brand image fetch present upstream is removed
