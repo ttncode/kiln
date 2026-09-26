@@ -1205,6 +1205,28 @@ test("DNA checkpoint: two projects in one repository, and two worktrees, never r
   assert.match(kiln(join(other, "a"), ["dna"]).stdout, /No DNA store in this project yet/, "a fresh worktree is not offered the main worktree's store");
 });
 
+test("D207: a gc run in another worktree does not prune this worktree's checkpoint", () => {
+  const root = project();
+  const plan = applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const other = join(tempRoot("kiln-wt-gc-"), "wt");
+  git(root, ["worktree", "add", "-q", "-b", "side-gc", other]);
+  git(other, ["gc", "-q", "--prune=now"]);
+  const kept = spawnSync("git", ["cat-file", "-t", plan.checkpoint.commit], { cwd: root, encoding: "utf8" });
+  assert.equal(kept.stdout.trim(), "commit", "a refs/worktree/ ref is invisible to another worktree's gc, and its commit went");
+});
+
+test("D207: a checkpoint written under refs/worktree/ by an earlier release is still restored and extended", () => {
+  const root = project();
+  const first = applyBatch(root, { batch: seedBatch(), today: TODAY });
+  const [ref] = spawnSync("git", ["for-each-ref", "--format=%(refname)", "refs/kiln/"], { cwd: root, encoding: "utf8" }).stdout.trim().split("\n");
+  git(root, ["update-ref", "refs/worktree/kiln/dna-checkpoint/_root", first.checkpoint.commit]);
+  git(root, ["update-ref", "-d", ref]);
+  rmSync(join(root, ".kiln", "dna"), { recursive: true, force: true });
+  assert.equal(kiln(root, ["dna", "restore"]).status, 0);
+  const next = applyBatch(root, { batch: { upsert: { findings: [{ category: "CODE_ONLY", proposition: "Another rule", module: "src/slug.js" }] } }, today: TODAY });
+  assert.equal(spawnSync("git", ["rev-parse", `${next.checkpoint.commit}^`], { cwd: root, encoding: "utf8" }).stdout.trim(), first.checkpoint.commit);
+});
+
 test("DNA checkpoint: a rejecting reference-transaction hook and a failing clean filter neither run nor stop it, and a failure is said", () => {
   const root = project();
   const hooks = join(root, ".git", "hooks");
