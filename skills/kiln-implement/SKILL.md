@@ -49,7 +49,14 @@ that norms say you ask about first (a merge, a push to a shared branch, a
 publish); and a plan so broken that every path forward is a guess. For
 those, stop and ask.
 
-Files `kiln practices` may name from here — agent-skills' own: [incremental-implementation.md](incremental-implementation.md) (always: thin slices, one thing at a time, safe defaults, rollback-friendly steps) and [browser-testing-with-devtools.md](browser-testing-with-devtools.md).
+Files `kiln practices` may name from here — agent-skills' own:
+[incremental-implementation.md](incremental-implementation.md) (always: thin slices, one thing
+at a time, safe defaults, rollback-friendly steps),
+[source-driven-development.md](source-driven-development.md),
+[doubt-driven-development.md](doubt-driven-development.md),
+[ci-cd-and-automation.md](ci-cd-and-automation.md) and
+[browser-testing-with-devtools.md](browser-testing-with-devtools.md) (it needs the Chrome
+DevTools MCP server; without one, say the browser check was not run).
 
 ## When to Use
 
@@ -107,9 +114,10 @@ a protected branch is blocked by a hook, not by your care.
 
 **Do not commit while implementing.** SHIP is the run's one commit point: it stages an
 explicit path list once the change has been reviewed and verified. A commit per task is
-upstream superpowers' habit, not kiln's — BMAD and agent-skills leave the tree uncommitted
-until the work is done, and so does kiln, because a spike's probe and a reviewed change
-both depend on nothing having been committed behind the gates.
+superpowers' and agent-skills' habit, not kiln's — BMAD commits once, at the end, and so does
+kiln, because a spike's probe and a reviewed change both depend on nothing having been
+committed behind the gates. Where a practice file says "commit", kiln's record is
+`kiln verify --task`.
 
 Conversation memory does not survive compaction. An inline executor that
 loses its place re-implements tasks it already finished — the same
@@ -139,6 +147,20 @@ rulings made without one are provisional.
 before Task 1. It governs every step of every task below; a plan whose
 steps already say "write the failing test first" does not exempt you
 from reading it.
+
+**Start from a clean baseline.** Before Task 1, run the project's suite once:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" verify <id> --phase full
+```
+
+superpowers runs the tests before any work "so later failures aren't ambiguous". If it is red
+before you have changed anything, that is not yours to fix silently: record it in the ledger
+and halt with `kiln halt <id> --kind blocking_unknown --reason "<which tests fail at the base>"`,
+so your human partner decides whether to proceed.
+
+Then run `node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" practices <id> --stage implement` and read
+every file it prints before Task 1.
 
 Before Task 1, scan the plan for conflicts between tasks. The plan's
 Interfaces blocks tell you where to look: for every task that consumes
@@ -240,6 +262,18 @@ node "${CLAUDE_PLUGIN_ROOT}/bin/kiln.mjs" scope <id>
 and read the `Scope —` line. Divergence is reported, not blocked — discovery during
 implementation is legitimate. A diff of **zero files** halts, and its usual cause is a
 commit on another branch.
+
+**Before handing over**, in this order — source closes after the review gate, so anything
+that could need an edit happens here:
+
+1. **Simplify** the diff this work made, following [code-simplification.md](code-simplification.md):
+   behaviour unchanged, tests green after each step.
+2. **Check every claim** you are about to make, following
+   [verification-before-completion.md](verification-before-completion.md): the plan's
+   requirements line by line, a regression test proved by undoing the fix (it must fail) and
+   restoring it, and no "should" or "probably".
+3. **The definition of done**, [definition-of-done.md](definition-of-done.md): every item met,
+   or the gap written in the handover.
 
 **The Matrix Test Audit** (BMAD). If the plan has an I/O & Edge-Case Matrix, verify every
 matrix row is covered by at least one test that verifies its expected behavior, and that

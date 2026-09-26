@@ -5,6 +5,8 @@ description: Use when implementing any feature or bugfix, before writing impleme
 
 # Test-Driven Development (TDD)
 
+For a bug fix, prove the regression test the way superpowers' verification-before-completion does: undo the fix by edit, run the test — it must fail — then restore the fix and see it pass.
+
 agent-skills' [test-driven-development.md](test-driven-development.md) adds test sizes, the test pyramid and the Prove-It pattern; where the two differ, the Iron Law here governs.
 
 ## Overview
