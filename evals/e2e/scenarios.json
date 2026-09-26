@@ -1,0 +1,54 @@
+[
+  {
+    "id": "bugfix-dashboard",
+    "ticket": "/kiln:kiln --auto The dashboard crashes whenever any project is on track (status GREEN). Fix it.",
+    "persona": "You are the agency developer who filed this bug. You want it fixed with a regression test and nothing else changed.",
+    "expect": {
+      "ships": true,
+      "tests_pass": true,
+      "grep": {
+        "src/status.js": "GREEN"
+      }
+    }
+  },
+  {
+    "id": "feature-user-search",
+    "ticket": "/kiln:kiln --auto Add GET /api/users/search?q= so signed-in staff can find users by an email fragment. Customers and signed-out callers must not be able to use it.",
+    "persona": "You are the agency's tech lead. Staff are users with role \"staff\". You care that customers can never list other users.",
+    "expect": {
+      "ships": true,
+      "tests_pass": true,
+      "flags": [
+        "security"
+      ],
+      "readers": [
+        "security-auditor"
+      ],
+      "grep": {
+        "src/server.js": "search"
+      }
+    }
+  },
+  {
+    "id": "spike-password-hashing",
+    "ticket": "/kiln:kiln Is the way we hash passwords safe? If not, what should we change, and how hard is it?",
+    "persona": "You are the agency's tech lead. You want an answer and a recommendation only. Do not agree to any code change in this session: when offered to implement, ratchet or continue into a change, decline and say you will open that as its own work later.",
+    "expect": {
+      "ships": false,
+      "path": "spike",
+      "no_source_change": true
+    }
+  },
+  {
+    "id": "feature-archive-orders",
+    "ticket": "/kiln:kiln --auto Customers should be able to archive an old order so it no longer appears in their order history on My Page. Archived orders must be kept, not deleted, and staff reports still count them.",
+    "persona": "You are the product owner. Archiving is per order, by the customer who owns it. Nothing is deleted.",
+    "expect": {
+      "ships": true,
+      "tests_pass": true,
+      "grep": {
+        "src/orders.js": "archiv"
+      }
+    }
+  }
+]
