@@ -232,7 +232,7 @@ hooks make sure a mistake doesn't reach you.
 
 | | |
 |---|---|
-| Tests | 656, plus one case per row of the guard corpus |
+| Tests | 657, plus one case per row of the guard corpus |
 | Decisions to a first PR | **5** — 3 questions `init` asks a clone, 2 gates on the `bounded` path. 7 on `full` |
 | Harness | Claude Code only |
 | Platform | Linux, WSL2, macOS |
@@ -240,7 +240,7 @@ hooks make sure a mistake doesn't reach you.
 | **Not done** | one validation run on a production repository |
 
 The design came before the code. The [architecture log](docs/design/2026-09-19-kiln-architecture.md)
-holds 189 decisions, each with its reason.
+holds 190 decisions, each with its reason.
 
 ---
 

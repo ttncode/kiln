@@ -169,7 +169,7 @@ test("D72: an overlapping claim is refused when the claim is registered", () => 
   const { root, base } = project({ "src/a.ts": "one\n" });
   writeState(root, { ...newWork({ id: "99", sessionId: "other", base }), predicted: [{ path: "src/a.ts" }] });
   writeState(root, newWork({ id: "42", sessionId: "mine", base }));
-  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
 
   const run = kiln(root, ["gate", "42", "plan", "--answer", "yes", "--predicted", "src/a.ts"]);
 
@@ -182,7 +182,7 @@ test("D72: disjoint claims are registered without complaint", () => {
   const { root, base } = project({ "src/a.ts": "one\n" });
   writeState(root, { ...newWork({ id: "99", sessionId: "other", base }), predicted: [{ path: "src/elsewhere.ts" }] });
   writeState(root, newWork({ id: "42", sessionId: "mine", base }));
-  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "42", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
 
   const run = kiln(root, ["gate", "42", "plan", "--answer", "yes", "--predicted", "src/a.ts"]);
 

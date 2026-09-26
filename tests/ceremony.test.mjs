@@ -306,7 +306,7 @@ test("--auto in the request rules this run's gates, and config is not touched", 
   assert.match(kiln(root, ["open", "w2", "--path", "bounded", "--auto"]).stdout, /auto mode is ON for bounded \(the --auto in your request\)/);
   assert.equal(readState(root, "w2").auto, true);
 
-  writeFile(join(root, ".kiln", "work", "w2", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w2", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   const ruled = kiln(root, ["gate", "w2", "plan", "--artifact", ".kiln/work/w2/plan.md", "--auto"]);
   assert.equal(ruled.status, 0, ruled.stderr);
   assert.equal(readState(root, "w2").gates.plan.by, "auto");

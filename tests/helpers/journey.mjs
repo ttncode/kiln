@@ -82,7 +82,7 @@ export function monorepo({ modules = [["AdminPage", "AdminPage", "v3-master"]] }
 /** Walks a work to the point where source edits are allowed, the way a run does. */
 export function throughPlanGate(root, id, { path = "bounded", predicted = "src/app.js", auto = false } = {}) {
   ok(root, ["open", id, "--path", path, "--session", SESSION, ...(auto ? ["--auto"] : [])]);
-  writeFile(join(root, ".kiln", "work", id, "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", id, "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   const answer = auto ? ["--auto"] : ["--answer", "Approve this plan as written"];
   return ok(root, ["gate", id, "plan", "--artifact", `.kiln/work/${id}/plan.md`, ...answer, "--predicted", predicted]);
 }

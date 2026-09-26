@@ -123,7 +123,7 @@ test("J2.4 opening a pull request before the review gate is blocked", async () =
 test("J3 the gate reads what the user said, not how they clicked", () => {
   const root = nodeProject({ name: "j3" });
   ok(root, ["open", "w1", "--session", SESSION]);
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   const answer = (text) => kiln(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", text]);
 
   assert.equal(answer("1").status, 2, "J3.3 a bare number is a click");
@@ -204,7 +204,7 @@ test("J5.4/J5.5/J5.6 --auto satisfies full's opt-in, stops at a halt, and is rep
   assert.match(report.stdout, /Your gate is now the PR/);
 
   ok(root, ["halt", "w1", "--reason", "a migration nobody reviewed"]);
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   const halted = kiln(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--auto"]);
   assert.equal(halted.status, 2, "J5.5");
   assert.match(halted.stderr, /halted/);
@@ -380,7 +380,7 @@ test("J9.1 an auto run on full reaches a pull request with no human gate, as des
 
   for (const key of ["spec", "plan", "review", "ship"]) {
     if (key === "review") writeReview(root, "w1");
-    else if (key !== "ship") writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), `# ${key}\n`);
+    else if (key !== "ship") writeFile(join(root, ".kiln", "work", "w1", `${key}.md`), key === "plan" ? "# plan\n\n## Risk flags\n- none\n" : `# ${key}\n`);
     assert.equal(ok(root, ["gate", "w1", key, "--auto"]).status, 0, key);
   }
   assert.equal(await bash(root, "gh pr create --fill"), ALLOW, "the design says the PR becomes the gate");
@@ -490,7 +490,7 @@ test("J9.8 every branch doctor calls protected is one the guard refuses", async 
 test("J9.9 an auto-ruled gate records words, not a click", () => {
   const root = nodeProject({ name: "j99" });
   ok(root, ["open", "w1", "--session", SESSION, "--auto"]);
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   ok(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--auto"]);
 
   const record = state(root, "w1").gates.plan;

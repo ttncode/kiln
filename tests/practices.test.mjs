@@ -69,6 +69,7 @@ test("D188: the facts at REVIEW are the diff's files, its changed lines counting
 test("D188: kiln practices refuses a plan still being written without its Risk flags, and records what it printed", () => {
   const root = nodeProject({ name: "practices-cli" });
   ok(root, ["open", "w1", "--session", "s"]);
+  assert.match(kiln(root, ["practices", "w1", "--stage", "plan", "--predicted", "src/app.js"]).stderr, /plan\.md does not exist yet/, "PLAN's practices come from the plan's flags, so the header is written first");
   writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Tasks\n");
   const refused = kiln(root, ["practices", "w1", "--stage", "plan", "--predicted", "src/app.js"]);
   assert.equal(refused.status, 1);
@@ -145,4 +146,17 @@ test("D189: the readers read one diff — untracked files in, kiln's own record 
   assert.doesNotMatch(diff, /\.kiln\//, "kiln's own record is not the change");
   assert.match(readFileSync(join(dir, "claims.md"), "utf8"), /## The plan/);
   assert.match(readFileSync(join(dir, "intent.md"), "utf8"), /Asked: make a two\.[\s\S]*\*\*Goal:\*\* a is two\./);
+});
+
+test("D190: the plan gate refuses a plan that does not say its Risk flags", () => {
+  const root = nodeProject({ name: "plan-flags" });
+  ok(root, ["open", "w1", "--session", "s"]);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Implementation Plan\n\n## Task List\n\n## Risks and Mitigations\n");
+  const refused = kiln(root, ["gate", "w1", "plan", "--answer", "yes, approved", "--predicted", "src/app.js"]);
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /plan\.md has no "## Risk flags" section/);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Risk flags\n- scurity: typo\n");
+  assert.match(kiln(root, ["gate", "w1", "plan", "--answer", "yes, approved"]).stderr, /name scurity/);
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# Plan\n\n## Risk flags\n- security: takes a query from the user\n");
+  assert.equal(kiln(root, ["gate", "w1", "plan", "--answer", "yes, approved", "--predicted", "src/app.js"]).status, 0);
 });

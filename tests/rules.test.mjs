@@ -170,7 +170,7 @@ test("E05: plan reads the files it is given; review reads what the diff actually
 
 test("E05: after the gate has claimed them, the plan stage needs no flag", () => {
   const root = opened(["src/** | js.md"], { "js.md": "No console.log." });
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   ok(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", "1. Approve this plan as written (recommended)", "--predicted", "src/app.js"]);
 
   assert.match(ok(root, ["rules", "w1", "--stage", "plan"]).stdout, /No console\.log\./,
@@ -506,7 +506,7 @@ test("a project that has routed no rule is not asked", () => {
 
 test("the plan gate is not asked — its call shapes a document the user is about to read", () => {
   const root = atReview(["src/** | js.md"], { "js.md": "No console.log." });
-  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n");
+  writeFile(join(root, ".kiln", "work", "w1", "plan.md"), "# plan\n\n## Risk flags\n- none\n");
   const run = kiln(root, ["gate", "w1", "plan", "--artifact", ".kiln/work/w1/plan.md", "--answer", "1. Approve this plan as written (recommended)"]);
   assert.equal(run.status, 0);
 });

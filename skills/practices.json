@@ -166,5 +166,110 @@
       "content:\\bfindAll\\s*\\(\\s*\\)|SELECT\\s+\\*\\s+FROM(?![^\\n]*\\b(?:LIMIT|WHERE)\\b)",
       "content:\\.sort\\s*\\([^\\n]*\\n?[^\\n]*\\bfor\\b|\\bfor\\b[^\\n]*\\n(?:[^\\n]*\\n){0,4}?[^\\n]*\\.sort\\s*\\("
     ]
+  },
+  {
+    "id": "planning-and-task-breakdown",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/planning-and-task-breakdown.md",
+    "when": [
+      "always"
+    ]
+  },
+  {
+    "id": "api-and-interface-design",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/api-and-interface-design.md",
+    "when": [
+      "flag:public-api",
+      "surface:API"
+    ]
+  },
+  {
+    "id": "deprecation-and-migration",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/deprecation-and-migration.md",
+    "when": [
+      "flag:migration",
+      "glob:**/migrations/**",
+      "glob:**/*.sql",
+      "surface:ENTITY"
+    ]
+  },
+  {
+    "id": "documentation-and-adrs",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/documentation-and-adrs.md",
+    "when": [
+      "path:full",
+      "flag:public-api"
+    ]
+  },
+  {
+    "id": "observability-and-instrumentation",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/observability-and-instrumentation.md",
+    "when": [
+      "surface:API",
+      "surface:BATCH"
+    ]
+  },
+  {
+    "id": "threat-model",
+    "stage": "plan",
+    "file": "skills/kiln-review/security-and-hardening.md",
+    "when": [
+      "flag:security",
+      "glob:**/*auth*",
+      "glob:**/*auth*/**",
+      "glob:**/*login*",
+      "glob:**/*session*",
+      "glob:**/*payment*",
+      "glob:**/*token*",
+      "glob:**/*upload*"
+    ]
+  },
+  {
+    "id": "performance-plan",
+    "stage": "plan",
+    "file": "skills/kiln-review/performance-optimization.md",
+    "when": [
+      "flag:performance"
+    ]
+  },
+  {
+    "id": "frontend-ui-engineering",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/frontend-ui-engineering.md",
+    "when": [
+      "flag:ui",
+      "surface:SCREEN",
+      "glob:**/*.tsx",
+      "glob:**/*.jsx",
+      "glob:**/*.vue",
+      "glob:**/*.svelte",
+      "glob:**/*.css",
+      "glob:**/*.scss",
+      "glob:**/views/**",
+      "glob:**/templates/**",
+      "glob:**/components/**"
+    ]
+  },
+  {
+    "id": "accessibility-checklist",
+    "stage": "plan",
+    "file": "skills/kiln-writing-plans/accessibility-checklist.md",
+    "when": [
+      "flag:ui",
+      "surface:SCREEN",
+      "glob:**/*.tsx",
+      "glob:**/*.jsx",
+      "glob:**/*.vue",
+      "glob:**/*.svelte",
+      "glob:**/*.css",
+      "glob:**/*.scss",
+      "glob:**/views/**",
+      "glob:**/templates/**",
+      "glob:**/components/**"
+    ]
   }
 ]

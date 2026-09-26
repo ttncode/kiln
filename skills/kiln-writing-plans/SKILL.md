@@ -81,6 +81,18 @@ include this section.]
 it to choose the practices this plan must follow, and refuses a plan still
 being written without it. A flag you are unsure of is a flag.]
 
+## I/O & Edge-Case Matrix
+
+[BMAD's matrix, on `bounded` and `full`: one row per input or state the change
+must handle — the happy path, then each error and boundary case — with the
+expected behaviour and how an error is handled. Every row gets a test in the
+task that owns the code, and kiln-implement's handover checks each ran and
+passed. Delete the section when the change has no meaningful inputs; do not
+write "N/A".]
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|---------------|----------------------------|----------------|
+
 ## Review Focus
 
 [The five input classes or failure modes the spec implies but no task's
@@ -105,6 +117,10 @@ owns the code, in that task's own step style.]
 - Create: `exact/path/to/file.py`
 - Modify: `exact/path/to/existing.py:123-145`
 - Test: `tests/exact/path/to/test.py`
+
+**Acceptance:** [≤ 3 bullets: what is true when this task is done]
+**Verification:** [the command, and the output that means it passed]
+**Depends on:** [earlier tasks, or none] · **Size:** [XS 1 file · S 1–2 · M 3–5 · L 5–8; XL is two tasks]
 
 **Interfaces:**
 - Consumes: [what this task uses from earlier tasks — exact signatures]
@@ -170,7 +186,16 @@ superpowers, agent-skills or BMAD that applies to this change — API design, mi
 security, observability, frontend — chosen in code from the flags and the files, not by
 you. A practice it did not print does not apply; one it printed is not optional.
 
-Files `kiln practices` may name from here: [observability-and-instrumentation.md](observability-and-instrumentation.md).
+Files `kiln practices` may name from here — agent-skills' own, kept beside this skill:
+[planning-and-task-breakdown.md](planning-and-task-breakdown.md) (always: vertical slices,
+dependency order, task sizing, checkpoints),
+[api-and-interface-design.md](api-and-interface-design.md),
+[deprecation-and-migration.md](deprecation-and-migration.md),
+[documentation-and-adrs.md](documentation-and-adrs.md),
+[observability-and-instrumentation.md](observability-and-instrumentation.md) with
+[observability-checklist.md](observability-checklist.md), and
+[frontend-ui-engineering.md](frontend-ui-engineering.md) with
+[accessibility-checklist.md](accessibility-checklist.md).
 
 ## Self-Review
 
@@ -223,6 +248,8 @@ Before handing back:
 - [ ] The Risk flags section names each flag with its reason, or says `- none`.
 - [ ] `kiln practices --stage plan` ran after the flags were written, and every file it printed was read.
 - [ ] Every spec requirement maps to a task, or the gap is stated.
+- [ ] Every task carries its acceptance, verification, dependencies and size; none is XL.
+- [ ] On `bounded` and `full`, every I/O & Edge-Case Matrix row is pinned by a test in the task that owns it — or the section is gone because the change has no inputs.
 - [ ] Every step lets the implementer write exactly one reasonable thing: no TBD, no "add appropriate error handling", no body the signature and its test already determine.
 - [ ] The plan is not a transcript of the program: its length is in proportion to the spec's.
 - [ ] Types and signatures agree across tasks.
