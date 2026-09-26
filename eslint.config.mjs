@@ -4,7 +4,7 @@ export default [
   // The visual companion is forked code (D26, D69). Restyling it would mean
   // rewriting 1,400 lines kiln did not author and does not maintain.
   // So are the DNA explorer and the harness its authors run it under (D84, D160).
-  { ignores: ["node_modules/**", "skills/kiln-brainstorming/scripts/**", "vendor/**", "tests/helpers/explorer-harness.mjs", "evals/review/fixtures/**", "evals/review/results/**"] },
+  { ignores: ["node_modules/**", "skills/kiln-brainstorming/scripts/**", "vendor/**", "tests/helpers/explorer-harness.mjs", "evals/review/fixtures/**", "evals/review/results/**", "evals/e2e/project/**", "evals/e2e/results/**"] },
   js.configs.recommended,
   {
     languageOptions: {

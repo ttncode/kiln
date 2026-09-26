@@ -3,3 +3,4 @@ node_modules/
 *.log
 .DS_Store
 evals/review/results/
+evals/e2e/results/
