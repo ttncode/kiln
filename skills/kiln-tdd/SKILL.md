@@ -5,6 +5,8 @@ description: Use when implementing any feature or bugfix, before writing impleme
 
 # Test-Driven Development (TDD)
 
+agent-skills' [test-driven-development.md](test-driven-development.md) adds test sizes, the test pyramid and the Prove-It pattern; where the two differ, the Iron Law here governs.
+
 ## Overview
 
 Write the test first. Watch it fail. Write minimal code to pass.

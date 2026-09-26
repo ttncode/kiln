@@ -170,6 +170,8 @@ superpowers, agent-skills or BMAD that applies to this change — API design, mi
 security, observability, frontend — chosen in code from the flags and the files, not by
 you. A practice it did not print does not apply; one it printed is not optional.
 
+Files `kiln practices` may name from here: [observability-and-instrumentation.md](observability-and-instrumentation.md).
+
 ## Self-Review
 
 After writing the complete plan, look at the spec with fresh eyes and check the plan against it. This is a checklist you run yourself — not a subagent dispatch.

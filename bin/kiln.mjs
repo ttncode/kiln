@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { existsSync, rmSync } from "node:fs";
 import { configPath, integrationBranch, loadConfig, writeConfig } from "../lib/config.mjs";
@@ -16,6 +16,7 @@ import { isGreen, planSteps, ranSteps, runPhase } from "../lib/steps.mjs";
 import { GATE_KEYS, artifactPath, isStaleVerify, recordFullVerified, recordPractices, recordRules, recordVerify } from "../lib/state.mjs";
 import { PRACTICE_STAGES, loadPractices, selectPractices } from "../lib/practices.mjs";
 import { gatherFacts } from "../lib/practices-facts.mjs";
+import { writeReviewInputs } from "../lib/review-inputs.mjs";
 import { shipVerdict } from "../lib/guards/gate.mjs";
 import { join, relative, resolve } from "node:path";
 import { DECISION, classifyAnswer, reAskFor } from "../lib/gate.mjs";
@@ -453,7 +454,7 @@ function gateArtifact(root, { id, key, rest }) {
 function gateOrRefuse(root, { id, key, decision, answer, rest }) {
   const artifact = gateArtifact(root, { id, key, rest });
   if (artifact.refusal) return process.stderr.write(`kiln refused the ${key} gate: ${artifact.refusal}\n`) && 2;
-  const unread = unreadRules(root, { id, key });
+  const unread = unreadRules(root, { id, key }) ?? unlistedReaders(root, { id, key, artifact: artifact.path });
   if (unread) return process.stderr.write(`${unread}\n`) && 2;
 
   const claimed = claimedPaths(rest);
@@ -488,6 +489,33 @@ function unreadRules(root, { id, key }) {
   return `kiln refused the review gate: nothing has matched this run's diff against the project's rules.
 Run \`kiln rules ${id} --stage review\` first, answer anything it prints, then record the gate.
 A rule reaching a file the plan never predicted is the case this catches, and it is the last moment to catch it.`;
+}
+
+/**
+ * `lenses: a reported, b failed, …` — each reader review.md accounts for, and how it ended. The
+ * paragraph, not the line: a real run wrapped it at eighty columns, as markdown is written.
+ */
+function lensesListed(text) {
+  const line = (/^lenses:\s*([\s\S]*?)(?:\n\s*\n|$(?![\s\S]))/im.exec(text)?.[1] ?? "").replace(/\s+/g, " ");
+  return new Set(line.split(",").map((entry) => entry.trim().split(/\s+/)).filter(([, how]) => how === "reported" || how === "failed").map(([name]) => name));
+}
+
+/**
+ * D189: the review gate asks whether the readers were asked for and accounted for, for D115's
+ * reason — prose did not make the rules run, and it will not make eight readers run either. It
+ * proves the list was made and every reader's end was written down; it cannot prove a report was
+ * read with care, and does not claim to.
+ */
+function unlistedReaders(root, { id, key, artifact }) {
+  if (key !== "review") return null;
+  const readers = new Set(loadPractices(PLUGIN_ROOT).filter((practice) => practice.stage === "review" && practice.reader).map((practice) => practice.id));
+  if (readers.size === 0) return null;
+  const record = (readState(root, id).practices ?? []).find((row) => row.stage === "review");
+  if (!record) return `kiln refused the review gate: nothing has asked which readers this change gets.\nRun \`kiln practices ${id} --stage review\`, launch every reader it names, then write review.md.`;
+  const listed = lensesListed(readFileSync(artifact, "utf8"));
+  const missing = record.ids.filter((name) => readers.has(name) && !listed.has(name));
+  if (missing.length === 0) return null;
+  return `kiln refused the review gate: review.md's lenses: line does not account for ${missing.join(", ")}.\nEvery reader \`kiln practices\` named is there, marked reported or failed.`;
 }
 
 function refuseAuto(key, refusal) {
@@ -959,6 +987,10 @@ function practicesText({ id, stage, selected }) {
   return [head, `Read each of these before you go on:`, ...rows].join("\n");
 }
 
+function readerInputsText(paths) {
+  return `\nThe readers' inputs (skills/kiln-review/readers.md says how to launch each reader):\n  diff    ${paths.diff}\n  claims  ${paths.claims}\n  intent  ${paths.intent}`;
+}
+
 function runPractices(argv) {
   const [id, ...rest] = argv;
   const stage = flag(rest, "--stage");
@@ -973,6 +1005,7 @@ function runPractices(argv) {
   const facts = gatherFacts(root, { config, state, stage, predicted: claimedPaths(rest) });
   const selected = selectPractices(loadPractices(PLUGIN_ROOT), { stage, facts });
   out(practicesText({ id: state.id, stage, selected }));
+  if (stage === "review" && selected.some((practice) => practice.reader)) out(readerInputsText(writeReviewInputs(root, state)));
   writeState(root, recordPractices(state, { stage, ids: selected.map((practice) => practice.id) }));
   return 0;
 }

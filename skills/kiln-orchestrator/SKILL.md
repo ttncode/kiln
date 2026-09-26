@@ -508,6 +508,8 @@ Say the two things kiln cannot do, in your own words, before the user goes to me
   half-merged. Gerrit says this about its own topics; kiln is not better placed to promise.
 - **The order is yours.** Nothing in the repositories says which depends on which.
 
+agent-skills' [shipping-and-launch.md](shipping-and-launch.md) is the pre-launch checklist and the rollback plan this stage writes into the pull request. kiln ends at the pull request: its deploy and rollout steps are the user's.
+
 ### When the user asks for a project rule
 
 They will say it in words — *"controllers must never contain SQL"*, *"every migration needs a

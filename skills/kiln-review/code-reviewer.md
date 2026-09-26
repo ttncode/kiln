@@ -65,6 +65,14 @@ Subagent (general-purpose):
     verdict counts for nothing. If the diff feels too large for one
     pass, review it in passes yourself and say so in your report.
 
+    ## How to Read It
+
+    Read `code-review-and-quality.md` in this skill's directory and review on its
+    five axes: correctness, readability, architecture, security, performance.
+    Read the agent instruction files (`AGENTS.md`, `CLAUDE.md`, or equivalents)
+    at the repository root and in the directories the diff touches; those are
+    the rules.
+
     ## What to Check
 
     **Plan alignment:**
