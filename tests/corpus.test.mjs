@@ -180,6 +180,9 @@ const DESTROYING = [
   ["bash", "git clean -fdx", "allow"],
   ["bash", "git clean -n -fdx {outside}", "allow"],
   ["bash", "git clean -fd -e {outside}", "allow"],
+  ["bash", "git clean -fd -e -n {outside}", "deny", SANDBOX],
+  ["bash", "git clean -fd --exclude -n {outside}", "deny", SANDBOX],
+  ["bash", "git clean -fd --exclude=-n {outside}", "deny", SANDBOX],
 ];
 
 const SANDBOXED = [
