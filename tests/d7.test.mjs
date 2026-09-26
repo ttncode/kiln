@@ -83,7 +83,7 @@ test("D7 item 1 — the real resolver answers from a real repository", () => {
 test("D7 item 2 — kiln never destroys data unasked", async () => {
   const project = kilnProject({ gates: { plan: "approved" } });
   assert.equal(await bash("rm -rf /tmp/not-my-repo", project), BLOCK);
-  assert.equal(await bash("git clean -xfd", project), ALLOW, "inside the repo is the user's own tree");
+  assert.equal(await bash("git clean -xfd", project), BLOCK, "D205: with a work open, what clean removes inside the repo is that work's new files");
   assert.equal(await bash("rm -rf build", project), ALLOW);
 });
 

@@ -6,10 +6,11 @@ import { gitOutput } from "../lib/init.mjs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { PathError, isInside, isSymlink, resolveEntry, resolveTarget } from "../lib/paths.mjs";
 import { destructiveTargets, opensPullRequest, permissionTargets, removalTargets, segmentsOf, stagesEverything, writeTargets } from "../lib/guards/bash-targets.mjs";
-import { GuardStateError, claimOwner, claimUnbound, displacedFrom, workForSession } from "../lib/guards/context.mjs";
+import { GuardStateError, claimOwner, claimUnbound, displacedFrom, drivingWorks, workForSession } from "../lib/guards/context.mjs";
 import { gateMessage, shipVerdict, sourceEditVerdict } from "../lib/guards/gate.mjs";
 import { branchesFor, cwdChain, dirOf } from "../lib/guards/git-repo.mjs";
 import { sweptPaths } from "../lib/guards/git-sweeps.mjs";
+import { discardIn } from "../lib/guards/discard.mjs";
 import { protectedBranchMessage, protectedBranchViolation } from "../lib/guards/protected-branch.mjs";
 import { interpreterMessage, interpreterReach, shellPrograms } from "../lib/guards/interpreter.mjs";
 import { holdsControl, isJudged, sandboxMessage, sandboxVerdict } from "../lib/guards/sandbox.mjs";
@@ -372,8 +373,30 @@ function guardGateBash(payload, ctx) {
     .find((verdict) => verdict === BLOCK) ?? ALLOW;
 }
 
+/**
+ * D205: while any work here is open, its change lives only in the working tree, so a verb
+ * that discards uncommitted work is refused — in every session, because a second session's
+ * `git checkout .` destroys it as surely. The remedy depends on whose work it is: the running
+ * work's own agent can edit a file back; anything else is the user's to discard, not the agent's.
+ */
+function discardRemedy(ctx, work) {
+  if (work.id === ctx.state?.id && work.status === "in_progress") {
+    return "If one of your changes is wrong, edit the file back — that edit is gated and recorded like any other.";
+  }
+  return "Discarding it is the user's decision, in their own terminal. kiln will not run it, and neither should you.";
+}
+
+function guardDiscard(payload, ctx) {
+  const work = ctx.state ?? drivingWorks(ctx.root)[0];
+  if (!work) return ALLOW;
+  const verb = discardIn(payload.tool_input?.command, { cwd: ctx.cwd, root: ctx.root });
+  if (!verb) return ALLOW;
+  return block(`kiln blocked \`${verb}\`: it throws away uncommitted work, and work ${work.id} (${work.status}) lives only in the working tree until SHIP commits it.
+${discardRemedy(ctx, work)}`);
+}
+
 const CHAINS = {
-  "pre-bash": [unreadableConfig, guardInterpreter, guardVerification, guardProtectedBranch, guardSandboxBash, guardGateBash],
+  "pre-bash": [unreadableConfig, guardInterpreter, guardVerification, guardProtectedBranch, guardSandboxBash, guardDiscard, guardGateBash],
   "pre-edit": [unreadableConfig, guardSandboxFile, guardGateFile],
   "post-edit": [],
 };
